@@ -1,0 +1,395 @@
+"use server";
+
+import { randomBytes, createHash } from "crypto";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { requirePermission } from "@/lib/auth/context";
+import {
+  createCompanyUserSchema,
+  inviteUserSchema,
+  updateInvitationStatusSchema,
+  updateUserRoleSchema,
+  updateUserStatusSchema,
+  updateUserTeamSchema,
+} from "@/lib/admin/schemas";
+import { hasSupabaseAdminConfig } from "@/lib/env";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+function getFormString(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
+function redirectWith(pathname: string, key: "notice" | "error", value: string): never {
+  redirect(`${pathname}?${key}=${encodeURIComponent(value)}`);
+}
+
+async function getRequestOrigin() {
+  const headerStore = await headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  const protocol = headerStore.get("x-forwarded-proto") ?? "http";
+
+  return process.env.NEXT_PUBLIC_SITE_URL ?? (host ? `${protocol}://${host}` : "http://localhost:3000");
+}
+
+async function assertRoleInCompany(roleId: string, companyId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("roles")
+    .select("id")
+    .eq("id", roleId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("Role does not belong to this company.");
+  }
+}
+
+async function assertTeamInCompany(teamId: string | null, companyId: string) {
+  if (!teamId) {
+    return;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("teams")
+    .select("id")
+    .eq("id", teamId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("Team does not belong to this company.");
+  }
+}
+
+async function assertUserInCompany(userId: string, companyId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("User does not belong to this company.");
+  }
+}
+
+export async function inviteUserAction(formData: FormData) {
+  const context = await requirePermission("users.invite", "full");
+  const parsed = inviteUserSchema.safeParse({
+    email: getFormString(formData, "email"),
+    roleId: getFormString(formData, "roleId"),
+    teamId: getFormString(formData, "teamId"),
+    message: getFormString(formData, "message"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/invitations", "error", parsed.error.issues[0]?.message ?? "Invalid invitation.");
+  }
+
+  if (!hasSupabaseAdminConfig()) {
+    redirectWith("/admin/invitations", "error", "Supabase service role is required to send invitations.");
+  }
+
+  try {
+    await assertRoleInCompany(parsed.data.roleId, context.companyId);
+    await assertTeamInCompany(parsed.data.teamId, context.companyId);
+  } catch {
+    redirectWith("/admin/invitations", "error", "Choose a valid company role and team.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: existingUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("company_id", context.companyId)
+    .eq("email", parsed.data.email)
+    .maybeSingle();
+
+  if (existingUser) {
+    redirectWith("/admin/invitations", "error", "That email already belongs to a company user.");
+  }
+
+  const { data: pendingInvitation } = await supabase
+    .from("user_invitations")
+    .select("id")
+    .eq("company_id", context.companyId)
+    .eq("email", parsed.data.email)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (pendingInvitation) {
+    redirectWith("/admin/invitations", "error", "A pending invitation already exists for that email.");
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+  const { data: invitation, error: invitationError } = await supabase
+    .from("user_invitations")
+    .insert({
+      company_id: context.companyId,
+      email: parsed.data.email,
+      role_id: parsed.data.roleId,
+      team_id: parsed.data.teamId,
+      token_hash: tokenHash,
+      status: "pending",
+      message: parsed.data.message,
+      invited_by: context.userId,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
+
+  if (invitationError || !invitation) {
+    redirectWith("/admin/invitations", "error", "We could not create the invitation.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const origin = await getRequestOrigin();
+  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
+    redirectTo: `${origin}/auth/callback?next=/sign-in`,
+    data: {
+      contento_invitation_id: invitation.id,
+      contento_company_id: context.companyId,
+    },
+  });
+
+  if (inviteError) {
+    await supabase.from("user_invitations").update({ status: "cancelled" }).eq("id", invitation.id);
+    redirectWith("/admin/invitations", "error", "Invitation email could not be sent.");
+  }
+
+  redirectWith("/admin/invitations", "notice", "invited");
+}
+
+export async function createCompanyUserAction(formData: FormData) {
+  const context = await requirePermission("users.invite", "full");
+  const parsed = createCompanyUserSchema.safeParse({
+    email: getFormString(formData, "email"),
+    firstName: getFormString(formData, "firstName"),
+    lastName: getFormString(formData, "lastName"),
+    roleId: getFormString(formData, "roleId"),
+    teamId: getFormString(formData, "teamId"),
+    status: getFormString(formData, "status") || "active",
+    temporaryPassword: getFormString(formData, "temporaryPassword"),
+    confirmTemporaryPassword: getFormString(formData, "confirmTemporaryPassword"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/users", "error", parsed.error.issues[0]?.message ?? "Invalid user.");
+  }
+
+  if (!hasSupabaseAdminConfig()) {
+    redirectWith("/admin/users", "error", "Supabase service role is required to create users.");
+  }
+
+  try {
+    await assertRoleInCompany(parsed.data.roleId, context.companyId);
+    await assertTeamInCompany(parsed.data.teamId, context.companyId);
+  } catch {
+    redirectWith("/admin/users", "error", "Choose a valid company role and team.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const admin = createSupabaseAdminClient();
+  const { data: existingCompanyUser } = await admin
+    .from("users")
+    .select("id")
+    .eq("email", parsed.data.email)
+    .maybeSingle();
+
+  if (existingCompanyUser) {
+    redirectWith("/admin/users", "error", "That email already belongs to a Contento user.");
+  }
+
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.temporaryPassword,
+    email_confirm: true,
+    user_metadata: {
+      first_name: parsed.data.firstName,
+      last_name: parsed.data.lastName,
+      contento_company_id: context.companyId,
+    },
+  });
+
+  if (authError || !authUser.user) {
+    redirectWith("/admin/users", "error", "Supabase Auth could not create this user.");
+  }
+
+  const createdAuthUserId = authUser.user.id;
+  const { error: profileError } = await supabase.from("users").insert({
+    id: createdAuthUserId,
+    company_id: context.companyId,
+    email: parsed.data.email,
+    first_name: parsed.data.firstName,
+    last_name: parsed.data.lastName,
+    role_id: parsed.data.roleId,
+    status: parsed.data.status,
+    must_change_password: true,
+  });
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(createdAuthUserId);
+    redirectWith("/admin/users", "error", "Contento profile could not be created.");
+  }
+
+  if (parsed.data.teamId) {
+    const { error: teamError } = await supabase
+      .from("team_members")
+      .insert({ team_id: parsed.data.teamId, user_id: createdAuthUserId });
+
+    if (teamError) {
+      await admin.from("team_members").delete().eq("user_id", createdAuthUserId);
+      await admin.from("users").delete().eq("id", createdAuthUserId);
+      await admin.auth.admin.deleteUser(createdAuthUserId);
+      redirectWith("/admin/users", "error", "User team could not be assigned.");
+    }
+  }
+
+  redirectWith("/admin/users", "notice", "created");
+}
+
+export async function updateInvitationStatusAction(formData: FormData) {
+  const context = await requirePermission("users.invite", "full");
+  const parsed = updateInvitationStatusSchema.safeParse({
+    invitationId: getFormString(formData, "invitationId"),
+    status: getFormString(formData, "status"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/invitations", "error", "Invalid invitation update.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("user_invitations")
+    .update({ status: parsed.data.status })
+    .eq("id", parsed.data.invitationId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    redirectWith("/admin/invitations", "error", "Invitation could not be updated.");
+  }
+
+  redirectWith("/admin/invitations", "notice", "updated");
+}
+
+export async function updateUserStatusAction(formData: FormData) {
+  const context = await requirePermission("users.disable", "full");
+  const parsed = updateUserStatusSchema.safeParse({
+    userId: getFormString(formData, "userId"),
+    status: getFormString(formData, "status"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/users", "error", "Invalid user status update.");
+  }
+
+  if (parsed.data.userId === context.userId) {
+    redirectWith("/admin/users", "error", "You cannot change your own account status.");
+  }
+
+  try {
+    await assertUserInCompany(parsed.data.userId, context.companyId);
+  } catch {
+    redirectWith("/admin/users", "error", "User does not belong to your company.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("users")
+    .update({ status: parsed.data.status })
+    .eq("id", parsed.data.userId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    redirectWith("/admin/users", "error", "User status could not be updated.");
+  }
+
+  redirectWith("/admin/users", "notice", "updated");
+}
+
+export async function updateUserRoleAction(formData: FormData) {
+  const context = await requirePermission("users.assign_role", "full");
+  const parsed = updateUserRoleSchema.safeParse({
+    userId: getFormString(formData, "userId"),
+    roleId: getFormString(formData, "roleId"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/users", "error", "Invalid role update.");
+  }
+
+  if (parsed.data.userId === context.userId) {
+    redirectWith("/admin/users", "error", "You cannot change your own role.");
+  }
+
+  try {
+    await assertUserInCompany(parsed.data.userId, context.companyId);
+    await assertRoleInCompany(parsed.data.roleId, context.companyId);
+  } catch {
+    redirectWith("/admin/users", "error", "Choose a valid company user and role.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("users")
+    .update({ role_id: parsed.data.roleId })
+    .eq("id", parsed.data.userId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    redirectWith("/admin/users", "error", "User role could not be updated.");
+  }
+
+  redirectWith("/admin/users", "notice", "updated");
+}
+
+export async function updateUserTeamAction(formData: FormData) {
+  const context = await requirePermission("teams.assign_members", "full");
+  const parsed = updateUserTeamSchema.safeParse({
+    userId: getFormString(formData, "userId"),
+    teamId: getFormString(formData, "teamId"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/users", "error", "Invalid team update.");
+  }
+
+  try {
+    await assertUserInCompany(parsed.data.userId, context.companyId);
+    await assertTeamInCompany(parsed.data.teamId, context.companyId);
+  } catch {
+    redirectWith("/admin/users", "error", "Choose a valid company user and team.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error: deleteError } = await supabase
+    .from("team_members")
+    .delete()
+    .eq("user_id", parsed.data.userId);
+
+  if (deleteError) {
+    redirectWith("/admin/users", "error", "User team could not be updated.");
+  }
+
+  if (parsed.data.teamId) {
+    const { error: insertError } = await supabase
+      .from("team_members")
+      .insert({ team_id: parsed.data.teamId, user_id: parsed.data.userId });
+
+    if (insertError) {
+      redirectWith("/admin/users", "error", "User team could not be assigned.");
+    }
+  }
+
+  redirectWith("/admin/users", "notice", "updated");
+}

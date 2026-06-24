@@ -1,0 +1,7 @@
+Navigation role fix implemented in:
+- src/components/layout/dashboard-navigation.tsx
+
+Change:
+- Render only the single dashboard item matching context.role (not all role dashboards).
+- Ensure workspace items array is empty when role is unmapped.
+
