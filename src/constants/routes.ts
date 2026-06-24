@@ -6,15 +6,22 @@ export const routes = {
   changePassword: "/change-password",
   onboarding: "/onboarding",
   accountInactive: "/account-inactive",
+  organizationDisabled: "/organization-disabled",
+  organizationUnavailable: "/organization-unavailable",
   profile: {
+    home: "/profile",
     workHours: "/profile/work-hours",
   },
+  notifications: "/notifications",
+  search: "/search",
+  settings: "/settings",
   team: "/team",
   tasks: "/tasks",
   ideas: "/ideas",
   content: {
     home: "/content",
     reviews: "/content/reviews",
+    templates: "/content/templates",
   },
   calendar: "/calendar",
   reports: "/reports",
@@ -29,6 +36,7 @@ export const routes = {
   superiorAdmin: {
     home: "/super-admin",
     organizations: "/super-admin/organizations",
+    organization: (id: string) => `/super-admin/organizations/${id}`,
   },
   dashboards: {
     admin: "/admin",

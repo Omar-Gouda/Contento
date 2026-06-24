@@ -22,6 +22,8 @@ type ProfileRow = {
   must_change_password: boolean | null;
 };
 
+type CompanyStatus = Database["public"]["Enums"]["company_status"];
+
 type RoleRow = {
   id: string;
   name: string;
@@ -43,7 +45,9 @@ type AuthUserSummary = {
 };
 
 export type SuperiorAdminContext = {
+  id: string;
   userId: string;
+  authUserId: string;
   email: string;
   status: "active" | "suspended";
 };
@@ -52,6 +56,8 @@ export type AuthProfileResolution =
   | { state: "unauthenticated" }
   | { state: "superior_admin"; user: AuthUserSummary; superiorAdmin: SuperiorAdminContext }
   | { state: "missing_profile"; user: AuthUserSummary }
+  | { state: "organization_disabled"; user: AuthUserSummary; profile: ProfileRow; companyStatus: CompanyStatus }
+  | { state: "organization_unavailable"; user: AuthUserSummary; profile: ProfileRow; companyStatus: CompanyStatus }
   | { state: "inactive"; user: AuthUserSummary; profile: ProfileRow }
   | { state: "incomplete_profile"; user: AuthUserSummary; profile: ProfileRow; message: string }
   | { state: "unresolved"; user: AuthUserSummary; message: string }
@@ -74,6 +80,26 @@ export async function loadAuthProfile(
     email: user.email ?? null,
   };
 
+  const { data: platformAdmin } = await supabase
+    .from("platform_admins")
+    .select("id, auth_user_id, email, status")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  if (platformAdmin?.status === "active") {
+    return {
+      state: "superior_admin",
+      user: authUser,
+      superiorAdmin: {
+        id: platformAdmin.id,
+        userId: platformAdmin.auth_user_id,
+        authUserId: platformAdmin.auth_user_id,
+        email: platformAdmin.email,
+        status: platformAdmin.status,
+      },
+    };
+  }
+
   const { data: superiorAdmin } = await supabase
     .from("superior_admins")
     .select("id, email, status")
@@ -85,7 +111,9 @@ export async function loadAuthProfile(
       state: "superior_admin",
       user: authUser,
       superiorAdmin: {
+        id: superiorAdmin.id,
         userId: superiorAdmin.id,
+        authUserId: superiorAdmin.id,
         email: superiorAdmin.email,
         status: superiorAdmin.status,
       },
@@ -122,6 +150,38 @@ export async function loadAuthProfile(
       user: authUser,
       profile: profileRow,
       message: "Your Contento profile is missing workspace or role access.",
+    };
+  }
+
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select("status")
+    .eq("id", profileRow.company_id)
+    .maybeSingle();
+
+  if (companyError || !company) {
+    return {
+      state: "unresolved",
+      user: authUser,
+      message: "We could not resolve your Contento organization.",
+    };
+  }
+
+  if (company.status === "disabled" || company.status === "suspended") {
+    return {
+      state: "organization_disabled",
+      user: authUser,
+      profile: profileRow,
+      companyStatus: company.status,
+    };
+  }
+
+  if (company.status === "deleted" || company.status === "archived") {
+    return {
+      state: "organization_unavailable",
+      user: authUser,
+      profile: profileRow,
+      companyStatus: company.status,
     };
   }
 
@@ -249,6 +309,14 @@ export async function requireAuthContext() {
 
   if (resolution.state === "unauthenticated") {
     redirect("/sign-in");
+  }
+
+  if (resolution.state === "organization_disabled") {
+    redirect("/organization-disabled");
+  }
+
+  if (resolution.state === "organization_unavailable") {
+    redirect("/organization-unavailable");
   }
 
   redirect("/account-inactive");

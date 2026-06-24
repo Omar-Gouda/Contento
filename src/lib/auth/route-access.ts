@@ -5,6 +5,8 @@ const authRoutes = ["/sign-in", "/forgot-password"];
 const publicRoutes = ["/", "/reset-password", "/auth/callback"];
 const onboardingRoutes = ["/onboarding"];
 const accountInactiveRoutes = ["/account-inactive"];
+const organizationDisabledRoutes = ["/organization-disabled"];
+const organizationUnavailableRoutes = ["/organization-unavailable"];
 const sharedProtectedRoutes = [
   "/profile",
   "/change-password",
@@ -14,6 +16,9 @@ const sharedProtectedRoutes = [
   "/content",
   "/calendar",
   "/reports",
+  "/notifications",
+  "/search",
+  "/settings",
 ];
 const superiorAdminRoutes = ["/super-admin"];
 
@@ -44,6 +49,14 @@ export function isAccountInactiveRoute(pathname: string) {
   return accountInactiveRoutes.some((route) => matchesPathPrefix(pathname, route));
 }
 
+export function isOrganizationDisabledRoute(pathname: string) {
+  return organizationDisabledRoutes.some((route) => matchesPathPrefix(pathname, route));
+}
+
+export function isOrganizationUnavailableRoute(pathname: string) {
+  return organizationUnavailableRoutes.some((route) => matchesPathPrefix(pathname, route));
+}
+
 export function isSuperiorAdminRoute(pathname: string) {
   return superiorAdminRoutes.some((route) => matchesPathPrefix(pathname, route));
 }
@@ -53,7 +66,13 @@ export function isChangePasswordRoute(pathname: string) {
 }
 
 export function isSetupRoute(pathname: string) {
-  return isOnboardingRoute(pathname) || isAccountInactiveRoute(pathname) || isChangePasswordRoute(pathname);
+  return (
+    isOnboardingRoute(pathname) ||
+    isAccountInactiveRoute(pathname) ||
+    isOrganizationDisabledRoute(pathname) ||
+    isOrganizationUnavailableRoute(pathname) ||
+    isChangePasswordRoute(pathname)
+  );
 }
 
 export function isPublicOrAuthRoute(pathname: string) {
@@ -90,6 +109,7 @@ export type RedirectAuthState =
   | { state: "unauthenticated" }
   | { state: "superior_admin" }
   | { state: "missing_profile" }
+  | { state: "organization_disabled" | "organization_unavailable" }
   | { state: "inactive" | "incomplete_profile" | "unresolved" }
   | { state: "active"; role: UserRole; mustChangePassword: boolean };
 
@@ -112,6 +132,10 @@ export function redirectStateFromResolution(resolution: AuthProfileResolution): 
 
   if (resolution.state === "missing_profile") {
     return { state: "missing_profile" };
+  }
+
+  if (resolution.state === "organization_disabled" || resolution.state === "organization_unavailable") {
+    return { state: resolution.state };
   }
 
   if (
@@ -141,6 +165,14 @@ export function getRedirectPathForAuthState(pathname: string, authState: Redirec
 
   if (authState.state === "missing_profile") {
     return isOnboardingRoute(pathname) ? null : normalizeRedirect(pathname, "/onboarding");
+  }
+
+  if (authState.state === "organization_disabled") {
+    return isOrganizationDisabledRoute(pathname) ? null : normalizeRedirect(pathname, "/organization-disabled");
+  }
+
+  if (authState.state === "organization_unavailable") {
+    return isOrganizationUnavailableRoute(pathname) ? null : normalizeRedirect(pathname, "/organization-unavailable");
   }
 
   if (

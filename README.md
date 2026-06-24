@@ -1,6 +1,6 @@
 # Contento
 
-Contento is a production-ready multi-company SaaS foundation for content operations teams. The current implementation covers authentication, company onboarding, superior-admin organization bootstrap, role-based route protection, Admin direct user creation, forced first-login password changes, working-hours tracking, teams, tasks, ideas, content pipeline, calendar, reports, dark mode, and a modern dashboard shell.
+Contento is a production-ready multi-company SaaS platform for content operations teams. The current implementation covers authentication, onboarding, platform Super Admin operations, organization lifecycle management, role-based route protection, Admin user management, working-hours tracking, teams, tasks, ideas, content review, calendar, reports, notifications, collaboration, saved views, search, analytics, organization branding, profile settings, dark mode, and a modern dashboard shell.
 
 ## Getting Started
 
@@ -22,10 +22,14 @@ Set the required Supabase values:
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_APP_ENV=local
 
-# Server-only. Required for Admin-created Supabase Auth users.
+# Server-only. Required for trusted user creation and platform actions.
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 DATABASE_URL=your-database-url
+
+# Optional for local Supabase CLI workflows.
+SUPABASE_PROJECT_ID=your-project-ref
 ```
 
 Run the development server:
@@ -36,57 +40,50 @@ npm run dev
 
 ## Landing Page Decision
 
-Phase 3 removes the marketing landing page. The `/` route redirects to `/sign-in` because the previous page exposed internal workflow and dashboard details. A future marketing site can be added separately with abstract, benefit-focused copy.
+The app root route redirects to `/sign-in`. Contento is currently an authenticated SaaS product surface, and the previous landing page exposed internal workflow details. A future public marketing site can be added separately with benefit-focused copy.
 
 ## Routes
 
 - `/` redirects to `/sign-in`
 - `/sign-in`, `/forgot-password`, `/reset-password`
+- `/auth/callback`
 - `/change-password` forced password change for Admin-created users
 - `/onboarding` first company workspace setup
-- `/account-inactive` inactive or incomplete account state
+- `/account-inactive`, `/organization-disabled`, `/organization-unavailable`
 - `/admin`, `/supervisor`, `/team-lead`, `/creator`
-- `/admin/users` Admin user creation and management
-- `/admin/invitations` redirects to `/admin/users`
-- `/admin/teams` Admin team management
-- `/team` scoped team workspace
-- `/tasks`, `/tasks/[id]`, and `/admin/tasks` task management
-- `/ideas`, `/ideas/[id]`, and `/admin/ideas` idea management
-- `/content`, `/content/[id]`, and `/content/reviews` content pipeline and reviews
-- `/calendar` content, work-hours, and day-off calendar with month, week, and list views
-- `/reports` and `/reports/[id]` report submission and review
-- `/reports/export` CSV report export
-- `/admin/work-hours` company work-hours view
-- `/profile/work-hours` current user work-hours view
-- `/super-admin/organizations` platform superior-admin organization creation
+- `/admin/users`, `/admin/invitations`, `/admin/teams`, `/admin/tasks`, `/admin/ideas`, `/admin/work-hours`
+- `/team`
+- `/tasks`, `/tasks/[id]`
+- `/ideas`, `/ideas/[id]`
+- `/content`, `/content/[id]`, `/content/reviews`, `/content/templates`
+- `/calendar`
+- `/reports`, `/reports/[id]`, `/reports/export`
+- `/notifications`
+- `/search`
+- `/settings`
+- `/profile`, `/profile/work-hours`
+- `/super-admin`, `/super-admin/organizations`, `/super-admin/organizations/[id]`
 
 ## Implemented Features
 
-- `next-themes` dark mode with light, dark, and system preferences
-- Premium dashboard shell with active navigation, responsive mobile menu, and theme toggle
-- Role-based sidebar navigation; users only see routes allowed for their role and permissions
-- Admin direct user creation with server-only Supabase Auth creation, temporary password, and `must_change_password`
-- Forced `/change-password` flow before Admin-created users can access dashboards
-- Admin user search, filtering, role assignment, team assignment, suspension, disable, and reactivation
-- Work-day, work-session, and break-session tracking
-- Work dates are derived from the `Africa/Cairo` calendar day
-- Sign-in starts or resumes today's work session
-- Sign-out closes the active work session unless a break is active
-- Break allowance is 90 minutes per day; excess break time is recorded as missing time
-- Missing time also uses a documented 480-minute default work-day target after sign-out
-- User and Admin work-hours pages show reviewable break history
-- Superior Admin can create organizations and the first Org Admin account without joining tenant workspaces
-- Admin team creation, editing, archiving, lead assignment, member assignment, and team statistics
-- Shared scoped team page for visible team rosters and workload signals
-- Supervisor scoped member assignment on visible teams; CC Team Leads cannot move users between teams
-- Task creation, assignment, reassignment, detail view, status updates, priority, due dates, comments, activity logs, and team filtering
-- CC Team Lead task assignment is limited to own led/assigned team members
-- Idea creation, editing, deletion, detail view, assignment, team scoping, notes, status tracking, and activity logs
-- Content item creation, detail view, task/idea linking, team scoping, creator assignment, Team Lead review, Supervisor review, approve, reject, request changes, feedback, ratings, and scheduling
-- Calendar monthly and weekly views for scheduled content, work-hours records, day-off rows, and calendar events in `Africa/Cairo`
-- Calendar list view for scoped operational agenda review
-- Daily, weekly, user, team, and company reports with team/date ranges, detail views, CSV export, and export activity logging
-- Lightweight role dashboards backed by real private user productivity counts
+- Supabase authentication with sign in, reset password, sign out, protected routes, role redirects, onboarding, account-state pages, and forced password changes.
+- Platform Super Admin route family with organization listing, details, analytics, lifecycle controls, platform audit logs, and first Org Admin creation.
+- Organization lifecycle states: active, disabled, and deleted. Disabled and deleted organizations are blocked from tenant dashboards.
+- Company-scoped RBAC with Admin, Supervisor, CC Team Lead, and Creator defaults.
+- Admin user creation, status changes, role assignment, team assignment, and audit logging.
+- Working-hours tracking from sign-in/sign-out, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, and Admin company view.
+- Teams, tasks, ideas, content pipeline, content reviews, review scoring, calendar, reports, and CSV report export.
+- In-app notification center with unread count, read/unread filtering, mark-read actions, and entity links.
+- Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
+- Global search across accessible users, teams, tasks, ideas, content, and reports.
+- Advanced list filters with saved views for tasks, ideas, content, and reports.
+- Real dashboard analytics backed by current database counts and role scope.
+- Organization branding and company settings for logo, colors, work target, break allowance, and timezone.
+- User profile page with profile updates, avatar upload, role/team context, password change, and work-hours link.
+- Content templates with create, edit, archive, and use-on-content-create flows.
+- Dashboard customization with show/hide widget preferences and reset support.
+- `next-themes` dark mode with light, dark, and system preferences.
+- Responsive dashboard shell with permission-aware navigation, active states, notification/search shortcuts, and mobile navigation.
 
 ## Supabase
 
@@ -104,17 +101,43 @@ supabase/
     202606240001_contento_phase_4_shared_operations_completion.sql
     202606240002_contento_phase_4_scope_fix_review_flow.sql
     202606240003_contento_phase_4_scope_policy_hardening.sql
+    202606240004_contento_final_production_saas_readiness.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.
+
+## Vercel Setup
+
+Configure these environment variables in Vercel:
+
+```txt
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_APP_ENV
+SUPABASE_SERVICE_ROLE_KEY
+DATABASE_URL
+SUPABASE_PROJECT_ID
+```
+
+Set `NEXT_PUBLIC_SITE_URL` to the production domain, for example `https://your-app.vercel.app`. In Supabase Auth, add the production site URL and callback URL, including:
+
+```txt
+https://your-app.vercel.app/auth/callback
+```
+
+Keep service-role and database credentials server-only in Vercel project settings.
 
 ## Validation
 
 ```bash
 npm run lint
 npm run build
+supabase db lint --linked
 ```
 
-## Deferred Modules
+## Known Limitations
 
-Advanced analytics dashboards, notifications, background jobs, advanced role editing UI, and richer charting remain intentionally deferred.
+- Email delivery templates and provider-level transactional email customization are configured in Supabase, not in this repository.
+- Real-time subscriptions, background workers, activity-log export, and advanced custom role/permission editing UI remain future enhancements.
+- Hard deletion of organizations is intentionally not implemented; Super Admin uses soft delete.

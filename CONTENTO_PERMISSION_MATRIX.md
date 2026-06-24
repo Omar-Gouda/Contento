@@ -150,6 +150,28 @@ Working-hours visibility uses Cairo work dates (`Africa/Cairo`). Current UI expo
 | `settings.roles_permissions` | Manage roles and permissions. | Full Access | No Access | No Access | No Access |
 | `settings.branding` | Manage workspace branding. | Full Access | No Access | No Access | No Access |
 
+## Notifications And Collaboration
+
+| Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
+| --- | --- | --- | --- | --- | --- |
+| `notifications.view` | View own in-app notifications. | Full Access | Full Access | Full Access | Full Access |
+| `notifications.manage` | Manage own notification read state. | Full Access | Full Access | Full Access | Full Access |
+| `attachments.manage` | Upload and delete scoped entity attachments. | Full Access | Limited Access | Limited Access | Limited Access |
+| `comments.create` | Add comments to accessible tasks, ideas, content, and reports. | Full Access | Limited Access | Limited Access | Limited Access |
+| `comments.delete` | Soft-delete accessible comments where permitted. | Full Access | Limited Access | Limited Access | No Access |
+| `mentions.create` | Mention same-company users who can access the entity. | Full Access | Limited Access | Limited Access | Limited Access |
+
+## Search, Saved Views, Templates, And Dashboards
+
+| Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
+| --- | --- | --- | --- | --- | --- |
+| `search.global` | Search across accessible company modules. | Full Access | Limited Access | Limited Access | Limited Access |
+| `saved_views.manage` | Save and manage reusable filters. | Full Access | Full Access | Full Access | Full Access |
+| `analytics.view` | View role-scoped analytics. | Full Access | Limited Access | Limited Access | View Only |
+| `content.templates.use` | Use active content templates. | Full Access | Full Access | Full Access | View Only |
+| `content.templates.manage` | Create, update, and archive content templates. | Full Access | Limited Access | Limited Access | No Access |
+| `dashboard.customize` | Show, hide, and reset dashboard widgets. | Full Access | Full Access | Full Access | Full Access |
+
 ## Exporting
 
 | Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
@@ -161,14 +183,14 @@ Working-hours visibility uses Cairo work dates (`Africa/Cairo`). Current UI expo
 
 ## Permission Summary
 
-* Permission capabilities identified: 59
+* Permission capabilities identified: 71
 * Roles covered: Admin, Supervisor, CC Team Lead, Creator
 * Access levels used: Full Access, Limited Access, View Only, No Access
 * Default isolation model: company-scoped access with role and ownership constraints
 
 ## Platform Superior Admin Scope
 
-Superior Admin is not a tenant role and is not assigned through `roles` or `role_permissions`. It is a platform bootstrap account used only to create organizations and their first Org Admin account.
+Superior Admin and Platform Admin are not tenant roles and are not assigned through `roles` or `role_permissions`. They are platform operator accounts used to create organizations, create first Org Admin accounts, view organization metadata, and manage organization lifecycle. Platform operators cannot access normal company dashboards as their primary route.
 
 ## Phase 4-10 Implementation Notes
 
@@ -181,6 +203,10 @@ The current implementation uses this matrix for Teams, Tasks, Ideas, Content, Ca
 * CC Team Leads are restricted to own-team members, own-team task assignment, and own-team submitted content review.
 * Role dashboards show private user productivity counts; review queues and team/company data live in permission-scoped operational pages.
 * Report CSV export requires `exports.reports`, never accepts a browser-provided `company_id`, and writes `reports.exported` to `activity_logs`.
+* Notifications, comments, mentions, attachments, saved views, content templates, search, analytics, and dashboard preferences use the final production permissions above.
+* Generic collaboration records are only visible when the user can access the linked entity.
+* Saved views and dashboard preferences are private to the owning user.
+* Content templates are company-scoped; Creators can use active templates but cannot manage them.
 
 Phase 4 also seeds permission aliases for future shared-module code:
 

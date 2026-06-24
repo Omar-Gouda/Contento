@@ -15,6 +15,7 @@ import {
 import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
+import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -173,6 +174,8 @@ export default async function IdeaDetailPage({
           </form>
         )}
       </div>
+
+      <CollaborationPanel context={context} entityType="idea" entityId={idea.id} redirectTo={`/ideas/${idea.id}`} />
     </section>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays,
+  Bell,
   ClipboardList,
   Clock,
   FileBarChart,
@@ -11,7 +12,10 @@ import {
   LayoutDashboard,
   Lightbulb,
   PanelsTopLeft,
+  Search,
+  Settings,
   ShieldCheck,
+  User,
   Users,
   UsersRound,
   type LucideIcon,
@@ -116,6 +120,10 @@ function getOperationItems(context: AuthContext): NavigationItem[] {
     items.push({ label: "Reviews", href: routes.content.reviews, icon: FileText });
   }
 
+  if (hasPermission(context, "content.templates.use", "view")) {
+    items.push({ label: "Templates", href: routes.content.templates, icon: FileText });
+  }
+
   if (hasPermission(context, "calendar.view", "view")) {
     items.push({ label: "Calendar", href: routes.calendar, icon: CalendarDays });
   }
@@ -132,7 +140,16 @@ export function DashboardNavigation({ context }: { context: AuthContext }) {
   const workspaceItems = workspaceItem ? [workspaceItem] : [];
   const operationItems = getOperationItems(context);
   const adminItems = getAdminItems(context);
-  const workHoursLabel = context.role === "admin" ? "Profile" : "My work hours";
+  const accountItems: NavigationItem[] = [
+    { label: "Search", href: routes.search, icon: Search },
+    { label: "Notifications", href: routes.notifications, icon: Bell },
+    { label: "Profile", href: routes.profile.home, icon: User },
+    { label: "Work hours", href: routes.profile.workHours, icon: ShieldCheck },
+  ];
+
+  if (hasPermission(context, "settings.company", "limited")) {
+    accountItems.push({ label: "Settings", href: routes.settings, icon: Settings });
+  }
 
 
   return (
@@ -179,7 +196,11 @@ export function DashboardNavigation({ context }: { context: AuthContext }) {
         <p className="px-3 text-xs font-medium uppercase tracking-[0.16em] text-sidebar-foreground/50">
           Account
         </p>
-        <NavLink href={routes.profile.workHours} icon={ShieldCheck} label={workHoursLabel} />
+        <div className="grid gap-1">
+          {accountItems.map((item) => (
+            <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
+          ))}
+        </div>
       </div>
     </nav>
   );

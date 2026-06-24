@@ -20,6 +20,57 @@ export async function getDashboardSummary(context: AuthContext): Promise<Dashboa
   nextWeek.setDate(nextWeek.getDate() + 7);
   const nextWeekDate = nextWeek.toISOString().slice(0, 10);
 
+  if (context.role === "admin") {
+    const [
+      totalUsers,
+      activeUsers,
+      teams,
+      openTasks,
+      approvedContent,
+      reviewedContent,
+      reports,
+      activeWorkDays,
+    ] = await Promise.all([
+      safeCount(supabase.from("users").select("id", { count: "exact", head: true }).eq("company_id", context.companyId)),
+      safeCount(supabase.from("users").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("status", "active")),
+      safeCount(supabase.from("teams").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("status", "active")),
+      safeCount(supabase.from("tasks").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).in("status", ["pending", "assigned", "in_progress", "under_review"])),
+      safeCount(supabase.from("content_items").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).in("status", ["approved", "scheduled", "published"])),
+      safeCount(supabase.from("content_items").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).neq("status", "draft")),
+      safeCount(supabase.from("reports").select("id", { count: "exact", head: true }).eq("company_id", context.companyId)),
+      safeCount(supabase.from("work_days").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("work_date", today).eq("status", "active")),
+    ]);
+    const approvalRate = reviewedContent ? `${Math.round((approvedContent / reviewedContent) * 100)}%` : "0%";
+
+    return [
+      { label: "Total users", value: totalUsers, description: "All company user profiles." },
+      { label: "Active users", value: activeUsers, description: "Users currently allowed into the workspace." },
+      { label: "Teams", value: teams, description: "Active operating teams." },
+      { label: "Open tasks", value: openTasks, description: "Tasks not yet completed or closed." },
+      { label: "Approval rate", value: approvalRate, description: "Approved, scheduled, or published content against reviewed content." },
+      { label: "Reports", value: reports, description: "Submitted company report records." },
+      { label: "Working now", value: activeWorkDays, description: "Active Cairo work-day records today." },
+    ];
+  }
+
+  if (context.role === "supervisor" || context.role === "team-lead") {
+    const [openTasks, pendingReviews, approvedContent, reports, activeWorkDays] = await Promise.all([
+      safeCount(supabase.from("tasks").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).in("status", ["assigned", "in_progress", "under_review"])),
+      safeCount(supabase.from("content_items").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).in("status", context.role === "team-lead" ? ["submitted_to_team_lead", "changes_requested_by_supervisor"] : ["sent_to_supervisor"])),
+      safeCount(supabase.from("content_items").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).in("status", ["approved", "scheduled", "published"])),
+      safeCount(supabase.from("reports").select("id", { count: "exact", head: true }).eq("company_id", context.companyId)),
+      safeCount(supabase.from("work_days").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("work_date", today).eq("status", "active")),
+    ]);
+
+    return [
+      { label: "Scoped tasks", value: openTasks, description: "Visible tasks currently in motion." },
+      { label: "Pending reviews", value: pendingReviews, description: "Content waiting on your review lane." },
+      { label: "Approved content", value: approvedContent, description: "Approved, scheduled, or published visible content." },
+      { label: "Reports", value: reports, description: "Visible submitted report records." },
+      { label: "Working now", value: activeWorkDays, description: "Visible active Cairo work-day records today." },
+    ];
+  }
+
   const [
     myOpenTasks,
     dueSoonTasks,

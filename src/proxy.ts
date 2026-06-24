@@ -12,9 +12,14 @@ import { normalizeRoleName } from "@/types/roles";
 import type { Database } from "@/types/database";
 
 type ProxyProfileRow = {
+  company_id: string;
   role_id: string | null;
   status: "invited" | "active" | "suspended" | "disabled";
   must_change_password: boolean | null;
+};
+
+type ProxyCompanyRow = {
+  status: Database["public"]["Enums"]["company_status"];
 };
 
 function copySessionCookies(source: NextResponse, target: NextResponse) {
@@ -85,7 +90,15 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const { data: superiorAdmin } = await supabase
+  const { data: platformAdmin } = await supabase
+    .from("platform_admins")
+    .select("status")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+
+  const { data: superiorAdmin } = platformAdmin?.status === "active"
+    ? { data: null }
+    : await supabase
     .from("superior_admins")
     .select("status")
     .eq("id", user.id)
@@ -93,12 +106,12 @@ export async function proxy(request: NextRequest) {
 
   let authState: RedirectAuthState;
 
-  if (superiorAdmin?.status === "active") {
+  if (platformAdmin?.status === "active" || superiorAdmin?.status === "active") {
     authState = { state: "superior_admin" };
   } else {
     const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("role_id, status, must_change_password")
+      .select("company_id, role_id, status, must_change_password")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -112,21 +125,37 @@ export async function proxy(request: NextRequest) {
       } else if (profileRow.status !== "active" || !profileRow.role_id) {
         authState = { state: "inactive" };
       } else {
-        const { data: roleData, error: roleError } = await supabase
+        const { data: company, error: companyError } = await supabase
+          .from("companies")
+          .select("status")
+          .eq("id", profileRow.company_id)
+          .maybeSingle();
+
+        const companyRow = company as ProxyCompanyRow | null;
+
+        if (companyError || !companyRow) {
+          authState = { state: "unresolved" };
+        } else if (companyRow.status === "disabled" || companyRow.status === "suspended") {
+          authState = { state: "organization_disabled" };
+        } else if (companyRow.status === "deleted" || companyRow.status === "archived") {
+          authState = { state: "organization_unavailable" };
+        } else {
+          const { data: roleData, error: roleError } = await supabase
           .from("roles")
           .select("name")
           .eq("id", profileRow.role_id)
           .maybeSingle();
 
-        const role = normalizeRoleName(roleData?.name);
+          const role = normalizeRoleName(roleData?.name);
 
-        authState = roleError || !role
-          ? { state: "unresolved" }
-          : {
-              state: "active",
-              role,
-              mustChangePassword: profileRow.must_change_password === true,
-            };
+          authState = roleError || !role
+            ? { state: "unresolved" }
+            : {
+                state: "active",
+                role,
+                mustChangePassword: profileRow.must_change_password === true,
+              };
+        }
       }
     }
   }

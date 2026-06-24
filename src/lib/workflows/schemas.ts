@@ -89,6 +89,7 @@ export const ideaDeleteSchema = z.object({
 export const contentSchema = z.object({
   title: z.string().trim().min(1, "Content title is required.").max(180, "Content title is too long."),
   description: z.string().trim().max(3000, "Description must be 3000 characters or fewer.").default(""),
+  templateId: optionalUuidSchema,
   creatorId: optionalUuidSchema,
   taskId: optionalUuidSchema,
   ideaId: optionalUuidSchema,
@@ -105,6 +106,11 @@ export const contentReviewSchema = z.object({
   contentId: z.string().trim().uuid(),
   decision: z.enum(["send_to_supervisor", "approved", "changes_requested", "rejected"]),
   feedback: z.string().trim().max(2000, "Feedback must be 2000 characters or fewer.").default(""),
+  qualityScore: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  creativityScore: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  accuracyScore: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  overallRating: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  scoreComment: z.string().trim().max(1000, "Score comment must be 1000 characters or fewer.").default(""),
   redirectTo: z.string().trim().default("/content/reviews"),
 });
 
@@ -129,4 +135,18 @@ export const reportSchema = z.object({
   teamId: optionalUuidSchema,
   dateRangeStart: optionalDateSchema,
   dateRangeEnd: optionalDateSchema,
+});
+
+export const contentTemplateSchema = z.object({
+  templateId: optionalUuidSchema,
+  title: z.string().trim().min(1, "Template title is required.").max(160, "Template title is too long."),
+  description: z.string().trim().max(1000, "Template description is too long.").default(""),
+  body: z.string().trim().max(5000, "Template body is too long.").default(""),
+  category: z.string().trim().max(80, "Template category is too long.").default(""),
+  redirectTo: z.string().trim().default("/content/templates"),
+});
+
+export const contentTemplateArchiveSchema = z.object({
+  templateId: z.string().trim().uuid(),
+  redirectTo: z.string().trim().default("/content/templates"),
 });

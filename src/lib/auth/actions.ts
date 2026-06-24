@@ -144,6 +144,22 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
     };
   }
 
+  if (resolution.state === "organization_disabled") {
+    return {
+      success: true,
+      message: "This organization is currently disabled.",
+      redirectTo: "/organization-disabled",
+    };
+  }
+
+  if (resolution.state === "organization_unavailable") {
+    return {
+      success: true,
+      message: "This organization is no longer available.",
+      redirectTo: "/organization-unavailable",
+    };
+  }
+
   if (resolution.state !== "active") {
     return {
       success: false,
@@ -319,6 +335,22 @@ export async function completeOnboardingAction(input: OnboardingInput): Promise<
       success: true,
       message: "Your workspace is already ready.",
       redirectTo: getDefaultDashboardPath(currentResolution.context.role),
+    };
+  }
+
+  if (currentResolution.state === "organization_disabled") {
+    return {
+      success: true,
+      message: "This organization is currently disabled.",
+      redirectTo: "/organization-disabled",
+    };
+  }
+
+  if (currentResolution.state === "organization_unavailable") {
+    return {
+      success: true,
+      message: "This organization is no longer available.",
+      redirectTo: "/organization-unavailable",
     };
   }
 

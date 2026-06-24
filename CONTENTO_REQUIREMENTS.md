@@ -93,6 +93,11 @@ Permissions:
 * Analytics
 * Activity logs
 * Notifications
+* Collaboration: comments, mentions, and attachments
+* Global search
+* Saved views and advanced filters
+* Content templates
+* Platform Super Admin
 * Settings
 * Exporting data
 
@@ -100,9 +105,11 @@ Permissions:
 
 ### Public Pages
 
-* Landing page
+* Root redirect to sign in
 * Sign in
-  Forgot password
+* Forgot password
+* Reset password
+* Organization blocked-state pages
 
 ### Shared App Pages
 
@@ -110,6 +117,8 @@ Permissions:
 * Profile
 * Notifications
 * Settings
+* Search
+* Saved operational views
 
 ### Admin Pages
 
@@ -121,6 +130,7 @@ Permissions:
 * Activity logs
 * Reports
 * Exports
+* Organization branding
 
 ### Supervisor Pages
 
@@ -150,6 +160,12 @@ Permissions:
 * My reports
 * Performance
 
+### Platform Pages
+
+* Super Admin overview
+* Organizations list
+* Organization detail and lifecycle controls
+
 ## 7. Main Workflows
 
 ### Content Workflow
@@ -164,10 +180,10 @@ Permissions:
 
 ### User Management Workflow
 
-1. Admin invites user.
-2. User joins company workspace.
-3. Admin assigns role.
-4. User sees dashboard based on role.
+1. Admin creates or invites a user inside the company workspace.
+2. Admin assigns role and optional team.
+3. Admin-created users receive temporary password access and must change password on first login.
+4. User sees dashboard based on role and company status.
 
 ### Review Workflow
 
@@ -193,6 +209,14 @@ The system should store:
 * Calendar events
 * Activity logs
 * Notifications
+* Attachments
+* Comments
+* Mentions
+* Saved views
+* Content templates
+* Dashboard preferences
+* Platform admins
+* Platform activity logs
 * Settings
 
 ## 9. Non-Functional Requirements
@@ -226,14 +250,15 @@ The system should store:
 
 Implemented production foundations now include:
 
-* Authentication, onboarding, superior-admin organization bootstrap, protected routes, RBAC, and RLS.
-* Admin user management, shared team workspace, task management with detail pages, ideas with detail pages, content pipeline with detail pages, content reviews, calendar month/week/list views, reports with detail pages, CSV report export with activity logging, working hours, scoped dashboard summaries, dark mode, and modern dashboard shell.
+* Authentication, onboarding, platform Super Admin organization bootstrap, organization lifecycle management, protected routes, RBAC, and RLS.
+* Admin user management, shared team workspace, task management with detail pages, ideas with detail pages, content pipeline with detail pages, content reviews and scoring, calendar month/week/list views, reports with detail pages, CSV report export with activity logging, working hours, scoped dashboard summaries, dark mode, and modern dashboard shell.
+* Notifications, global search, comments, mentions, attachments, saved views, content templates, organization settings and branding, profile management, dashboard customization, and Supabase Storage buckets.
 * Role dashboards are private productivity spaces for the signed-in user's own work. Team/company review queues live in scoped operational pages.
 * New operational workflow routes are server-rendered, permission-checked, company-scoped, team-boundary-aware, and backed by Supabase tables.
 
 Still deferred:
 
-* Advanced analytics charts.
-* Notifications.
 * Background jobs.
 * Advanced role/permission editing UI.
+* Real-time subscriptions.
+* Activity log export.

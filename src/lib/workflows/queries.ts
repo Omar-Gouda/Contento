@@ -479,7 +479,7 @@ export async function getWorkflowContentReviews(context: AuthContext, contentIds
   const supabase = await createSupabaseServerClient();
   let query = supabase
     .from("content_reviews")
-    .select("id, company_id, content_id, reviewer_id, decision, feedback, reviewed_at")
+    .select("id, company_id, content_id, reviewer_id, decision, feedback, quality_score, creativity_score, accuracy_score, overall_rating, score_comment, reviewed_at")
     .eq("company_id", context.companyId)
     .order("reviewed_at", { ascending: false });
 

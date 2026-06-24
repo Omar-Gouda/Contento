@@ -16,6 +16,7 @@ import {
 import { hasSupabaseAdminConfig } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Json } from "@/types/database";
 
 function getFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -78,6 +79,25 @@ async function assertUserInCompany(userId: string, companyId: string) {
   if (error || !data) {
     throw new Error("User does not belong to this company.");
   }
+}
+
+async function logAdminActivity(
+  companyId: string,
+  userId: string,
+  action: string,
+  entityType: string,
+  entityId: string | null,
+  metadata: Json = {}
+) {
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("activity_logs").insert({
+    company_id: companyId,
+    user_id: userId,
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    metadata,
+  });
 }
 
 export async function inviteUserAction(formData: FormData) {
@@ -166,6 +186,11 @@ export async function inviteUserAction(formData: FormData) {
     redirectWith("/admin/invitations", "error", "Invitation email could not be sent.");
   }
 
+  await logAdminActivity(context.companyId, context.userId, "users.invited", "invitation", invitation.id, {
+    email: parsed.data.email,
+    role_id: parsed.data.roleId,
+    team_id: parsed.data.teamId,
+  });
   redirectWith("/admin/invitations", "notice", "invited");
 }
 
@@ -254,6 +279,12 @@ export async function createCompanyUserAction(formData: FormData) {
     }
   }
 
+  await logAdminActivity(context.companyId, context.userId, "users.created", "user", createdAuthUserId, {
+    email: parsed.data.email,
+    role_id: parsed.data.roleId,
+    team_id: parsed.data.teamId,
+    status: parsed.data.status,
+  });
   redirectWith("/admin/users", "notice", "created");
 }
 
@@ -279,6 +310,9 @@ export async function updateInvitationStatusAction(formData: FormData) {
     redirectWith("/admin/invitations", "error", "Invitation could not be updated.");
   }
 
+  await logAdminActivity(context.companyId, context.userId, "users.invitation_status_updated", "invitation", parsed.data.invitationId, {
+    status: parsed.data.status,
+  });
   redirectWith("/admin/invitations", "notice", "updated");
 }
 
@@ -314,6 +348,9 @@ export async function updateUserStatusAction(formData: FormData) {
     redirectWith("/admin/users", "error", "User status could not be updated.");
   }
 
+  await logAdminActivity(context.companyId, context.userId, "users.status_updated", "user", parsed.data.userId, {
+    status: parsed.data.status,
+  });
   redirectWith("/admin/users", "notice", "updated");
 }
 
@@ -350,6 +387,9 @@ export async function updateUserRoleAction(formData: FormData) {
     redirectWith("/admin/users", "error", "User role could not be updated.");
   }
 
+  await logAdminActivity(context.companyId, context.userId, "users.role_updated", "user", parsed.data.userId, {
+    role_id: parsed.data.roleId,
+  });
   redirectWith("/admin/users", "notice", "updated");
 }
 
@@ -391,5 +431,8 @@ export async function updateUserTeamAction(formData: FormData) {
     }
   }
 
+  await logAdminActivity(context.companyId, context.userId, "users.team_updated", "user", parsed.data.userId, {
+    team_id: parsed.data.teamId,
+  });
   redirectWith("/admin/users", "notice", "updated");
 }

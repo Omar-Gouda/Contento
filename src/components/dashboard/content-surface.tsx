@@ -8,6 +8,7 @@ import {
   scheduleContentAction,
   submitContentAction,
 } from "@/lib/workflows/actions";
+import { getContentTemplates } from "@/lib/content-templates/queries";
 import {
   getWorkflowContent,
   getWorkflowContentRatings,
@@ -20,6 +21,7 @@ import {
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { SavedViewsPanel } from "@/components/dashboard/saved-views-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -95,6 +97,12 @@ function reviewOptions(role: AuthContext["role"], status: string) {
   return [];
 }
 
+function scoreOptions() {
+  return [5, 4, 3, 2, 1].map((value) => (
+    <option key={value} value={value}>{value}</option>
+  ));
+}
+
 function isVisibleInReviewMode(context: AuthContext, status: string, creatorId: string | null) {
   if (context.role === "creator") {
     return creatorId === context.userId && status !== "draft";
@@ -120,7 +128,7 @@ export async function ContentSurface({
   mode: "pipeline" | "reviews";
   searchParams: { q?: string; status?: string; team?: string; error?: string; notice?: string };
 }) {
-  const [content, users, tasks, ideas, teams, reviews, ratings] = await Promise.all([
+  const [content, users, tasks, ideas, teams, reviews, ratings, templates] = await Promise.all([
     getWorkflowContent(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team }),
     getWorkflowUsers(context),
     getWorkflowTasks(context, { status: "all" }),
@@ -128,11 +136,13 @@ export async function ContentSurface({
     getWorkflowTeams(context),
     getWorkflowContentReviews(context),
     getWorkflowContentRatings(context),
+    getContentTemplates(context),
   ]);
   const activeUsers = users.filter((user) => user.status === "active");
   const openTasks = tasks.filter((task) => task.status !== "closed");
   const activeIdeas = ideas.filter((idea) => idea.status !== "archived" && idea.status !== "rejected");
   const activeTeams = teams.filter((team) => team.status === "active");
+  const activeTemplates = templates.filter((template) => template.status === "active");
   const canCreate = hasPermission(context, "content.create", "limited");
   const canSubmit = hasPermission(context, "content.submit", "limited");
   const canReview = hasPermission(context, "reviews.add_feedback", "limited");
@@ -183,6 +193,15 @@ export async function ContentSurface({
               <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="description">Description</Label>
                 <Input id="description" name="description" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="templateId">Template</Label>
+                <select id="templateId" name="templateId" className={selectClass}>
+                  <option value="">No template</option>
+                  {activeTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.title}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="taskId">Linked task</Label>
@@ -254,6 +273,19 @@ export async function ContentSurface({
             </form>
           </CardContent>
         </Card>
+      )}
+
+      {mode === "pipeline" && (
+        <SavedViewsPanel
+          context={context}
+          module="content"
+          basePath="/content"
+          currentFilters={{
+            q: searchParams.q,
+            status: searchParams.status,
+            team: searchParams.team,
+          }}
+        />
       )}
 
       <div className="grid gap-4">
@@ -354,6 +386,36 @@ export async function ContentSurface({
                         </Button>
                       </div>
                     </div>
+                    <div className="grid gap-3 md:grid-cols-5">
+                      <div className="space-y-2">
+                        <Label htmlFor={`quality-${item.id}`}>Quality</Label>
+                        <select id={`quality-${item.id}`} name="qualityScore" className={selectClass} defaultValue="5">
+                          {scoreOptions()}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`creativity-${item.id}`}>Creativity</Label>
+                        <select id={`creativity-${item.id}`} name="creativityScore" className={selectClass} defaultValue="5">
+                          {scoreOptions()}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`accuracy-${item.id}`}>Accuracy</Label>
+                        <select id={`accuracy-${item.id}`} name="accuracyScore" className={selectClass} defaultValue="5">
+                          {scoreOptions()}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`overall-${item.id}`}>Overall</Label>
+                        <select id={`overall-${item.id}`} name="overallRating" className={selectClass} defaultValue="5">
+                          {scoreOptions()}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`score-comment-${item.id}`}>Score note</Label>
+                        <Input id={`score-comment-${item.id}`} name="scoreComment" />
+                      </div>
+                    </div>
                   </form>
                 )}
 
@@ -393,7 +455,9 @@ export async function ContentSurface({
                           <span>{formatCairoDateTime(review.reviewed_at)}</span>
                         </div>
                         <Badge variant={review.decision === "approved" ? "default" : "secondary"}>{review.decision}</Badge>
+                        {review.overall_rating && <Badge variant="outline">{review.overall_rating}/5 overall</Badge>}
                         {review.feedback && <p className="mt-2">{review.feedback}</p>}
+                        {review.score_comment && <p className="mt-1 text-muted-foreground">{review.score_comment}</p>}
                       </div>
                     ))}
                   </div>

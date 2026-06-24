@@ -1,6 +1,6 @@
 # Contento Backend Architecture
 
-This document describes the backend architecture for Contento as of the Phase 3 foundation. Contento uses Supabase Auth, Supabase PostgreSQL, Row Level Security, Next.js App Router server components/actions, role permissions, and company-scoped data access.
+This document describes the backend architecture for Contento as of the final production SaaS readiness phase. Contento uses Supabase Auth, Supabase PostgreSQL, Row Level Security, Supabase Storage, Next.js App Router server components/actions, role permissions, platform-admin controls, and company-scoped data access.
 
 ## 1. Backend Goals
 
@@ -13,7 +13,7 @@ Primary backend goals:
 * Keep authorization clear, role-driven, and permission-aware.
 * Prefer server-side data access for protected operations.
 * Never trust browser-provided `company_id`.
-* Make activity logging and audit trails part of important future workflows.
+* Make activity logging and audit trails part of important workflows.
 * Keep frontend routes aligned with authenticated user role and company.
 
 ## 2. Backend Stack
@@ -28,6 +28,7 @@ Primary backend goals:
 | Forms | React Hook Form |
 | UI | TailwindCSS and shadcn/ui |
 | Theme | `next-themes` |
+| File Storage | Supabase Storage |
 | Hosting | Vercel for Next.js, Supabase for backend services |
 
 ## 3. Architecture Overview
@@ -69,14 +70,14 @@ Responsibilities:
 
 ### Auth Layer
 
-The auth layer validates user identity through Supabase Auth and maps that identity to either a superior-admin account or a Contento company-user profile.
+The auth layer validates user identity through Supabase Auth and maps that identity to a platform-admin account, legacy superior-admin account, or Contento company-user profile.
 
 Responsibilities:
 
 * Sign users in and out.
 * Send password reset emails.
 * Refresh sessions.
-* Resolve superior-admin access.
+* Resolve platform-admin access.
 * Resolve company-user profile, role, status, company, and permissions.
 * Redirect users to the correct route.
 * Accept pending invitations after authenticated sign-in.
@@ -89,7 +90,7 @@ The application access layer decides whether an authenticated user can perform a
 Responsibilities:
 
 * Load `users` profile and `company_id` for company routes.
-* Load superior-admin context for `/super-admin`.
+* Load platform-admin context for `/super-admin`.
 * Load role and permission data.
 * Enforce role checks before sensitive actions.
 * Keep all company writes scoped to the authenticated company.
@@ -110,7 +111,7 @@ Responsibilities:
 
 ### Workflow Layer
 
-The current implemented workflows are authentication, onboarding, invitations, user management, superior-admin organization bootstrap, and working-hours tracking. Future workflows include tasks, ideas, content pipeline, approvals, reporting, analytics, notifications, and exports.
+The current implemented workflows are authentication, onboarding, invitations, user management, platform organization management, working-hours tracking, teams, tasks, ideas, content pipeline, approvals, reports, analytics, notifications, collaboration, templates, profile/settings, and exports.
 
 Responsibilities:
 
@@ -136,16 +137,15 @@ Implemented company-scoped tables:
 * `work_sessions`
 * `break_sessions`
 * `task_comments`
-* Existing workflow tables now actively used: `tasks`, `ideas`, `content_items`, `content_reviews`, `reports`, `calendar_events`, `day_off_requests`, and `activity_logs`
+* Existing workflow tables now actively used: `tasks`, `ideas`, `content_items`, `content_reviews`, `reports`, `calendar_events`, `day_off_requests`, `notifications`, and `activity_logs`
+* Final production tables: `attachments`, `comments`, `mentions`, `saved_views`, `content_templates`, and `dashboard_preferences`
 
 Global or platform tables:
 
 * `companies` is the tenant root.
 * `permissions` is the global permission catalog.
 * `role_permissions` inherits scope through `roles`.
-* `superior_admins` is platform-scoped and not tenant membership.
-
-Future company-scoped tables include tasks, ideas, content items, reviews, reports, calendar events, day-off requests, notifications, activity logs, and exports.
+* `superior_admins`, `platform_admins`, and `platform_activity_logs` are platform-scoped and not tenant membership.
 
 Tenant rules:
 
@@ -154,7 +154,7 @@ Tenant rules:
 * Supervisors and CC Team Leads are constrained to permissions and assigned teams when those modules arrive.
 * Creators are constrained to their own work.
 * Superior admins bootstrap organizations but are not company users.
-* Exports and analytics must never cross company boundaries.
+* Exports, analytics, notifications, search, saved views, and collaboration records must never cross company boundaries.
 
 ## 6. Authorization Model
 
@@ -163,7 +163,7 @@ Contento combines role-based access control with company-scoped data rules.
 Authorization inputs:
 
 * Authenticated Supabase user id.
-* Contento `users` profile or `superior_admins` record.
+* Contento `users` profile, `platform_admins` record, or legacy `superior_admins` record.
 * User `company_id`.
 * User `role_id`.
 * Role permissions from `role_permissions`.
@@ -172,7 +172,7 @@ Authorization inputs:
 Recommended authorization order:
 
 1. Confirm the request has a valid Supabase session.
-2. Resolve superior-admin context or company-user profile.
+2. Resolve platform-admin, superior-admin, or company-user profile.
 3. Confirm the account is active.
 4. Resolve company scope for company routes.
 5. Resolve role and permissions.
@@ -195,6 +195,7 @@ Implemented responsibilities:
 * Role-based redirect.
 * Session refresh through middleware.
 * Active/inactive account handling.
+* Organization disabled/deleted access handling.
 
 ### Company Workspaces
 
@@ -244,22 +245,39 @@ Implemented responsibilities:
 
 Implemented responsibilities:
 
-* Platform-level superior-admin table.
-* Superior-admin route protection.
+* Platform-level `platform_admins` table with legacy `superior_admins` compatibility.
+* Super Admin route protection.
+* Platform overview analytics.
 * Organization and first Org Admin creation.
+* Organization detail view with owner/admin/user/team/activity counts.
+* Organization disable, reactivate, and soft-delete lifecycle actions.
+* Platform activity logs.
 * No tenant dashboard access by default.
+
+### Notifications, Collaboration, Search, And Preferences
+
+Implemented responsibilities:
+
+* Notification records with entity links, unread counts, read/unread filters, and mark-read actions.
+* Generic comments, mentions, and attachments for tasks, ideas, content, and reports.
+* Mention notifications for same-company accessible users.
+* Supabase Storage buckets for attachments and avatars.
+* Global search across accessible company records.
+* Saved views for advanced filters.
+* Content templates for reusable content creation.
+* Dashboard preferences for per-user widget visibility.
+* Organization branding and settings stored in company/company settings rows.
+* User profile and avatar management.
 
 ## 8. Planned Backend Modules
 
-Future modules:
+Future enhancements:
 
-* Advanced analytics charts
-* Notifications
-* Background jobs
-* Advanced role editing UI
-* Activity log export
-
-These modules should inherit the current tenant, RBAC, RLS, validation, and server-action patterns.
+* Real-time notification delivery.
+* Background jobs for scheduled workflows.
+* Advanced role editing UI.
+* Activity log export.
+* Rich text and media preview workflows.
 
 ## 9. Data Access Strategy
 
@@ -329,8 +347,10 @@ Expected environment variables:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_APP_ENV
 SUPABASE_SERVICE_ROLE_KEY
 DATABASE_URL
+SUPABASE_PROJECT_ID
 ```
 
 Rules:
@@ -339,6 +359,7 @@ Rules:
 * Service-role keys and database URLs must never be exposed to the browser.
 * Environment files stay in the project root.
 * Production secrets should be configured in the hosting provider.
+* Vercel production must set `NEXT_PUBLIC_SITE_URL` to the deployed domain and Supabase Auth must include the production callback URL.
 
 ## 13. RLS and Security Principles
 
@@ -350,7 +371,9 @@ Rules:
 * Never expose service-role credentials to client code.
 * Check both role permission and record scope.
 * Keep inactive, suspended, or disabled users blocked from protected workflows.
-* Keep superior-admin access separate from tenant membership.
+* Keep platform-admin access separate from tenant membership.
+* Keep platform-admin access separate from tenant membership.
+* Keep Supabase Storage buckets private and company/user folder scoped.
 
 ## 14. Phase Alignment
 
@@ -364,16 +387,17 @@ Rules:
 | Phase 6 | Reports, filters, and CSV export foundation. |
 | Phase 7 | Activity logs and notifications. |
 | Phase 9 | Security hardening, error handling, performance, testing, deployment guide. |
+| Final Production | Platform admin lifecycle, notifications, collaboration, search, saved views, analytics, branding, profile, templates, dashboard customization, GitHub/Vercel readiness. |
 
 ## 15. Current Foundation Boundary
 
-The current foundation includes authentication, onboarding, RBAC, RLS, Admin user management, invitations, working-hours tracking, superior-admin organization bootstrap, the app shell, teams, tasks, ideas, content pipeline, calendar, and reports.
+The current foundation includes authentication, onboarding, RBAC, RLS, Admin user management, invitations, working-hours tracking, platform organization management, the app shell, teams, tasks, ideas, content pipeline, calendar, reports, notifications, collaboration, search, analytics, branding/settings, user profiles, content templates, and dashboard customization.
 
 The current foundation intentionally does not include:
 
-* Advanced analytics
-* Notifications
 * Activity log export
 * Background jobs
+* Real-time subscriptions
+* Advanced role/permission editing UI
 
 These belong to later roadmap phases.

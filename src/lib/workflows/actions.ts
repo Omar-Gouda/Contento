@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/permissions";
+import { createNotificationForUser } from "@/lib/notifications/service";
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -29,7 +30,7 @@ import type { Database, Json } from "@/types/database";
 
 type ContentActionRow = Pick<
   Database["public"]["Tables"]["content_items"]["Row"],
-  "id" | "company_id" | "creator_id" | "team_id" | "status"
+  "id" | "company_id" | "title" | "creator_id" | "team_id" | "status"
 >;
 
 function formString(formData: FormData, key: string) {
@@ -125,7 +126,7 @@ async function loadContentForAction(contentId: string, companyId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("content_items")
-    .select("id, company_id, creator_id, team_id, status")
+    .select("id, company_id, title, creator_id, team_id, status")
     .eq("id", contentId)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -216,6 +217,26 @@ async function logActivity(
     entity_type: entityType,
     entity_id: entityId,
     metadata,
+  });
+}
+
+async function notifyUser(
+  context: AuthContext,
+  userId: string | null | undefined,
+  title: string,
+  message: string,
+  entityType: string,
+  entityId: string,
+  linkHref: string
+) {
+  await createNotificationForUser({
+    context,
+    userId,
+    title,
+    message,
+    entityType,
+    entityId,
+    linkHref,
   });
 }
 
@@ -365,6 +386,15 @@ export async function updateTeamMembersAction(formData: FormData) {
   await logActivity(context, "teams.members_updated", "team", parsed.data.teamId, {
     member_count: parsed.data.memberIds.length,
   });
+  await Promise.all(parsed.data.memberIds.map((userId) => notifyUser(
+    context,
+    userId,
+    "Team membership updated",
+    "You were added to a Contento team.",
+    "team",
+    parsed.data.teamId,
+    "/team"
+  )));
   safeRedirect(parsed.data.redirectTo, "notice", "Team members updated.");
 }
 
@@ -415,6 +445,15 @@ export async function createTaskAction(formData: FormData) {
   }
 
   await logActivity(context, "tasks.created", "task", data.id, { title: parsed.data.title });
+  await notifyUser(
+    context,
+    parsed.data.assignedTo,
+    "Task assigned",
+    parsed.data.title,
+    "task",
+    data.id,
+    `/tasks/${data.id}`
+  );
   safeRedirect(parsed.data.redirectTo, "notice", "Task created.");
 }
 
@@ -460,6 +499,15 @@ export async function assignTaskAction(formData: FormData) {
     assigned_to: parsed.data.assignedTo,
     team_id: parsed.data.teamId,
   });
+  await notifyUser(
+    context,
+    parsed.data.assignedTo,
+    "Task assigned",
+    "A task was assigned or reassigned to you.",
+    "task",
+    parsed.data.taskId,
+    `/tasks/${parsed.data.taskId}`
+  );
   safeRedirect(parsed.data.redirectTo, "notice", "Task assignment updated.");
 }
 
@@ -479,6 +527,12 @@ export async function updateTaskStatusAction(formData: FormData) {
     : await requirePermission("tasks.update_status", "limited");
 
   const supabase = await createSupabaseServerClient();
+  const { data: taskBeforeUpdate } = await supabase
+    .from("tasks")
+    .select("assigned_to, title")
+    .eq("id", parsed.data.taskId)
+    .eq("company_id", context.companyId)
+    .maybeSingle();
   const { error } = await supabase
     .from("tasks")
     .update({ status: parsed.data.status })
@@ -490,6 +544,15 @@ export async function updateTaskStatusAction(formData: FormData) {
   }
 
   await logActivity(context, "tasks.status_updated", "task", parsed.data.taskId, { status: parsed.data.status });
+  await notifyUser(
+    context,
+    taskBeforeUpdate?.assigned_to,
+    "Task status changed",
+    `${taskBeforeUpdate?.title ?? "Task"} is now ${parsed.data.status}.`,
+    "task",
+    parsed.data.taskId,
+    `/tasks/${parsed.data.taskId}`
+  );
   safeRedirect(parsed.data.redirectTo, "notice", "Task status updated.");
 }
 
@@ -565,6 +628,15 @@ export async function createIdeaAction(formData: FormData) {
   }
 
   await logActivity(context, "ideas.created", "idea", data.id, { title: parsed.data.title });
+  await notifyUser(
+    context,
+    parsed.data.assignedTo,
+    "Idea assigned",
+    parsed.data.title,
+    "idea",
+    data.id,
+    `/ideas/${data.id}`
+  );
   safeRedirect(parsed.data.redirectTo, "notice", "Idea created.");
 }
 
@@ -626,6 +698,12 @@ export async function updateIdeaStatusAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const { data: ideaBeforeUpdate } = await supabase
+    .from("ideas")
+    .select("title, created_by, assigned_to")
+    .eq("id", parsed.data.ideaId)
+    .eq("company_id", context.companyId)
+    .maybeSingle();
   const { error } = await supabase
     .from("ideas")
     .update({ status: parsed.data.status })
@@ -637,6 +715,26 @@ export async function updateIdeaStatusAction(formData: FormData) {
   }
 
   await logActivity(context, "ideas.status_updated", "idea", parsed.data.ideaId, { status: parsed.data.status });
+  await Promise.all([
+    notifyUser(
+      context,
+      ideaBeforeUpdate?.created_by,
+      "Idea status changed",
+      `${ideaBeforeUpdate?.title ?? "Idea"} is now ${parsed.data.status}.`,
+      "idea",
+      parsed.data.ideaId,
+      `/ideas/${parsed.data.ideaId}`
+    ),
+    notifyUser(
+      context,
+      ideaBeforeUpdate?.assigned_to,
+      "Idea status changed",
+      `${ideaBeforeUpdate?.title ?? "Idea"} is now ${parsed.data.status}.`,
+      "idea",
+      parsed.data.ideaId,
+      `/ideas/${parsed.data.ideaId}`
+    ),
+  ]);
   safeRedirect(parsed.data.redirectTo, "notice", "Idea status updated.");
 }
 
@@ -671,6 +769,7 @@ export async function createContentAction(formData: FormData) {
   const parsed = contentSchema.safeParse({
     title: formString(formData, "title"),
     description: formString(formData, "description"),
+    templateId: formString(formData, "templateId"),
     creatorId: formString(formData, "creatorId"),
     taskId: formString(formData, "taskId"),
     ideaId: formString(formData, "ideaId"),
@@ -699,12 +798,26 @@ export async function createContentAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient();
+  let description = parsed.data.description;
+
+  if (parsed.data.templateId && !description) {
+    const { data: template } = await supabase
+      .from("content_templates")
+      .select("description, body")
+      .eq("id", parsed.data.templateId)
+      .eq("company_id", context.companyId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    description = template?.body || template?.description || "";
+  }
+
   const { data, error } = await supabase
     .from("content_items")
     .insert({
       company_id: context.companyId,
       title: parsed.data.title,
-      description: parsed.data.description,
+      description,
       creator_id: creatorId,
       task_id: parsed.data.taskId,
       idea_id: parsed.data.ideaId,
@@ -765,6 +878,24 @@ export async function submitContentAction(formData: FormData) {
   }
 
   await logActivity(context, "content.submitted", "content", parsed.data.contentId, { status: "submitted_to_team_lead" });
+  if (content.team_id) {
+    const { data: team } = await supabase
+      .from("teams")
+      .select("team_lead_id")
+      .eq("id", content.team_id)
+      .eq("company_id", context.companyId)
+      .maybeSingle();
+
+    await notifyUser(
+      context,
+      team?.team_lead_id,
+      "Content submitted",
+      content.title,
+      "content",
+      parsed.data.contentId,
+      `/content/${parsed.data.contentId}`
+    );
+  }
   safeRedirect(parsed.data.redirectTo, "notice", "Content submitted.");
 }
 
@@ -779,6 +910,11 @@ export async function reviewContentAction(formData: FormData) {
     contentId: formString(formData, "contentId"),
     decision,
     feedback: formString(formData, "feedback"),
+    qualityScore: formString(formData, "qualityScore") || undefined,
+    creativityScore: formString(formData, "creativityScore") || undefined,
+    accuracyScore: formString(formData, "accuracyScore") || undefined,
+    overallRating: formString(formData, "overallRating") || undefined,
+    scoreComment: formString(formData, "scoreComment"),
     redirectTo: formString(formData, "redirectTo") || "/content/reviews",
   });
 
@@ -803,6 +939,11 @@ export async function reviewContentAction(formData: FormData) {
     reviewer_id: context.userId,
     decision: reviewDecisionValue(parsed.data.decision),
     feedback: parsed.data.feedback,
+    quality_score: parsed.data.qualityScore ?? null,
+    creativity_score: parsed.data.creativityScore ?? null,
+    accuracy_score: parsed.data.accuracyScore ?? null,
+    overall_rating: parsed.data.overallRating ?? null,
+    score_comment: parsed.data.scoreComment,
   });
 
   if (reviewError) {
@@ -823,6 +964,15 @@ export async function reviewContentAction(formData: FormData) {
   }
 
   await logActivity(context, `content.${parsed.data.decision}`, "content", parsed.data.contentId);
+  await notifyUser(
+    context,
+    content.creator_id,
+    "Content review updated",
+    `${content.title} is now ${nextStatus}.`,
+    "content",
+    parsed.data.contentId,
+    `/content/${parsed.data.contentId}`
+  );
   safeRedirect(parsed.data.redirectTo, "notice", "Review saved.");
 }
 

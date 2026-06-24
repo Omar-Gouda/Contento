@@ -131,6 +131,11 @@ export type Database = {
         reviewer_id: string | null;
         decision: Database["public"]["Enums"]["review_decision"];
         feedback: string;
+        quality_score: number | null;
+        creativity_score: number | null;
+        accuracy_score: number | null;
+        overall_rating: number | null;
+        score_comment: string;
         reviewed_at: string;
       }>;
       content_ratings: Table<{
@@ -185,7 +190,12 @@ export type Database = {
         title: string;
         message: string;
         read: boolean;
+        entity_type: string | null;
+        entity_id: string | null;
+        link_href: string | null;
+        read_at: string | null;
         created_at: string;
+        updated_at: string;
       }>;
       activity_logs: Table<{
         id: string;
@@ -256,6 +266,85 @@ export type Database = {
         id: string;
         email: string;
         status: Database["public"]["Enums"]["superior_admin_status"];
+        created_at: string;
+        updated_at: string;
+      }>;
+      platform_admins: Table<{
+        id: string;
+        auth_user_id: string;
+        email: string;
+        status: Database["public"]["Enums"]["superior_admin_status"];
+        created_at: string;
+        updated_at: string;
+      }>;
+      platform_activity_logs: Table<{
+        id: string;
+        platform_admin_id: string | null;
+        action: string;
+        entity_type: string;
+        entity_id: string | null;
+        metadata: Json;
+        created_at: string;
+      }>;
+      attachments: Table<{
+        id: string;
+        company_id: string;
+        entity_type: "task" | "idea" | "content" | "report";
+        entity_id: string;
+        uploaded_by: string | null;
+        file_name: string;
+        file_path: string;
+        file_type: string;
+        file_size: number;
+        created_at: string;
+      }>;
+      comments: Table<{
+        id: string;
+        company_id: string;
+        entity_type: "task" | "idea" | "content" | "report";
+        entity_id: string;
+        author_id: string | null;
+        body: string;
+        created_at: string;
+        updated_at: string;
+        deleted_at: string | null;
+      }>;
+      mentions: Table<{
+        id: string;
+        company_id: string;
+        comment_id: string;
+        mentioned_user_id: string;
+        created_at: string;
+      }>;
+      saved_views: Table<{
+        id: string;
+        company_id: string;
+        user_id: string;
+        name: string;
+        module: string;
+        filters_json: Json;
+        is_default: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      content_templates: Table<{
+        id: string;
+        company_id: string;
+        title: string;
+        description: string;
+        body: string;
+        category: string;
+        status: "active" | "archived";
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      dashboard_preferences: Table<{
+        id: string;
+        company_id: string;
+        user_id: string;
+        role: string;
+        widgets_json: Json;
         created_at: string;
         updated_at: string;
       }>;
@@ -346,9 +435,24 @@ export type Database = {
         };
         Returns: string;
       };
+      current_platform_admin_id: {
+        Args: Record<PropertyKey, never>;
+        Returns: string | null;
+      };
+      is_current_platform_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      can_access_entity_scope: {
+        Args: {
+          target_entity_type: string;
+          target_entity_id: string;
+        };
+        Returns: boolean;
+      };
     };
     Enums: {
-      company_status: "active" | "suspended" | "archived";
+      company_status: "active" | "suspended" | "archived" | "disabled" | "deleted";
       user_status: "invited" | "active" | "suspended" | "disabled";
       superior_admin_status: "active" | "suspended";
       team_status: "active" | "archived";

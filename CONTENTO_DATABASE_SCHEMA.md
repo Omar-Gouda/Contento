@@ -32,7 +32,7 @@ Tenant root table. Each row represents one isolated company workspace.
 | `name` | Display name of the company. |
 | `slug` | URL-safe workspace identifier. Must be unique. |
 | `logo_url` | Optional company logo asset URL. |
-| `status` | Company state, such as active, suspended, or archived. |
+| `status` | Company state. Current lifecycle values are active, disabled, and deleted. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
@@ -195,6 +195,11 @@ Company-scoped review records for approval decisions and feedback.
 | `reviewer_id` | User who reviewed the content. |
 | `decision` | Review result, such as approved, rejected, or changes requested. |
 | `feedback` | Reviewer feedback. |
+| `quality_score` | Optional quality score from 1 to 5. |
+| `creativity_score` | Optional creativity score from 1 to 5. |
+| `accuracy_score` | Optional accuracy score from 1 to 5. |
+| `overall_rating` | Optional overall rating from 1 to 5. |
+| `score_comment` | Optional scoring comment. |
 | `reviewed_at` | Review timestamp. |
 
 ### `content_ratings`
@@ -273,8 +278,105 @@ Company-scoped notification table for assignment, review, approval, rejection, a
 | `user_id` | User receiving the notification. |
 | `title` | Notification title. |
 | `message` | Notification message. |
+| `entity_type` | Optional entity type linked by the notification. |
+| `entity_id` | Optional entity id linked by the notification. |
+| `link_href` | Optional app route for navigation. |
 | `read` | Read state. |
+| `read_at` | Timestamp when read. |
 | `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+
+### `attachments`
+
+Company-scoped file metadata for files attached to tasks, ideas, content, and reports. File bytes live in Supabase Storage.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the attachment. |
+| `company_id` | Company that owns the attachment. |
+| `entity_type` | Attached entity type, such as task, idea, content, or report. |
+| `entity_id` | Identifier of the attached entity. |
+| `uploaded_by` | User who uploaded the file. |
+| `file_name` | Original display file name. |
+| `file_path` | Private Supabase Storage path. |
+| `file_type` | MIME type when available. |
+| `file_size` | File size in bytes. |
+| `created_at` | Creation timestamp. |
+
+### `comments`
+
+Generic company-scoped comments for tasks, ideas, content, and reports.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the comment. |
+| `company_id` | Company that owns the comment. |
+| `entity_type` | Commented entity type. |
+| `entity_id` | Commented entity id. |
+| `author_id` | User who wrote the comment. |
+| `body` | Comment body. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+| `deleted_at` | Soft-delete timestamp. |
+
+### `mentions`
+
+Company-scoped mention records created from comments.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the mention. |
+| `company_id` | Company that owns the mention. |
+| `comment_id` | Comment containing the mention. |
+| `mentioned_user_id` | User mentioned in the comment. |
+| `created_at` | Creation timestamp. |
+
+### `saved_views`
+
+Private saved filter views for operational pages.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the saved view. |
+| `company_id` | Company that owns the saved view. |
+| `user_id` | User who owns the saved view. |
+| `name` | Saved view name. |
+| `module` | Module key, such as tasks, ideas, content, or reports. |
+| `filters_json` | Stored filter payload. |
+| `is_default` | Whether this is the user's default view for the module. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+
+### `content_templates`
+
+Company-scoped templates used when creating content items.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the template. |
+| `company_id` | Company that owns the template. |
+| `title` | Template title. |
+| `description` | Optional template description. |
+| `body` | Reusable content body. |
+| `category` | Optional template category. |
+| `status` | Template status, active or archived. |
+| `created_by` | User who created the template. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+
+### `dashboard_preferences`
+
+Private user dashboard widget preferences.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the preference row. |
+| `company_id` | Company that owns the preference. |
+| `user_id` | User who owns the preference. |
+| `role` | Role dashboard the preferences apply to. |
+| `widgets_json` | Widget visibility and ordering payload. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
 
 ### `activity_logs`
 
@@ -392,6 +494,33 @@ Platform-level superior admin accounts. These users are not company members and 
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
+### `platform_admins`
+
+Current platform-level admin table used by the final production phase. Platform admins are not company users and are resolved before tenant profile resolution.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary platform admin identifier. |
+| `auth_user_id` | Supabase Auth user id. |
+| `email` | Platform admin email. |
+| `status` | Active or suspended. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+
+### `platform_activity_logs`
+
+Platform-level audit logs for organization lifecycle actions.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary log identifier. |
+| `platform_admin_id` | Platform admin who performed the action. |
+| `action` | Platform action key. |
+| `entity_type` | Entity type, usually company. |
+| `entity_id` | Affected entity id. |
+| `metadata` | Structured before/after context. |
+| `created_at` | Creation timestamp. |
+
 ## 3. Relationships
 
 Relationship count: 33 documented direct relationships, plus additional Phase 4 workflow links listed in the migration notes.
@@ -479,6 +608,10 @@ These tables directly store tenant-owned data and must include `company_id`:
 * `users`
 * `roles`
 * `teams`
+* `user_invitations`
+* `work_days`
+* `work_sessions`
+* `break_sessions`
 * `task_comments`
 * `tasks`
 * `ideas`
@@ -489,6 +622,12 @@ These tables directly store tenant-owned data and must include `company_id`:
 * `calendar_events`
 * `day_off_requests`
 * `notifications`
+* `attachments`
+* `comments`
+* `mentions`
+* `saved_views`
+* `content_templates`
+* `dashboard_preferences`
 * `activity_logs`
 * `company_settings`
 
@@ -499,7 +638,8 @@ These tables directly store tenant-owned data and must include `company_id`:
 * `role_permissions` inherits company scope through `role_id`.
 * `team_members` inherits company scope through both `team_id` and `user_id`.
 * `task_comments` includes `company_id` directly and also inherits task scope through `task_id`.
-* `superior_admins` is platform-scoped and should not include `company_id`.
+* `superior_admins` and `platform_admins` are platform-scoped and should not include `company_id`.
+* `platform_activity_logs` is platform-scoped and references platform admin actions.
 
 ### Data isolation rules
 
@@ -601,15 +741,16 @@ Recommended RLS approach:
 * Never trust a browser-provided `company_id` for authorization decisions.
 * User invitation acceptance must create the profile inside the invited company only.
 * Working-hours writes should be performed through server actions or database RPCs that resolve `company_id` from the active user profile.
-* Superior admins can bootstrap organizations through a dedicated server action and database RPC, but should not read tenant data as company members.
+* Superior admins and platform admins can bootstrap and manage organization lifecycle through dedicated server actions, but should not read tenant data as company members.
+* Disabled and deleted companies block company users from dashboards before tenant data is rendered.
 
 ## Schema Summary
 
-* Tables designed: 24
-* Direct relationships defined: 39 including Phase 4-10 workflow additions
+* Tables designed: 32
+* Direct relationships defined: 49 including Phase 4-10 and final production workflow additions
 * Tenant root table: `companies`
-* Company-scoped tables with `company_id`: 19
-* Global/platform tables: `permissions`, `superior_admins`
+* Company-scoped tables with `company_id`: 25
+* Global/platform tables: `permissions`, `superior_admins`, `platform_admins`, `platform_activity_logs`
 * Join tables: `role_permissions`, `team_members`
 
 ## Phase 4-10 Workflow Additions
@@ -649,3 +790,15 @@ Migration `202606240003_contento_phase_4_scope_policy_hardening.sql` adds explic
 * Team member write policies.
 * Task create/update policies for assignees, assigners, and teams.
 * Content create/update policies for creators, teams, tasks, and ideas.
+
+Migration `202606240004_contento_final_production_saas_readiness.sql` adds final production SaaS readiness:
+
+* Platform admin tables and policies.
+* Organization lifecycle status support for active, disabled, and deleted companies.
+* Notification entity links and read timestamps.
+* Generic comments, mentions, and attachments with entity-scope helpers.
+* Supabase Storage buckets for company-scoped attachments and avatars.
+* Saved views, content templates, and dashboard preferences.
+* Content review scoring fields.
+* Additional permissions for notifications, attachments, comments, mentions, search, saved views, analytics, templates, and dashboard customization.
+* RLS policies and indexes for the final production tables and helper functions.

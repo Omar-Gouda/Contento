@@ -17,6 +17,7 @@ import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
+import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -299,6 +300,8 @@ export default async function ContentDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <CollaborationPanel context={context} entityType="content" entityId={content.id} redirectTo={`/content/${content.id}`} />
     </section>
   );
 }

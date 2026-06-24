@@ -15,6 +15,7 @@ import {
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { SavedViewsPanel } from "@/components/dashboard/saved-views-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -161,6 +162,17 @@ export async function IdeasSurface({
           </form>
         </CardContent>
       </Card>
+
+      <SavedViewsPanel
+        context={context}
+        module="ideas"
+        basePath={basePath}
+        currentFilters={{
+          q: searchParams.q,
+          status: searchParams.status,
+          team: searchParams.team,
+        }}
+      />
 
       <div className="grid gap-4">
         {ideas.map((idea) => (

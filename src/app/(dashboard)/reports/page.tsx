@@ -12,6 +12,7 @@ import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { SavedViewsPanel } from "@/components/dashboard/saved-views-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -156,6 +157,16 @@ export default async function ReportsPage({
           </form>
         </CardContent>
       </Card>
+
+      <SavedViewsPanel
+        context={context}
+        module="reports"
+        basePath="/reports"
+        currentFilters={{
+          type: params.type,
+          team: params.team,
+        }}
+      />
 
       <Card>
         <CardHeader>

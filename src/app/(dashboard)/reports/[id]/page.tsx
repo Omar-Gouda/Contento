@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/context";
 import { getWorkflowReportById } from "@/lib/workflows/queries";
 import { formatCairoDateTime } from "@/lib/time";
+import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -82,6 +83,8 @@ export default async function ReportDetailPage({
           {report.body}
         </CardContent>
       </Card>
+
+      <CollaborationPanel context={context} entityType="report" entityId={report.id} redirectTo={`/reports/${report.id}`} />
     </section>
   );
 }

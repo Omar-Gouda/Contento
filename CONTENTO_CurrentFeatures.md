@@ -200,7 +200,7 @@ Features:
 
 ## 10. Analytics
 
-Status: Planned
+Status: Implemented
 
 Features:
 
@@ -211,6 +211,9 @@ Features:
 * Creator performance
 * Team performance
 * Activity trends
+* Role-scoped dashboard metrics for Admin, Supervisor, CC Team Lead, and Creator
+* Company-wide Admin analytics for users, active users, teams, open tasks, approval rate, reports, and active work days
+* Team-scoped Supervisor and CC Team Lead metrics
 
 ## 11. Activity Logs
 
@@ -226,7 +229,7 @@ Features:
 
 ## 12. Notifications
 
-Status: Planned
+Status: Implemented
 
 Features:
 
@@ -235,6 +238,11 @@ Features:
 * Content rejected notification
 * Review requested notification
 * Feedback received notification
+* Notification center at `/notifications`
+* Unread count in the dashboard shell
+* Read/unread filtering
+* Mark one or all notifications as read
+* Entity links when a notification maps to a task, idea, content item, report, or organization event
 
 ## 13. UI/UX
 
@@ -355,3 +363,26 @@ Created in the current implementation:
 * Workflow migration for team leads/status, task priority/comments, idea assignment/notes, content schedule timestamps, calendar links, RLS helpers, and workflow indexes
 * Shared operations completion migration for team creators, task assigners, idea team links, content idea/team links, report titles/team/date ranges, report export activity logs, and permission aliases
 * Phase 4 scope-fix migration for private dashboards, Team Lead own-team boundaries, scoped task/content review helpers, content review handoff statuses, content ratings, and tightened RLS policies
+
+## 20. Final Production SaaS Readiness
+
+Status: Implemented
+
+Created in the final production phase:
+
+* Platform Admin table and route family at `/super-admin`, `/super-admin/organizations`, and `/super-admin/organizations/[id]`
+* Organization lifecycle management for active, disabled, and deleted states
+* Organization blocked-state pages at `/organization-disabled` and `/organization-unavailable`
+* Platform activity logs for organization lifecycle changes
+* Notification center, notification unread count, mark-read actions, and workflow-generated notifications
+* Generic company-scoped comments, mentions, and attachments for tasks, ideas, content, and reports
+* Supabase Storage buckets and policies for attachments and avatars
+* Global search at `/search`
+* Saved views and advanced filter persistence for operational list pages
+* Organization settings and branding at `/settings`
+* User profile management at `/profile`
+* Review scoring fields on content reviews
+* Content templates at `/content/templates`
+* Dashboard widget customization with user preferences
+* Expanded audit logging for user management and workflow actions
+* GitHub and Vercel readiness documentation, safe `.env.example`, and temporary file cleanup

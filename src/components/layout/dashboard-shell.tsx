@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
-import { Building2, Menu, Search, ShieldCheck } from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
+import Link from "next/link";
+import { Bell, Building2, Menu, Search, ShieldCheck } from "lucide-react";
 
 import { SignOutButton } from "@/components/forms/sign-out-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { routes } from "@/constants/routes";
 import type { AuthContext } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 import { DashboardNavigation } from "./dashboard-navigation";
@@ -13,12 +15,26 @@ import { ThemeToggle } from "./theme-toggle";
 export function DashboardShell({
   children,
   context,
+  unreadNotificationCount,
+  branding,
 }: {
   children: ReactNode;
   context: AuthContext;
+  unreadNotificationCount?: number;
+  branding?: {
+    primaryColor: string | null;
+    secondaryColor: string | null;
+    accentColor: string | null;
+  } | null;
 }) {
+  const brandingStyle = {
+    ...(branding?.primaryColor ? { "--primary": branding.primaryColor, "--sidebar-primary": branding.primaryColor } : {}),
+    ...(branding?.secondaryColor ? { "--secondary": branding.secondaryColor, "--sidebar-accent": branding.secondaryColor } : {}),
+    ...(branding?.accentColor ? { "--accent": branding.accentColor } : {}),
+  } as CSSProperties;
+
   return (
-    <div className="min-h-svh bg-background">
+    <div className="min-h-svh bg-background" style={brandingStyle}>
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex lg:flex-col">
         <div className="px-2">
           <SiteLogo />
@@ -59,13 +75,28 @@ export function DashboardShell({
               </div>
             </div>
 
-            <div className="hidden w-full max-w-md items-center gap-2 rounded-lg border bg-secondary/45 px-3 py-1.5 text-sm text-muted-foreground md:flex">
+            <Link
+              href={routes.search}
+              className="hidden w-full max-w-md items-center gap-2 rounded-lg border bg-secondary/45 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary md:flex"
+            >
               <Search className="size-4" />
-              Company-scoped controls and records
-            </div>
+              Search company-scoped records
+            </Link>
 
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
+              <Link
+                href={routes.notifications}
+                className={cn(buttonVariants({ variant: "outline", size: "icon" }), "relative")}
+                aria-label="Notifications"
+              >
+                <Bell />
+                {Boolean(unreadNotificationCount) && (
+                  <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                    {unreadNotificationCount}
+                  </span>
+                )}
+              </Link>
               <div className="hidden sm:block">
                 <SignOutButton />
               </div>

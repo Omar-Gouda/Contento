@@ -1,6 +1,6 @@
 # Contento Auth Flow
 
-This document describes the implemented and planned authentication and authorization flow for Contento. The current foundation uses Supabase Auth, Contento profile resolution, company-scoped RBAC, first-company onboarding, Admin direct user creation, forced first-login password changes, working-hours session tracking, operational workflow modules, and a platform-level superior-admin path.
+This document describes the implemented and planned authentication and authorization flow for Contento. The current foundation uses Supabase Auth, Contento profile resolution, company-scoped RBAC, first-company onboarding, Admin direct user creation, forced first-login password changes, working-hours session tracking, operational workflow modules, organization lifecycle checks, and a platform-level Super Admin path.
 
 ## 1. Auth Flow Goals
 
@@ -16,7 +16,7 @@ Primary goals:
 * Support password reset, first-company onboarding, and Admin-created users.
 * Force Admin-created users to change temporary passwords before dashboard access.
 * Track working-hours sign-in and sign-out events without weakening authentication.
-* Support superior-admin organization bootstrap outside tenant workspaces.
+* Support Super Admin organization bootstrap and lifecycle management outside tenant workspaces.
 
 ## 2. Core Concepts
 
@@ -28,9 +28,10 @@ Primary goals:
 | Role | Admin, Supervisor, CC Team Lead, or Creator. |
 | Permission | A product capability assigned to a role through `role_permissions`. |
 | Session | The authenticated Supabase session used by the app. |
-| Superior Admin | A platform operator account that can create organizations and their first Org Admin without joining a tenant. |
+| Platform Admin | A platform operator account that can create organizations, manage organization lifecycle, and view platform metadata without joining a tenant. |
+| Superior Admin | Legacy platform bootstrap account model kept for compatibility. |
 
-The Supabase Auth user confirms identity. The Contento `users` row confirms workspace access, role, company, and operational status. Superior admins are resolved separately through `superior_admins`.
+The Supabase Auth user confirms identity. The Contento `users` row confirms workspace access, role, company, and operational status. Platform admins are resolved separately through `platform_admins` before company-user profile resolution.
 
 ## 3. Auth-Related Routes
 
@@ -42,6 +43,8 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 | `/change-password` | Required password change for Admin-created users. | Implemented in Phase 3 fixes. |
 | `/onboarding` | First authenticated user creates the company workspace and Admin profile. | Implemented in Phase 2.5. |
 | `/account-inactive` | Signed-in account exists but cannot access dashboards because status or role resolution is not active. | Implemented in Phase 2.5. |
+| `/organization-disabled` | Signed-in account belongs to a disabled organization. | Implemented in final production phase. |
+| `/organization-unavailable` | Signed-in account belongs to a soft-deleted or unavailable organization. | Implemented in final production phase. |
 | `/admin` | Admin dashboard. | Protected in Phase 2. |
 | `/supervisor` | Supervisor dashboard. | Protected in Phase 2. |
 | `/team-lead` | CC Team Lead dashboard. | Protected in Phase 2. |
@@ -61,6 +64,13 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 | `/calendar` | Monthly and weekly content/work/day-off calendar. | Implemented in Phase 4-10 workflow foundation. |
 | `/reports` | Report submission and review. | Implemented in Phase 4-10 workflow foundation. |
 | `/reports/export` | Permission-checked CSV report export. | Implemented in Phase 4-10 workflow foundation. |
+| `/notifications` | Notification center. | Implemented in final production phase. |
+| `/search` | Global search over accessible company data. | Implemented in final production phase. |
+| `/settings` | Admin organization settings and branding. | Implemented in final production phase. |
+| `/profile` | Current user profile and avatar settings. | Implemented in final production phase. |
+| `/content/templates` | Content template management and use. | Implemented in final production phase. |
+| `/super-admin` | Platform overview. | Implemented in final production phase. |
+| `/super-admin/organizations/[id]` | Organization detail and lifecycle controls. | Implemented in final production phase. |
 
 ## 4. User Statuses
 
@@ -73,6 +83,14 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 
 Only `Active` company users should access protected company routes.
 
+## 4.1 Organization Statuses
+
+| Status | Meaning |
+| --- | --- |
+| Active | Organization users can access the workspace according to role and permission. |
+| Disabled | Organization users are blocked from dashboards and redirected to `/organization-disabled`. |
+| Deleted | Organization users are blocked from dashboards and redirected to `/organization-unavailable`. |
+
 ## 5. Role Redirect Map
 
 | Role | Default Route |
@@ -81,6 +99,7 @@ Only `Active` company users should access protected company routes.
 | Supervisor | `/supervisor` |
 | CC Team Lead | `/team-lead` |
 | Creator | `/creator` |
+| Platform Admin | `/super-admin/organizations` |
 | Superior Admin | `/super-admin/organizations` |
 
 If a signed-in company user visits the wrong role dashboard, the app redirects to the user's default route unless the user has valid permission for that route.
@@ -97,7 +116,7 @@ User submits email and password
 Supabase Auth validates credentials
   |
   v
-App resolves superior_admins or Contento users profile
+App resolves platform_admins, legacy superior_admins, or Contento users profile
   |
   v
 Missing company profile attempts pending invitation acceptance
@@ -115,10 +134,13 @@ App redirects user to the correct dashboard
 Expected behavior:
 
 * Invalid credentials show a generic sign-in error.
-* Active superior admins redirect to `/super-admin/organizations`.
+* Active platform admins redirect to `/super-admin/organizations`.
+* Active legacy superior admins redirect to `/super-admin/organizations`.
 * Missing Contento profile first attempts to accept a pending invitation matching the authenticated email.
 * Missing Contento profile with no pending invitation redirects to `/onboarding`.
 * Suspended, disabled, invited, or incomplete profiles redirect to `/account-inactive`.
+* Active profiles in disabled companies redirect to `/organization-disabled`.
+* Active profiles in deleted companies redirect to `/organization-unavailable`.
 * Active users with `must_change_password = true` redirect to `/change-password`.
 * Active company users redirect based on role.
 * All protected data reads after sign in remain company-scoped.
@@ -288,10 +310,13 @@ Middleware checks Supabase session
 No session -> redirect to /sign-in
   |
   v
-Session exists -> resolve superior-admin account or Contento profile
+Session exists -> resolve platform-admin account, legacy superior-admin account, or Contento profile
   |
   v
 Inactive profile -> block or account inactive
+  |
+  v
+Disabled/deleted organization -> organization blocked page
   |
   v
 Role mismatch -> redirect to correct dashboard
@@ -303,8 +328,9 @@ Render protected route with scoped data
 Protected route responsibilities:
 
 * Require authentication.
-* Resolve active superior-admin account for `/super-admin`.
+* Resolve active platform-admin or legacy superior-admin account for `/super-admin`.
 * Resolve active Contento user profile for company routes.
+* Resolve company status before rendering company dashboards.
 * Resolve company context, role, and permissions.
 * Block dashboard access while `must_change_password = true`.
 * Render only role-appropriate and company-scoped data.
@@ -317,8 +343,9 @@ Middleware stays focused and lightweight:
 * Refresh Supabase auth session.
 * Redirect unauthenticated users away from protected routes.
 * Redirect authenticated users away from auth pages when appropriate.
-* Redirect active superior admins to `/super-admin/organizations`.
+* Redirect active platform admins and legacy superior admins to `/super-admin/organizations`.
 * Redirect active company users according to role.
+* Redirect active company users in disabled/deleted organizations to organization blocked pages.
 * Redirect active company users with `must_change_password = true` to `/change-password`.
 * Avoid large dashboard queries, analytics, exports, or workflow writes.
 
@@ -330,7 +357,10 @@ Detailed permission checks still happen server-side after profile resolution.
 Supabase session user id
   |
   v
-Check superior_admins.id for active platform access
+Check platform_admins.auth_user_id for active platform access
+  |
+  v
+Fallback check superior_admins.id for legacy platform access
   |
   v
 If not superior admin, find users.id
@@ -356,8 +386,9 @@ Company-user auth context includes:
 * `status`
 * `must_change_password`
 * `permissions`
+* company status
 
-Superior-admin context includes only the platform account id, email, and status. It does not include `company_id`, role permissions, or tenant membership.
+Platform-admin context includes only the platform account id, email, and status. It does not include `company_id`, role permissions, or tenant membership.
 
 ## 15. Authorization Flow
 
@@ -371,7 +402,7 @@ Resolve auth context
 Check user status
   |
   v
-Check company scope or superior-admin scope
+Check company scope or platform-admin scope
   |
   v
 Check permission key
@@ -392,6 +423,11 @@ Examples:
 | View own working hours | Active user, own user id, `work_hours.view_own`. |
 | View company working hours | Active Admin, same company, `work_hours.view_company`. |
 | Create organization | Active superior admin, no company context accepted from browser. |
+| Manage organization lifecycle | Active platform admin, organization id resolved server-side, lifecycle change logged. |
+| View notifications | Active company user, own notification rows only. |
+| Upload attachment | Active company user with entity access and `attachments.manage`. |
+| Comment or mention | Active company user with entity access and comment/mention permission. |
+| Use content template | Active company user with template-use permission and active same-company template. |
 | Assign task | Active Admin, Supervisor, or CC Team Lead with task assignment permission and same company. |
 | Submit content | Active Creator or permitted role, own or assigned task, same company. |
 | Approve content | Active Admin or Supervisor, same company, `reviews.approve`. |
@@ -429,16 +465,16 @@ Company isolation rules:
 ## 17. Superior Admin Flow
 
 ```txt
-Superior admin signs in
+Platform admin signs in
   |
   v
-App resolves superior_admins.id
+App resolves platform_admins.auth_user_id
   |
   v
-Active superior admin redirects to /super-admin/organizations
+Active platform admin redirects to /super-admin/organizations
   |
   v
-Superior admin submits company and first Org Admin fields
+Platform admin submits company and first Org Admin fields
   |
   v
 Server-only action creates Supabase Auth user for Org Admin
@@ -449,10 +485,11 @@ Database RPC creates company, roles, company settings, active Org Admin profile,
 
 Rules:
 
-* Superior admins are not company users.
-* Superior admins cannot access tenant dashboards unless they also have a separate Contento profile.
-* Organization creation must happen through trusted server code and the superior-admin-only RPC.
+* Platform admins are not company users.
+* Platform admins cannot access tenant dashboards unless they also have a separate Contento profile.
+* Organization creation and lifecycle changes must happen through trusted server code and platform-admin checks.
 * The first Org Admin becomes the company owner.
+* Disable, reactivate, and soft-delete operations write platform activity logs.
 
 ## 18. Working-Hours Auth Integration
 
@@ -477,7 +514,7 @@ RLS responsibilities:
 * Restrict user profile access by role and ownership.
 * Restrict working-hours records to the owner or Admins in the same company.
 * Clear `must_change_password` through a narrow authenticated RPC.
-* Restrict superior-admin reads to the matching superior-admin account.
+* Restrict platform-admin reads to the matching platform-admin account.
 
 RLS does not replace application authorization entirely. The app still checks permissions before sensitive workflow actions.
 
@@ -491,13 +528,15 @@ RLS does not replace application authorization entirely. The app still checks pe
 | Invited but incomplete setup | Continue invitation flow or show account state. |
 | Suspended user | Block access and show workspace access unavailable. |
 | Disabled user | Block access and sign out if needed. |
+| Disabled organization | Redirect to `/organization-disabled`. |
+| Deleted organization | Redirect to `/organization-unavailable`. |
 | Missing role | Block access and ask Admin to assign role. |
 | Missing company | Block access and ask Admin or support to fix workspace. |
 | Unauthorized role route | Redirect to correct dashboard or show unauthorized state. |
 | Permission denied | Show no-access state without exposing private data. |
 | Active break during sign out | Keep the user signed in and redirect to work-hours controls. |
 | Must change password | Redirect to `/change-password` before dashboard access. |
-| Suspended superior admin | Block access and redirect to account inactive. |
+| Suspended platform admin | Block access and redirect to account inactive. |
 
 ## 21. Security Rules
 
@@ -512,8 +551,8 @@ RLS does not replace application authorization entirely. The app still checks pe
 * User status changes should take effect quickly.
 * Temporary passwords must not be logged or stored in Contento tables.
 * Admin-created users must change temporary passwords before dashboard access.
-* Superior admins must not be treated as tenant users.
-* User creation and superior-admin operations that require service-role access must remain server-only.
+* Platform admins must not be treated as tenant users.
+* User creation and platform-admin operations that require service-role access must remain server-only.
 
 ## 22. Phase Alignment
 
@@ -527,16 +566,16 @@ RLS does not replace application authorization entirely. The app still checks pe
 | Phase 6 | Reports and CSV export protected by report/export permissions. |
 | Phase 7 | Notifications and expanded activity-log UI tied to workflow actions. |
 | Phase 9 | Security policies, error handling, testing, deployment readiness. |
+| Final Production | Platform admin lifecycle, organization-blocked auth states, notifications, search, collaboration, profile/settings, templates, dashboard preferences, and Vercel readiness. |
 
 ## 23. Current Foundation Boundary
 
-The current foundation includes real Supabase authentication, password reset, protected routes, role redirects, database migrations, RLS policies, first-company onboarding, Admin direct user creation, forced password change, working-hours tracking, dark mode, superior-admin organization bootstrap, Teams, Tasks, Ideas, Content, Calendar, and Reports.
+The current foundation includes real Supabase authentication, password reset, protected routes, role redirects, database migrations, RLS policies, first-company onboarding, Admin direct user creation, forced password change, working-hours tracking, dark mode, platform organization management, Teams, Tasks, Ideas, Content, Calendar, Reports, Notifications, Search, Collaboration, Settings, Profile, Templates, and Dashboard Preferences.
 
 It should not yet include:
 
-* Advanced analytics dashboard charts.
-* Notifications.
 * Background jobs.
 * Advanced role/permission editing UI.
+* Real-time subscriptions.
 
 Those items continue in later roadmap phases.
