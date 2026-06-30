@@ -45,11 +45,15 @@ The production app also seeds additional agency-facing role labels for Graphic D
 
 ## Client Workspaces
 
-| Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
+| Permission Key | Capability | Marketing Manager | Account Manager | Team Lead | Content Creator |
 | --- | --- | --- | --- | --- | --- |
-| `clients.view` | View company client workspaces, briefs, and delivery context. | Full Access | Full Access | Limited Access | Limited Access |
-| `clients.manage` | Create and edit client workspaces. | Full Access | Limited Access | No Access | No Access |
-| `clients.assign` | Assign account managers and scoped delivery users to client workspaces. | Full Access | Limited Access | No Access | No Access |
+| `clients.view` | View company client workspaces, briefs, and delivery context. | Full Access | Limited assigned-client access | Limited assigned-client access | Limited assigned-client access |
+| `clients.create` | Create client workspaces. | Full Access | Limited self-assigned access | No Access | No Access |
+| `clients.update` | Edit client workspaces and briefs. | Full Access | Limited assigned-client access | No Access | No Access |
+| `clients.manage` | Manage client profile details. | Full Access | Limited assigned-client access | No Access | No Access |
+| `clients.assign` | Assign account managers and scoped delivery users to client workspaces. | Full Access | No Access | No Access | No Access |
+| `clients.assign_account_manager` | Assign or self-assign account managers to client workspaces. | Full Access | Limited self-assignment access | No Access | No Access |
+| `clients.delete` | Disable, archive, or delete client profiles. | Full Access | No Access | No Access | No Access |
 | `content.final_output` | Attach final Drive links for production handoff. | Full Access | Limited Access | Limited Access | Limited Access |
 | `reports.send_to_client` | Mark reports as shared with the client. | Full Access | Limited Access | No Access | No Access |
 

@@ -123,7 +123,10 @@ export default async function ClientDetailPage({
   }
 
   const taskComments = await getWorkflowTaskComments(context, client.tasks.map((task) => task.id));
-  const canManageClient = hasPermission(context, "clients.manage", "limited") && context.role !== "client";
+  const canManageClient = (
+    hasPermission(context, "clients.update", "limited") ||
+    hasPermission(context, "clients.manage", "limited")
+  ) && context.role !== "client";
   const canCreateIdea = hasPermission(context, "ideas.create", "limited") && context.role !== "client";
   const canCreateTask = hasPermission(context, "tasks.create", "limited") && context.role !== "client";
   const canComment = hasPermission(context, "tasks.view", "view") && context.role !== "client";
