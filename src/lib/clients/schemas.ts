@@ -27,9 +27,7 @@ export const clientProfileSchema = z.object({
   slug: z
     .string()
     .trim()
-    .toLowerCase()
-    .max(120, "Slug is too long.")
-    .regex(/^[a-z0-9-]*$/, "Use lowercase letters, numbers, and dashes only.")
+    .max(160, "Slug is too long.")
     .optional()
     .default(""),
   logoUrl: optionalUrlSchema,

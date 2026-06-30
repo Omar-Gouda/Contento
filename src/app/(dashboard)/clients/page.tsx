@@ -32,7 +32,13 @@ export default async function ClientsPage({
     getClients(context, { search: params.q, status: params.status }),
     getClientAssignableUsers(context),
   ]);
-  const canManage = hasPermission(context, "clients.manage", "limited");
+  const canCreateClient =
+    hasPermission(context, "clients.create", "limited") ||
+    hasPermission(context, "clients.manage", "limited");
+  const canAssignClients =
+    hasPermission(context, "clients.assign", "full") ||
+    hasPermission(context, "clients.assign_account_manager", "full");
+  const accountManagers = users.filter((user) => user.roleKey === "supervisor");
 
   return (
     <section className="space-y-6">
@@ -52,7 +58,7 @@ export default async function ClientsPage({
 
       <PageMessage error={params.error} status={params.notice} />
 
-      {canManage && (
+      {canCreateClient && (
         <Card>
           <CardHeader>
             <CardTitle>Create client</CardTitle>
@@ -70,16 +76,23 @@ export default async function ClientsPage({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="assignedAccountManagerId">Account manager</Label>
-                <select id="assignedAccountManagerId" name="assignedAccountManagerId" className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm">
-                  <option value="">None</option>
-                  {users
-                    .filter((user) => ["supervisor", "team-lead", "admin"].includes(user.roleKey ?? ""))
-                    .map((user) => (
+                {canAssignClients ? (
+                  <select id="assignedAccountManagerId" name="assignedAccountManagerId" className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm">
+                    <option value="">None</option>
+                    {accountManagers.map((user) => (
                       <option key={user.id} value={user.id}>
                         {user.displayName} - {getRoleDisplayName(user.roleName)}
                       </option>
                     ))}
-                </select>
+                  </select>
+                ) : (
+                  <>
+                    <input type="hidden" name="assignedAccountManagerId" value={context.userId} />
+                    <div className="rounded-lg border bg-secondary/35 px-3 py-2 text-sm text-muted-foreground">
+                      New clients are assigned to your account automatically.
+                    </div>
+                  </>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contactPerson">Contact person</Label>
@@ -127,20 +140,22 @@ export default async function ClientsPage({
                   {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
                 </select>
               </div>
-              <div className="lg:col-span-3 space-y-3">
-                <Label>Assigned users</Label>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {users.map((user) => (
-                    <label key={user.id} className="flex items-start gap-3 rounded-lg border p-3 text-sm">
-                      <input type="checkbox" name="assignedUserIds" value={user.id} className="mt-1 size-4 rounded border-input" />
-                      <span className="min-w-0">
-                        <span className="block font-medium">{user.displayName}</span>
-                        <span className="block text-muted-foreground">{getRoleDisplayName(user.roleName)}</span>
-                      </span>
-                    </label>
-                  ))}
+              {canAssignClients && (
+                <div className="lg:col-span-3 space-y-3">
+                  <Label>Assigned users</Label>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {users.map((user) => (
+                      <label key={user.id} className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+                        <input type="checkbox" name="assignedUserIds" value={user.id} className="mt-1 size-4 rounded border-input" />
+                        <span className="min-w-0">
+                          <span className="block font-medium">{user.displayName}</span>
+                          <span className="block text-muted-foreground">{getRoleDisplayName(user.roleName)}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="lg:col-span-3">
                 <Button type="submit">
                   <Plus />
