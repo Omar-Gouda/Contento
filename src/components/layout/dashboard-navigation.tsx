@@ -43,7 +43,7 @@ type NavigationGroup = {
   items: NavigationItem[];
 };
 
-const expandedGroupsStorageKey = "contento-sidebar-expanded-groups";
+const expandedGroupStorageKey = "contento-sidebar-open-group";
 
 const dashboardByRole: Record<UserRole, NavigationItem> = {
   admin: { label: "Marketing Manager dashboard", href: routes.dashboards.marketingManager, icon: LayoutDashboard },
@@ -59,25 +59,32 @@ function isActivePath(pathname: string, item: NavigationItem) {
   return pathname === item.href || (!item.exact && pathname.startsWith(`${item.href}/`));
 }
 
-function getStoredExpandedGroups() {
+function getStoredExpandedGroupId() {
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
-    const rawValue = window.localStorage.getItem(expandedGroupsStorageKey);
+    const rawValue = window.localStorage.getItem(expandedGroupStorageKey);
     const parsedValue = rawValue ? JSON.parse(rawValue) : null;
 
-    return Array.isArray(parsedValue) && parsedValue.every((item) => typeof item === "string")
-      ? parsedValue
-      : null;
+    if (typeof parsedValue === "string") {
+      return parsedValue;
+    }
+
+    return Array.isArray(parsedValue) && typeof parsedValue[0] === "string" ? parsedValue[0] : null;
   } catch {
     return null;
   }
 }
 
-function persistExpandedGroups(groupIds: string[]) {
-  window.localStorage.setItem(expandedGroupsStorageKey, JSON.stringify(groupIds));
+function persistExpandedGroupId(groupId: string | null) {
+  if (groupId) {
+    window.localStorage.setItem(expandedGroupStorageKey, JSON.stringify(groupId));
+    return;
+  }
+
+  window.localStorage.removeItem(expandedGroupStorageKey);
 }
 
 function NavTooltip({
@@ -315,7 +322,7 @@ function SidebarGroup({
   group: NavigationGroup;
   collapsed: boolean;
   expanded: boolean;
-  onToggle: (id: string) => void;
+  onToggle: (group: NavigationGroup) => void;
 }) {
   const pathname = usePathname();
   const GroupIcon = group.icon;
@@ -328,6 +335,8 @@ function SidebarGroup({
           type="button"
           title={group.label}
           aria-label={group.label}
+          aria-expanded={expanded}
+          onClick={() => onToggle(group)}
           className={cn(
             "group/nav-item relative flex h-10 items-center justify-center rounded-lg transition-colors",
             active
@@ -339,6 +348,13 @@ function SidebarGroup({
           {active && <span className="absolute right-1 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-current" />}
           <NavTooltip label={group.label} detail={group.items.map((item) => item.label).join(" / ")} />
         </button>
+        {expanded && (
+          <div className="grid gap-1 rounded-lg border border-sidebar-border/70 bg-sidebar-accent/30 p-1">
+            {group.items.map((item) => (
+              <NavLink key={item.href} item={item} collapsed nested />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -348,7 +364,7 @@ function SidebarGroup({
       <button
         type="button"
         aria-expanded={expanded}
-        onClick={() => onToggle(group.id)}
+        onClick={() => onToggle(group)}
         className={cn(
           "flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold transition-colors",
           active
@@ -382,22 +398,41 @@ function SidebarGroup({
 export function DashboardNavigation({ context, collapsed = false }: { context: AuthContext; collapsed?: boolean }) {
   const pathname = usePathname();
   const groups = useMemo(() => getNavigationGroups(context), [context]);
-  const activeGroupIds = useMemo(
-    () => groups.filter((group) => group.items.some((item) => isActivePath(pathname, item))).map((group) => group.id),
+  const activeRouteGroupId = useMemo(
+    () => groups.find((group) => group.items.some((item) => isActivePath(pathname, item)))?.id ?? null,
     [groups, pathname]
   );
-  const defaultGroupIds = useMemo(
-    () => [activeGroupIds[0] ?? "dashboard"],
-    [activeGroupIds]
-  );
-  const [expandedGroupId, setExpandedGroupId] = useState(() => activeGroupIds[0] ?? getStoredExpandedGroups()?.[0] ?? defaultGroupIds[0]);
-  const visibleExpandedGroupId = activeGroupIds[0] || expandedGroupId || defaultGroupIds[0];
+  const [openGroupState, setOpenGroupState] = useState<{ groupId: string | null; pathname: string }>(() => {
+    const storedGroupId = getStoredExpandedGroupId();
+    const validStoredGroupId = groups.some((group) => group.id === storedGroupId) ? storedGroupId : null;
 
-  function toggleGroup(id: string) {
-    setExpandedGroupId((current) => {
-      const next = current === id ? "" : id;
-      persistExpandedGroups(next ? [next] : []);
-      return next;
+    return {
+      groupId: activeRouteGroupId ?? validStoredGroupId ?? groups[0]?.id ?? null,
+      pathname,
+    };
+  });
+  const derivedOpenGroupId = openGroupState.pathname !== pathname && activeRouteGroupId
+    ? activeRouteGroupId
+    : openGroupState.groupId;
+  const visibleOpenGroupId = derivedOpenGroupId && groups.some((group) => group.id === derivedOpenGroupId)
+    ? derivedOpenGroupId
+    : activeRouteGroupId;
+
+  function toggleGroup(group: NavigationGroup) {
+    setOpenGroupState((current) => {
+      const currentOpenGroupId = current.pathname !== pathname && activeRouteGroupId
+        ? activeRouteGroupId
+        : current.groupId;
+      const nextGroupId = currentOpenGroupId === group.id
+        ? (group.id === activeRouteGroupId ? group.id : null)
+        : group.id;
+
+      persistExpandedGroupId(nextGroupId);
+
+      return {
+        groupId: nextGroupId,
+        pathname,
+      };
     });
   }
 
@@ -408,7 +443,7 @@ export function DashboardNavigation({ context, collapsed = false }: { context: A
           key={group.id}
           group={group}
           collapsed={collapsed}
-          expanded={visibleExpandedGroupId === group.id}
+          expanded={visibleOpenGroupId === group.id}
           onToggle={toggleGroup}
         />
       ))}
