@@ -45,7 +45,7 @@ type PlatformGroup = {
 };
 
 const collapsedStorageKey = "contento-super-admin-sidebar-collapsed";
-const expandedStorageKey = "contento-super-admin-sidebar-expanded-groups";
+const expandedStorageKey = "contento-super-admin-sidebar-open-group";
 
 const platformGroups: PlatformGroup[] = [
   {
@@ -75,12 +75,23 @@ function getStoredExpandedGroups() {
     const rawValue = window.localStorage.getItem(expandedStorageKey);
     const parsedValue = rawValue ? JSON.parse(rawValue) : null;
 
-    return Array.isArray(parsedValue) && parsedValue.every((item) => typeof item === "string")
-      ? parsedValue
-      : null;
+    if (typeof parsedValue === "string") {
+      return parsedValue;
+    }
+
+    return Array.isArray(parsedValue) && typeof parsedValue[0] === "string" ? parsedValue[0] : null;
   } catch {
     return null;
   }
+}
+
+function persistExpandedGroupId(groupId: string | null) {
+  if (groupId) {
+    window.localStorage.setItem(expandedStorageKey, JSON.stringify(groupId));
+    return;
+  }
+
+  window.localStorage.removeItem(expandedStorageKey);
 }
 
 function NavTooltip({ label, detail }: { label: string; detail?: string }) {
@@ -94,9 +105,11 @@ function NavTooltip({ label, detail }: { label: string; detail?: string }) {
 
 function PlatformNavLink({
   item,
+  collapsed = false,
   nested = false,
 }: {
   item: PlatformItem;
+  collapsed?: boolean;
   nested?: boolean;
 }) {
   const pathname = usePathname();
@@ -106,17 +119,21 @@ function PlatformNavLink({
   return (
     <Link
       href={item.href}
+      title={collapsed ? item.label : undefined}
+      aria-label={item.label}
       className={cn(
-        "flex h-9 items-center gap-2 rounded-lg text-sm font-medium transition-colors",
+        "group/nav-item relative flex h-9 items-center gap-2 rounded-lg text-sm font-medium transition-colors",
         nested ? "px-3 pl-8" : "px-3",
+        collapsed && "justify-center px-0",
         active
           ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
           : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       )}
     >
-      <Icon className={cn("size-4 shrink-0", nested && "size-3.5")} />
-      <span className="truncate">{item.label}</span>
-      {active && <span className="ml-auto size-1.5 rounded-full bg-current opacity-80" />}
+      <Icon className={cn("size-4 shrink-0", nested && !collapsed && "size-3.5")} />
+      <span className={cn("truncate", collapsed && "sr-only")}>{item.label}</span>
+      {active && !collapsed && <span className="ml-auto size-1.5 rounded-full bg-current opacity-80" />}
+      {collapsed && <NavTooltip label={item.label} />}
     </Link>
   );
 }
@@ -127,16 +144,38 @@ function SuperAdminNavigation({ collapsed = false }: { collapsed?: boolean }) {
     () => platformGroups.filter((group) => group.items.some((item) => isActivePath(pathname, item))).map((group) => group.id),
     [pathname]
   );
-  const [expandedGroupId, setExpandedGroupId] = useState(
-    () => activeGroupIds[0] ?? getStoredExpandedGroups()?.[0] ?? "dashboard"
-  );
-  const visibleExpandedGroupId = activeGroupIds[0] || expandedGroupId || "dashboard";
+  const activeRouteGroupId = activeGroupIds[0] ?? null;
+  const [openGroupState, setOpenGroupState] = useState<{ groupId: string | null; pathname: string }>(() => {
+    const storedGroupId = getStoredExpandedGroups();
+    const validStoredGroupId = platformGroups.some((group) => group.id === storedGroupId) ? storedGroupId : null;
 
-  function toggleGroup(id: string) {
-    setExpandedGroupId((current) => {
-      const next = current === id ? "" : id;
-      window.localStorage.setItem(expandedStorageKey, JSON.stringify(next ? [next] : []));
-      return next;
+    return {
+      groupId: activeRouteGroupId ?? validStoredGroupId ?? platformGroups[0]?.id ?? null,
+      pathname,
+    };
+  });
+  const derivedOpenGroupId = openGroupState.pathname !== pathname && activeRouteGroupId
+    ? activeRouteGroupId
+    : openGroupState.groupId;
+  const visibleOpenGroupId = derivedOpenGroupId && platformGroups.some((group) => group.id === derivedOpenGroupId)
+    ? derivedOpenGroupId
+    : activeRouteGroupId;
+
+  function toggleGroup(group: PlatformGroup) {
+    setOpenGroupState((current) => {
+      const currentOpenGroupId = current.pathname !== pathname && activeRouteGroupId
+        ? activeRouteGroupId
+        : current.groupId;
+      const nextGroupId = currentOpenGroupId === group.id
+        ? (group.id === activeRouteGroupId ? group.id : null)
+        : group.id;
+
+      persistExpandedGroupId(nextGroupId);
+
+      return {
+        groupId: nextGroupId,
+        pathname,
+      };
     });
   }
 
@@ -144,27 +183,37 @@ function SuperAdminNavigation({ collapsed = false }: { collapsed?: boolean }) {
     <nav className={cn("grid gap-2", collapsed && "gap-1.5")}>
       {platformGroups.map((group) => {
         const GroupIcon = group.icon;
-        const expanded = visibleExpandedGroupId === group.id;
+        const expanded = visibleOpenGroupId === group.id;
         const active = group.items.some((item) => isActivePath(pathname, item));
 
         if (collapsed) {
           return (
-            <button
-              key={group.id}
-              type="button"
-              title={group.label}
-              aria-label={group.label}
-              className={cn(
-                "group/nav-item relative flex h-10 items-center justify-center rounded-lg transition-colors",
-                active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            <div key={group.id} className="grid gap-1">
+              <button
+                type="button"
+                title={group.label}
+                aria-label={group.label}
+                aria-expanded={expanded}
+                onClick={() => toggleGroup(group)}
+                className={cn(
+                  "group/nav-item relative flex h-10 items-center justify-center rounded-lg transition-colors",
+                  active
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <GroupIcon className="size-4" />
+                {active && <span className="absolute right-1 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-current" />}
+                <NavTooltip label={group.label} detail={group.items.map((item) => item.label).join(" / ")} />
+              </button>
+              {expanded && (
+                <div className="grid gap-1 rounded-lg border border-sidebar-border/70 bg-sidebar-accent/30 p-1">
+                  {group.items.map((item) => (
+                    <PlatformNavLink key={item.href} item={item} collapsed nested />
+                  ))}
+                </div>
               )}
-            >
-              <GroupIcon className="size-4" />
-              {active && <span className="absolute right-1 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-current" />}
-              <NavTooltip label={group.label} detail={group.items.map((item) => item.label).join(" / ")} />
-            </button>
+            </div>
           );
         }
 
@@ -173,7 +222,7 @@ function SuperAdminNavigation({ collapsed = false }: { collapsed?: boolean }) {
             <button
               type="button"
               aria-expanded={expanded}
-              onClick={() => toggleGroup(group.id)}
+              onClick={() => toggleGroup(group)}
               className={cn(
                 "flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold transition-colors",
                 active
