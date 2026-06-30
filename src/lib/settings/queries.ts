@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { Json, Database } from "@/types/database";
+import { getRoleDisplayName } from "@/types/roles";
 
 export type CompanySettingsData = {
   company: Database["public"]["Tables"]["companies"]["Row"];
@@ -10,6 +11,7 @@ export type CompanySettingsData = {
 export type ProfileData = Database["public"]["Tables"]["users"]["Row"] & {
   roleName: string;
   teamName: string | null;
+  avatarSignedUrl: string | null;
 };
 
 export async function getCompanySettings(context: AuthContext): Promise<CompanySettingsData> {
@@ -58,10 +60,25 @@ export async function getProfileData(context: AuthContext): Promise<ProfileData>
 
   const firstTeam = (teams as Array<{ team_id: string; teams: { name: string } | null }> | null)?.[0];
 
+  let avatarSignedUrl: string | null = null;
+
+  if (profile.avatar_url) {
+    if (profile.avatar_url.startsWith("http://") || profile.avatar_url.startsWith("https://")) {
+      avatarSignedUrl = profile.avatar_url;
+    } else {
+      const { data: signedAvatar } = await supabase.storage
+        .from("contento-avatars")
+        .createSignedUrl(profile.avatar_url, 60 * 60);
+
+      avatarSignedUrl = signedAvatar?.signedUrl ?? null;
+    }
+  }
+
   return {
     ...(profile as Database["public"]["Tables"]["users"]["Row"]),
-    roleName: context.roleName,
+    roleName: getRoleDisplayName(context.role),
     teamName: firstTeam?.teams?.name ?? null,
+    avatarSignedUrl,
   };
 }
 
@@ -81,6 +98,7 @@ export async function getCompanyBranding(context: AuthContext) {
     }
 
     return {
+      companyName: data.company.name,
       primaryColor: typeof branding.primaryColor === "string" ? branding.primaryColor : null,
       secondaryColor: typeof branding.secondaryColor === "string" ? branding.secondaryColor : null,
       accentColor: typeof branding.accentColor === "string" ? branding.accentColor : null,

@@ -4,7 +4,7 @@ This document describes the backend architecture for Contento as of the final pr
 
 ## 1. Backend Goals
 
-Contento needs a backend that is simple, secure, and scalable enough for a multi-company SaaS platform. The backend must support authentication, company workspaces, user management, invitations, working-hours tracking, role-based access, content workflows, approvals, reports, schedules, analytics, notifications, activity logs, and exports over time.
+Contento needs a backend that is simple, secure, and scalable enough for a multi-company SaaS platform. The backend must support authentication, company workspaces, client workspaces, user management, invitations, working-hours tracking, role-based access, content workflows, approvals, reports, schedules, analytics, notifications, activity logs, and exports over time.
 
 Primary backend goals:
 
@@ -111,7 +111,7 @@ Responsibilities:
 
 ### Workflow Layer
 
-The current implemented workflows are authentication, onboarding, invitations, user management, platform organization management, working-hours tracking, teams, tasks, ideas, content pipeline, approvals, reports, analytics, notifications, collaboration, templates, profile/settings, and exports.
+The current implemented workflows are authentication, onboarding, invitations, user management, platform organization management, working-hours tracking, teams, client workspaces, tasks, ideas, content pipeline, approvals, reports, analytics, notifications, collaboration, templates, profile/settings, and exports.
 
 Responsibilities:
 
@@ -131,6 +131,8 @@ Implemented company-scoped tables:
 * `roles`
 * `teams`
 * `team_members`
+* `clients`
+* `client_assignments`
 * `company_settings`
 * `user_invitations`
 * `work_days`
@@ -153,6 +155,7 @@ Tenant rules:
 * Admins have full access inside their own company only.
 * Supervisors and CC Team Leads are constrained to permissions and assigned teams when those modules arrive.
 * Creators are constrained to their own work.
+* Client workspaces stay inside the owning company and are constrained by `clients` and `client_assignments` helpers.
 * Superior admins bootstrap organizations but are not company users.
 * Exports, analytics, notifications, search, saved views, and collaboration records must never cross company boundaries.
 
@@ -216,6 +219,7 @@ Implemented responsibilities:
 * Role permissions.
 * Admin user listing, filtering, status changes, role assignment, and team assignment.
 * Admin invitations.
+* Client assignments and client workspace ownership metadata.
 
 ### Working Hours
 
@@ -235,11 +239,13 @@ Implemented responsibilities:
 Implemented responsibilities:
 
 * Admin team creation, updates, archive state, lead assignment, member assignment, and team statistics.
+* Client workspace creation, editing, assignments, and client-linked delivery visibility.
 * Task creation, assignment, reassignment, status updates, priority, due dates, comments, and activity logs.
 * Idea creation, editing, deletion, assignment, notes, status tracking, and activity logs.
-* Content item creation, task linking, creator assignment, submission, resubmission, review feedback, approval, rejection, change requests, and scheduling.
-* Calendar monthly and weekly views that combine scheduled content, calendar events, work-hour rows, and day-off rows using `Africa/Cairo` display rules.
-* Report submission and CSV export with permission checks.
+* Content item creation, client/task/idea linking, creator assignment, submission, resubmission, review feedback, approval, rejection, change requests, final Drive handoff, and scheduling.
+* Calendar month, week, and day views for scheduling only: task due dates, scheduled content, submitted day off/sick leave requests, and optional general meetings using `Africa/Cairo` display rules.
+* Time-off request submission and scoped Admin/Supervisor approval with reviewer metadata.
+* Generated daily and weekly reports from real tasks, content decisions, client scope, work hours, and time-off records, plus CSV export with permission checks.
 
 ### Superior Admin
 
@@ -258,14 +264,14 @@ Implemented responsibilities:
 
 Implemented responsibilities:
 
-* Notification records with entity links, unread counts, read/unread filters, and mark-read actions.
+* Notification records with entity links, unread counts, header dropdown, read/unread filters, mark-read actions, and browser-local sound preference.
 * Generic comments, mentions, and attachments for tasks, ideas, content, and reports.
 * Mention notifications for same-company accessible users.
 * Supabase Storage buckets for attachments and avatars.
-* Global search across accessible company records.
+* Standalone global search across accessible company records. The app shell does not show a fake header search field.
 * Saved views for advanced filters.
 * Content templates for reusable content creation.
-* Dashboard preferences for per-user widget visibility.
+* Dashboard preferences for per-user widget visibility under `/settings/preferences`.
 * Organization branding and settings stored in company/company settings rows.
 * User profile and avatar management.
 
@@ -302,6 +308,13 @@ Protected route groups:
 * `/supervisor`
 * `/team-lead`
 * `/creator`
+* `/marketing-manager`
+* `/account-manager`
+* `/content-creator`
+* `/graphic-designer`
+* `/video-editor`
+* `/client`
+* `/clients`
 * `/profile`
 * `/super-admin`
 * `/tasks`
@@ -318,7 +331,15 @@ Default redirects:
 | Supervisor | `/supervisor` |
 | CC Team Lead | `/team-lead` |
 | Creator | `/creator` |
+| Marketing Manager | `/marketing-manager` |
+| Account Manager | `/account-manager` |
+| Content Creator | `/content-creator` |
+| Graphic Designer | `/graphic-designer` |
+| Video Editor | `/video-editor` |
+| Client | `/client` |
 | Superior Admin | `/super-admin/organizations` |
+
+Legacy aliases `/admin`, `/supervisor`, and `/creator` remain available for compatibility.
 
 ## 11. Validation and Error Handling
 

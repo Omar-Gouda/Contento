@@ -1,6 +1,6 @@
 # Contento Auth Flow
 
-This document describes the implemented and planned authentication and authorization flow for Contento. The current foundation uses Supabase Auth, Contento profile resolution, company-scoped RBAC, first-company onboarding, Admin direct user creation, forced first-login password changes, working-hours session tracking, operational workflow modules, organization lifecycle checks, and a platform-level Super Admin path.
+This document describes the implemented and planned authentication and authorization flow for Contento. The current foundation uses Supabase Auth, Contento profile resolution, company-scoped RBAC, first-company onboarding, Admin direct user creation, forced first-login password changes, working-hours session tracking, client workspaces, operational workflow modules, organization lifecycle checks, and a platform-level Super Admin path.
 
 ## 1. Auth Flow Goals
 
@@ -13,8 +13,8 @@ Primary goals:
 * Protect dashboard routes with middleware and server-side profile resolution.
 * Redirect users to the correct role dashboard.
 * Enforce tenant isolation through application checks and RLS.
-* Support password reset, first-company onboarding, and Admin-created users.
-* Force Admin-created users to change temporary passwords before dashboard access.
+* Support password reset, first-company onboarding, and Marketing Manager-created users.
+* Force Marketing Manager-created users to change temporary passwords before dashboard access.
 * Track working-hours sign-in and sign-out events without weakening authentication.
 * Support Super Admin organization bootstrap and lifecycle management outside tenant workspaces.
 
@@ -40,15 +40,22 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 | `/sign-in` | User sign in. | Implemented in Phase 2. |
 | `/forgot-password` | Request password reset. | Implemented in Phase 2. |
 | `/reset-password` | Complete Supabase password reset. | Implemented in Phase 2. |
-| `/change-password` | Required password change for Admin-created users. | Implemented in Phase 3 fixes. |
+| `/change-password` | Required password change for Marketing Manager-created users. | Implemented in Phase 3 fixes. |
 | `/onboarding` | First authenticated user creates the company workspace and Admin profile. | Implemented in Phase 2.5. |
 | `/account-inactive` | Signed-in account exists but cannot access dashboards because status or role resolution is not active. | Implemented in Phase 2.5. |
 | `/organization-disabled` | Signed-in account belongs to a disabled organization. | Implemented in final production phase. |
 | `/organization-unavailable` | Signed-in account belongs to a soft-deleted or unavailable organization. | Implemented in final production phase. |
-| `/admin` | Admin dashboard. | Protected in Phase 2. |
-| `/supervisor` | Supervisor dashboard. | Protected in Phase 2. |
+| `/marketing-manager` | Marketing Manager dashboard. | Protected in Phase 2. |
+| `/account-manager` | Account Manager dashboard. | Protected in Phase 2. |
 | `/team-lead` | CC Team Lead dashboard. | Protected in Phase 2. |
-| `/creator` | Creator dashboard. | Protected in Phase 2. |
+| `/content-creator` | Content Creator dashboard. | Protected in Phase 2. |
+| `/graphic-designer` | Graphic Designer dashboard. | Protected in final production phase. |
+| `/video-editor` | Video Editor dashboard. | Protected in final production phase. |
+| `/client` | Client dashboard. | Protected in final production phase. |
+| `/clients` | Client workspace list and detail pages. | Protected in final production phase. |
+| Legacy `/admin` | Admin dashboard alias. | Protected in Phase 2. |
+| Legacy `/supervisor` | Supervisor dashboard alias. | Protected in Phase 2. |
+| Legacy `/creator` | Creator dashboard alias. | Protected in Phase 2. |
 | `/profile/work-hours` | Current user's work-hours view and break controls. | Implemented in Phase 3. |
 | `/admin/users` | Admin company user management. | Implemented in Phase 3. |
 | `/admin/invitations` | Redirects to Admin user management. | Disabled in Phase 3 fixes. |
@@ -61,8 +68,8 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 | `/admin/ideas` | Admin company-wide idea management. | Implemented in Phase 4-10 workflow foundation. |
 | `/content` | Content pipeline creation, submission, and scheduling. | Implemented in Phase 4-10 workflow foundation. |
 | `/content/reviews` | Content review, approval, rejection, feedback, and change requests. | Implemented in Phase 4-10 workflow foundation. |
-| `/calendar` | Monthly and weekly content/work/day-off calendar. | Implemented in Phase 4-10 workflow foundation. |
-| `/reports` | Report submission and review. | Implemented in Phase 4-10 workflow foundation. |
+| `/calendar` | Month, week, and day scheduling calendar for task due dates, scheduled content, time off, sick leave, and meetings. | Implemented in Phase 4-10 workflow foundation and corrected in product review. |
+| `/reports` | Auto-generated report creation and review. | Implemented in Phase 4-10 workflow foundation and corrected in product review. |
 | `/reports/export` | Permission-checked CSV report export. | Implemented in Phase 4-10 workflow foundation. |
 | `/notifications` | Notification center. | Implemented in final production phase. |
 | `/search` | Global search over accessible company data. | Implemented in final production phase. |
@@ -95,12 +102,17 @@ Only `Active` company users should access protected company routes.
 
 | Role | Default Route |
 | --- | --- |
-| Admin | `/admin` |
-| Supervisor | `/supervisor` |
+| Admin / Marketing Manager | `/marketing-manager` |
+| Supervisor / Account Manager | `/account-manager` |
 | CC Team Lead | `/team-lead` |
-| Creator | `/creator` |
+| Creator / Content Creator | `/content-creator` |
+| Graphic Designer | `/graphic-designer` |
+| Video Editor | `/video-editor` |
+| Client | `/client` |
 | Platform Admin | `/super-admin/organizations` |
 | Superior Admin | `/super-admin/organizations` |
+
+Legacy aliases `/admin`, `/supervisor`, and `/creator` remain available for compatibility and now redirect through the same auth decision tree.
 
 If a signed-in company user visits the wrong role dashboard, the app redirects to the user's default route unless the user has valid permission for that route.
 
@@ -212,7 +224,7 @@ Rules:
 ## 9. Forced Password Change Flow
 
 ```txt
-Admin-created user signs in
+Marketing Manager-created user signs in
   |
   v
 App resolves active profile with must_change_password = true
@@ -230,6 +242,9 @@ Supabase Auth password is updated
 Database RPC clears must_change_password
   |
   v
+Same-user profile update fallback runs if RPC is unavailable
+  |
+  v
 User redirects to role dashboard
 ```
 
@@ -237,7 +252,8 @@ Rules:
 
 * `/change-password` requires authentication.
 * Users who do not need a password change are redirected to their role dashboard.
-* Clearing the flag uses `clear_current_user_must_change_password()` so broad self-profile updates are not exposed.
+* Clearing the flag uses `clear_current_user_must_change_password()` first so broad self-profile updates are not exposed.
+* If the RPC cannot finish after Supabase Auth has already updated the password, the server action attempts the same-user, same-company RLS update before showing a partial-failure message.
 
 ## 10. Invitation Acceptance Flow
 
@@ -550,7 +566,7 @@ RLS does not replace application authorization entirely. The app still checks pe
 * Session refresh should happen consistently for protected routes.
 * User status changes should take effect quickly.
 * Temporary passwords must not be logged or stored in Contento tables.
-* Admin-created users must change temporary passwords before dashboard access.
+* Marketing Manager-created users must change temporary passwords before dashboard access.
 * Platform admins must not be treated as tenant users.
 * User creation and platform-admin operations that require service-role access must remain server-only.
 

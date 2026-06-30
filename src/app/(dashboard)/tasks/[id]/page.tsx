@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 
 import {
   addTaskCommentAction,
   assignTaskAction,
+  submitTaskFinalOutputAction,
   updateTaskStatusAction,
 } from "@/lib/workflows/actions";
 import {
@@ -16,6 +18,7 @@ import {
 import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
+import { routes } from "@/constants/routes";
 import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +31,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getClients } from "@/lib/clients/queries";
 
 export const metadata: Metadata = {
   title: "Task detail",
@@ -46,11 +50,12 @@ export default async function TaskDetailPage({
 }) {
   const [{ id }, messages] = await Promise.all([params, searchParams]);
   const context = await requirePermission("tasks.view", "view");
-  const [task, comments, users, teams] = await Promise.all([
+  const [task, comments, users, teams, clients] = await Promise.all([
     getWorkflowTaskById(context, id),
     getWorkflowTaskComments(context, [id]),
     getWorkflowUsers(context),
     getWorkflowTeams(context),
+    getClients(context),
   ]);
 
   if (!task) {
@@ -59,8 +64,10 @@ export default async function TaskDetailPage({
 
   const activeUsers = users.filter((user) => user.status === "active");
   const activeTeams = teams.filter((team) => team.status === "active");
+  const activeClients = clients.filter((client) => client.status === "active");
   const canAssign = hasPermission(context, "tasks.assign", "limited");
   const canUpdateStatus = hasPermission(context, "tasks.update_status", "limited");
+  const canFinalOutput = hasPermission(context, "content.final_output", "limited");
 
   return (
     <section className="space-y-6">
@@ -90,11 +97,22 @@ export default async function TaskDetailPage({
             <div className="flex flex-wrap gap-2">
               <Badge>{task.status}</Badge>
               <Badge variant="secondary">{task.priority}</Badge>
+              {task.clientName && <Badge variant="secondary">{task.clientName}</Badge>}
               {task.teamName && <Badge variant="secondary">{task.teamName}</Badge>}
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 text-sm md:grid-cols-4">
+          <div>
+            <p className="text-muted-foreground">Client</p>
+            {task.client_id ? (
+              <Link href={routes.clients.detail(task.client_id)} className="font-medium text-primary hover:underline">
+                {task.clientName ?? "Open client"}
+              </Link>
+            ) : (
+              <p className="font-medium">No client</p>
+            )}
+          </div>
           <div>
             <p className="text-muted-foreground">Assignee</p>
             <p className="font-medium">{task.assigneeName ?? "Unassigned"}</p>
@@ -125,6 +143,13 @@ export default async function TaskDetailPage({
               <form action={assignTaskAction} className="grid gap-3">
                 <input type="hidden" name="taskId" value={task.id} />
                 <input type="hidden" name="redirectTo" value={`/tasks/${task.id}`} />
+                <Label htmlFor="clientId">Client</Label>
+                <select id="clientId" name="clientId" defaultValue={task.client_id ?? ""} className={selectClass}>
+                  <option value="">No client</option>
+                  {activeClients.map((client) => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
+                  ))}
+                </select>
                 <Label htmlFor="assignedTo">Assignee</Label>
                 <select id="assignedTo" name="assignedTo" defaultValue={task.assigned_to ?? ""} className={selectClass}>
                   <option value="">Unassigned</option>
@@ -156,6 +181,31 @@ export default async function TaskDetailPage({
                   {taskStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
                 </select>
                 <Button type="submit" variant="outline">Update status</Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {canFinalOutput && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Final output</CardTitle>
+              <CardDescription>Attach the final Drive link for production handoff.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={submitTaskFinalOutputAction} className="grid gap-3">
+                <input type="hidden" name="taskId" value={task.id} />
+                <input type="hidden" name="redirectTo" value={`/tasks/${task.id}`} />
+                <Label htmlFor="finalDriveLink">Final Drive link</Label>
+                <Input
+                  id="finalDriveLink"
+                  name="finalDriveLink"
+                  type="url"
+                  defaultValue={task.final_drive_link ?? ""}
+                  placeholder="https://drive.google.com/..."
+                  required
+                />
+                <Button type="submit" variant="outline">Save final</Button>
               </form>
             </CardContent>
           </Card>

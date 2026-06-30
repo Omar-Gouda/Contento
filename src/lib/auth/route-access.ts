@@ -9,7 +9,9 @@ const organizationDisabledRoutes = ["/organization-disabled"];
 const organizationUnavailableRoutes = ["/organization-unavailable"];
 const sharedProtectedRoutes = [
   "/profile",
+  "/users",
   "/change-password",
+  "/clients",
   "/team",
   "/tasks",
   "/ideas",
@@ -24,9 +26,15 @@ const superiorAdminRoutes = ["/super-admin"];
 
 const protectedRouteRoles: Array<{ prefix: string; role: UserRole }> = [
   { prefix: "/admin", role: "admin" },
+  { prefix: "/marketing-manager", role: "admin" },
   { prefix: "/supervisor", role: "supervisor" },
+  { prefix: "/account-manager", role: "supervisor" },
   { prefix: "/team-lead", role: "team-lead" },
   { prefix: "/creator", role: "creator" },
+  { prefix: "/content-creator", role: "creator" },
+  { prefix: "/graphic-designer", role: "graphic-designer" },
+  { prefix: "/video-editor", role: "video-editor" },
+  { prefix: "/client", role: "client" },
 ];
 
 function matchesPathPrefix(pathname: string, prefix: string) {

@@ -1,10 +1,13 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Building2,
   CalendarDays,
-  Bell,
+  CheckSquare,
+  ChevronDown,
   ClipboardList,
   Clock,
   FileBarChart,
@@ -24,45 +27,105 @@ import {
 import { routes } from "@/constants/routes";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
-import type { UserRole } from "@/types/roles";
+import { getRoleDisplayName, type UserRole } from "@/types/roles";
 
 type NavigationItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  exact?: boolean;
 };
+
+type NavigationGroup = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  items: NavigationItem[];
+};
+
+const expandedGroupsStorageKey = "contento-sidebar-expanded-groups";
 
 const dashboardByRole: Record<UserRole, NavigationItem> = {
-  admin: { label: "Admin dashboard", href: routes.dashboards.admin, icon: LayoutDashboard },
-  supervisor: { label: "Supervisor dashboard", href: routes.dashboards.supervisor, icon: LayoutDashboard },
+  admin: { label: "Marketing Manager dashboard", href: routes.dashboards.marketingManager, icon: LayoutDashboard },
+  supervisor: { label: "Account Manager dashboard", href: routes.dashboards.accountManager, icon: LayoutDashboard },
   "team-lead": { label: "Team Lead dashboard", href: routes.dashboards.teamLead, icon: LayoutDashboard },
-  creator: { label: "Creator dashboard", href: routes.dashboards.creator, icon: LayoutDashboard },
+  creator: { label: "Content Creator dashboard", href: routes.dashboards.contentCreator, icon: LayoutDashboard },
+  "graphic-designer": { label: "Graphic Designer dashboard", href: routes.dashboards.graphicDesigner, icon: LayoutDashboard },
+  "video-editor": { label: "Video Editor dashboard", href: routes.dashboards.videoEditor, icon: LayoutDashboard },
+  client: { label: "Client dashboard", href: routes.dashboards.client, icon: LayoutDashboard },
 };
 
-function NavLink({
-  href,
-  icon: Icon,
+function isActivePath(pathname: string, item: NavigationItem) {
+  return pathname === item.href || (!item.exact && pathname.startsWith(`${item.href}/`));
+}
+
+function getStoredExpandedGroups() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(expandedGroupsStorageKey);
+    const parsedValue = rawValue ? JSON.parse(rawValue) : null;
+
+    return Array.isArray(parsedValue) && parsedValue.every((item) => typeof item === "string")
+      ? parsedValue
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistExpandedGroups(groupIds: string[]) {
+  window.localStorage.setItem(expandedGroupsStorageKey, JSON.stringify(groupIds));
+}
+
+function NavTooltip({
   label,
+  detail,
 }: {
-  href: string;
-  icon: LucideIcon;
   label: string;
+  detail?: string;
+}) {
+  return (
+    <span className="pointer-events-none absolute left-12 top-1/2 z-50 hidden min-w-36 -translate-y-1/2 rounded-md border bg-popover px-2.5 py-1.5 text-left text-xs font-medium text-popover-foreground shadow-xl group-hover/nav-item:block group-focus-visible/nav-item:block">
+      <span className="block whitespace-nowrap">{label}</span>
+      {detail && <span className="mt-0.5 block whitespace-nowrap text-[11px] font-normal text-muted-foreground">{detail}</span>}
+    </span>
+  );
+}
+
+function NavLink({
+  item,
+  collapsed = false,
+  nested = false,
+}: {
+  item: NavigationItem;
+  collapsed?: boolean;
+  nested?: boolean;
 }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+  const active = isActivePath(pathname, item);
+  const Icon = item.icon;
 
   return (
     <Link
-      href={href}
+      href={item.href}
+      title={collapsed ? item.label : undefined}
+      aria-label={item.label}
       className={cn(
-        "flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
+        "group/nav-item relative flex h-9 items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200",
+        nested ? "px-3 pl-8" : "px-3",
+        collapsed && "justify-center px-0",
         active
           ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
           : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       )}
     >
-      <Icon className="size-4" />
-      {label}
+      <Icon className={cn("size-4 shrink-0", nested && !collapsed && "size-3.5")} />
+      <span className={cn("truncate", collapsed && "sr-only")}>{item.label}</span>
+      {active && !collapsed && <span className="ml-auto size-1.5 rounded-full bg-current opacity-80" />}
+      {collapsed && <NavTooltip label={item.label} />}
     </Link>
   );
 }
@@ -83,11 +146,11 @@ function getAdminItems(context: AuthContext): NavigationItem[] {
   }
 
   if (hasPermission(context, "tasks.view", "full")) {
-    items.push({ label: "Tasks", href: routes.admin.tasks, icon: ClipboardList });
+    items.push({ label: "Task oversight", href: routes.admin.tasks, icon: ClipboardList });
   }
 
   if (hasPermission(context, "ideas.review", "full")) {
-    items.push({ label: "Ideas", href: routes.admin.ideas, icon: Lightbulb });
+    items.push({ label: "Idea oversight", href: routes.admin.ideas, icon: Lightbulb });
   }
 
   if (hasPermission(context, "work_hours.view_company", "view")) {
@@ -97,12 +160,18 @@ function getAdminItems(context: AuthContext): NavigationItem[] {
   return items;
 }
 
-function getOperationItems(context: AuthContext): NavigationItem[] {
+function getClientItems(context: AuthContext): NavigationItem[] {
   const items: NavigationItem[] = [];
 
-  if (hasPermission(context, "teams.view_roster", "view")) {
-    items.push({ label: "Team", href: routes.team, icon: UsersRound });
+  if (hasPermission(context, "clients.view", "view")) {
+    items.push({ label: "All clients", href: routes.clients.home, icon: Building2, exact: true });
   }
+
+  return items;
+}
+
+function getWorkItems(context: AuthContext): NavigationItem[] {
+  const items: NavigationItem[] = [];
 
   if (hasPermission(context, "tasks.view", "view")) {
     items.push({ label: "Tasks", href: routes.tasks, icon: ClipboardList });
@@ -116,10 +185,6 @@ function getOperationItems(context: AuthContext): NavigationItem[] {
     items.push({ label: "Content", href: routes.content.home, icon: PanelsTopLeft });
   }
 
-  if (hasPermission(context, "reviews.view_submissions", "view")) {
-    items.push({ label: "Reviews", href: routes.content.reviews, icon: FileText });
-  }
-
   if (hasPermission(context, "content.templates.use", "view")) {
     items.push({ label: "Templates", href: routes.content.templates, icon: FileText });
   }
@@ -128,80 +193,225 @@ function getOperationItems(context: AuthContext): NavigationItem[] {
     items.push({ label: "Calendar", href: routes.calendar, icon: CalendarDays });
   }
 
-  if (hasPermission(context, "reports.view_own", "view")) {
-    items.push({ label: "Reports", href: routes.reports, icon: FileBarChart });
+  return items;
+}
+
+function getReviewItems(context: AuthContext): NavigationItem[] {
+  const items: NavigationItem[] = [];
+
+  if (hasPermission(context, "ideas.review", "full")) {
+    items.push({ label: "Ideas review", href: routes.admin.ideas, icon: Lightbulb });
+  }
+
+  if (hasPermission(context, "reviews.view_submissions", "view")) {
+    items.push({ label: "Content review", href: routes.content.reviews, icon: CheckSquare });
   }
 
   return items;
 }
 
-export function DashboardNavigation({ context }: { context: AuthContext }) {
-  const workspaceItem = dashboardByRole[context.role];
-  const workspaceItems = workspaceItem ? [workspaceItem] : [];
-  const operationItems = getOperationItems(context);
-  const adminItems = getAdminItems(context);
-  const accountItems: NavigationItem[] = [
+function getReportItems(context: AuthContext): NavigationItem[] {
+  if (!hasPermission(context, "reports.view_own", "view")) {
+    return [];
+  }
+
+  return [{ label: "Reports", href: routes.reports, icon: FileBarChart }];
+}
+
+function getTeamItems(context: AuthContext): NavigationItem[] {
+  const items: NavigationItem[] = [];
+
+  if (hasPermission(context, "teams.view_roster", "view")) {
+    items.push({ label: "Team roster", href: routes.team, icon: UsersRound });
+  }
+
+  if (context.role === "admin" && hasPermission(context, "teams.view_roster", "view")) {
+    items.push({ label: "Manage teams", href: routes.admin.teams, icon: UsersRound });
+  }
+
+  return items;
+}
+
+function getAccountItems(context: AuthContext): NavigationItem[] {
+  const items: NavigationItem[] = [
     { label: "Search", href: routes.search, icon: Search },
-    { label: "Notifications", href: routes.notifications, icon: Bell },
     { label: "Profile", href: routes.profile.home, icon: User },
-    { label: "Work hours", href: routes.profile.workHours, icon: ShieldCheck },
+    { label: "My work hours", href: routes.profile.workHours, icon: ShieldCheck },
   ];
 
   if (hasPermission(context, "settings.company", "limited")) {
-    accountItems.push({ label: "Settings", href: routes.settings, icon: Settings });
+    items.push({ label: "Organization settings", href: routes.settings, icon: Settings, exact: true });
   }
 
+  return items;
+}
+
+function getNavigationGroups(context: AuthContext): NavigationGroup[] {
+  const workspaceItem = {
+    ...dashboardByRole[context.role],
+    label: `${getRoleDisplayName(context.role)} dashboard`,
+  };
+
+  const groups: NavigationGroup[] = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      items: [workspaceItem],
+    },
+    {
+      id: "clients",
+      label: "Clients",
+      icon: Building2,
+      items: getClientItems(context),
+    },
+    {
+      id: "work",
+      label: "Work",
+      icon: ClipboardList,
+      items: getWorkItems(context),
+    },
+    {
+      id: "reviews",
+      label: "Reviews",
+      icon: CheckSquare,
+      items: getReviewItems(context),
+    },
+    {
+      id: "reports",
+      label: "Reports",
+      icon: FileBarChart,
+      items: getReportItems(context),
+    },
+    {
+      id: "team",
+      label: "Team",
+      icon: UsersRound,
+      items: getTeamItems(context),
+    },
+    {
+      id: "admin",
+      label: "Management",
+      icon: ShieldCheck,
+      items: getAdminItems(context),
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: User,
+      items: getAccountItems(context),
+    },
+  ];
+
+  return groups.filter((group) => group.items.length > 0);
+}
+
+function SidebarGroup({
+  group,
+  collapsed,
+  expanded,
+  onToggle,
+}: {
+  group: NavigationGroup;
+  collapsed: boolean;
+  expanded: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const pathname = usePathname();
+  const GroupIcon = group.icon;
+  const active = group.items.some((item) => isActivePath(pathname, item));
+
+  if (collapsed) {
+    return (
+      <div className="grid gap-1">
+        <button
+          type="button"
+          title={group.label}
+          aria-label={group.label}
+          className={cn(
+            "group/nav-item relative flex h-10 items-center justify-center rounded-lg transition-colors",
+            active
+              ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+              : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          )}
+        >
+          <GroupIcon className="size-4" />
+          {active && <span className="absolute right-1 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-current" />}
+          <NavTooltip label={group.label} detail={group.items.map((item) => item.label).join(" / ")} />
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <nav className="space-y-6">
-      <div className="space-y-2">
-        <p className="px-3 text-xs font-medium uppercase tracking-[0.16em] text-sidebar-foreground/50">
-          Workspace
-        </p>
-        <div className="grid gap-1">
-          {workspaceItems.map((item) => (
-            <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
-          ))}
-        </div>
+    <div className="space-y-1.5">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => onToggle(group.id)}
+        className={cn(
+          "flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold transition-colors",
+          active
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        )}
+      >
+        <GroupIcon className="size-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform duration-200", expanded && "rotate-180")} />
+      </button>
 
-      </div>
-
-      {operationItems.length > 0 && (
-        <div className="space-y-2">
-          <p className="px-3 text-xs font-medium uppercase tracking-[0.16em] text-sidebar-foreground/50">
-            Operations
-          </p>
-          <div className="grid gap-1">
-            {operationItems.map((item) => (
-              <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
+      <div
+        className={cn(
+          "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
+          expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        )}
+      >
+        <div className="min-h-0">
+          <div className="grid gap-1 border-l border-sidebar-border/80 pl-2">
+            {group.items.map((item) => (
+              <NavLink key={item.href} item={item} nested />
             ))}
           </div>
         </div>
-      )}
-
-      {adminItems.length > 0 && (
-        <div className="space-y-2">
-          <p className="px-3 text-xs font-medium uppercase tracking-[0.16em] text-sidebar-foreground/50">
-            Admin
-          </p>
-          <div className="grid gap-1">
-            {adminItems.map((item) => (
-              <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <p className="px-3 text-xs font-medium uppercase tracking-[0.16em] text-sidebar-foreground/50">
-          Account
-        </p>
-        <div className="grid gap-1">
-          {accountItems.map((item) => (
-            <NavLink key={item.href} href={item.href} icon={item.icon} label={item.label} />
-          ))}
-        </div>
       </div>
+    </div>
+  );
+}
+
+export function DashboardNavigation({ context, collapsed = false }: { context: AuthContext; collapsed?: boolean }) {
+  const pathname = usePathname();
+  const groups = useMemo(() => getNavigationGroups(context), [context]);
+  const activeGroupIds = useMemo(
+    () => groups.filter((group) => group.items.some((item) => isActivePath(pathname, item))).map((group) => group.id),
+    [groups, pathname]
+  );
+  const defaultGroupIds = useMemo(
+    () => [activeGroupIds[0] ?? "dashboard"],
+    [activeGroupIds]
+  );
+  const [expandedGroupId, setExpandedGroupId] = useState(() => activeGroupIds[0] ?? getStoredExpandedGroups()?.[0] ?? defaultGroupIds[0]);
+  const visibleExpandedGroupId = activeGroupIds[0] || expandedGroupId || defaultGroupIds[0];
+
+  function toggleGroup(id: string) {
+    setExpandedGroupId((current) => {
+      const next = current === id ? "" : id;
+      persistExpandedGroups(next ? [next] : []);
+      return next;
+    });
+  }
+
+  return (
+    <nav className={cn("grid gap-2", collapsed && "gap-1.5")}>
+      {groups.map((group) => (
+        <SidebarGroup
+          key={group.id}
+          group={group}
+          collapsed={collapsed}
+          expanded={visibleExpandedGroupId === group.id}
+          onToggle={toggleGroup}
+        />
+      ))}
     </nav>
   );
 }

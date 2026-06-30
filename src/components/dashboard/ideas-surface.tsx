@@ -12,10 +12,11 @@ import {
   getWorkflowTeams,
   getWorkflowUsers,
 } from "@/lib/workflows/queries";
+import { getClients } from "@/lib/clients/queries";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
-import { SavedViewsPanel } from "@/components/dashboard/saved-views-panel";
+import { IdeaTypeFields } from "@/components/dashboard/idea-type-fields";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -32,16 +33,20 @@ const ideaStatuses = ["draft", "submitted", "under_review", "approved", "rejecte
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
-function statusVariant(status: string) {
+function ideaTone(status: string) {
   if (status === "approved") {
-    return "default";
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200";
   }
 
   if (status === "rejected" || status === "archived") {
-    return "secondary";
+    return "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200";
   }
 
-  return "outline";
+  if (status === "under_review" || status === "submitted") {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200";
+  }
+
+  return "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-200";
 }
 
 export async function IdeasSurface({
@@ -55,15 +60,17 @@ export async function IdeasSurface({
   basePath: string;
   title: string;
   description: string;
-  searchParams: { q?: string; status?: string; team?: string; error?: string; notice?: string };
+  searchParams: { q?: string; status?: string; team?: string; client?: string; error?: string; notice?: string };
 }) {
   const [ideas, users, teams] = await Promise.all([
-    getWorkflowIdeas(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team }),
+    getWorkflowIdeas(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team, clientId: searchParams.client }),
     getWorkflowUsers(context),
     getWorkflowTeams(context),
   ]);
+  const clients = await getClients(context);
   const activeUsers = users.filter((user) => user.status === "active");
   const activeTeams = teams.filter((team) => team.status === "active");
+  const activeClients = clients.filter((client) => client.status === "active");
   const canCreate = hasPermission(context, "ideas.create", "limited");
   const canUpdate = hasPermission(context, "ideas.update", "limited");
   const canChangeStatus = hasPermission(context, "ideas.change_status", "limited");
@@ -81,8 +88,8 @@ export async function IdeasSurface({
       {canCreate && (
         <Card>
           <CardHeader>
-            <CardTitle>Create idea</CardTitle>
-            <CardDescription>Capture a concept and optionally assign someone to develop it.</CardDescription>
+            <CardTitle>Drop your idea before it disappears forever.</CardTitle>
+            <CardDescription>Warning: creativity may occur here. Select a client, then shape the idea by format.</CardDescription>
           </CardHeader>
           <CardContent>
             <form action={createIdeaAction} className="grid gap-4 lg:grid-cols-3">
@@ -90,6 +97,13 @@ export async function IdeasSurface({
               <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="title">Title</Label>
                 <Input id="title" name="title" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clientId">Client</Label>
+                <select id="clientId" name="clientId" className={selectClass}>
+                  <option value="">No client</option>
+                  {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="assignedTo">Assignee</Label>
@@ -113,6 +127,7 @@ export async function IdeasSurface({
                 <Label htmlFor="description">Description</Label>
                 <Input id="description" name="description" />
               </div>
+              <IdeaTypeFields selectClass={selectClass} />
               <div className="space-y-2 lg:col-span-3">
                 <Label htmlFor="notes">Notes</Label>
                 <Input id="notes" name="notes" />
@@ -134,7 +149,7 @@ export async function IdeasSurface({
           <CardDescription>Search ideas and narrow by review status.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={basePath} className="grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
+          <form action={basePath} className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_auto]">
             <div className="space-y-2">
               <Label htmlFor="q">Search</Label>
               <div className="relative">
@@ -156,6 +171,13 @@ export async function IdeasSurface({
                 {activeTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
               </select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="client">Client</Label>
+              <select id="client" name="client" defaultValue={searchParams.client ?? "all"} className={selectClass}>
+                <option value="all">All clients</option>
+                {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+              </select>
+            </div>
             <div className="flex items-end">
               <Button type="submit" className="w-full md:w-auto">Apply</Button>
             </div>
@@ -163,37 +185,42 @@ export async function IdeasSurface({
         </CardContent>
       </Card>
 
-      <SavedViewsPanel
-        context={context}
-        module="ideas"
-        basePath={basePath}
-        currentFilters={{
-          q: searchParams.q,
-          status: searchParams.status,
-          team: searchParams.team,
-        }}
-      />
-
       <div className="grid gap-4">
         {ideas.map((idea) => (
           <Card key={idea.id}>
             <CardHeader>
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <CardTitle>{idea.title}</CardTitle>
-                  <CardDescription>{idea.description || "No description provided."}</CardDescription>
+                  <div>
+                    <CardTitle>{idea.title}</CardTitle>
+                    <CardDescription>{idea.description || "No description provided."}</CardDescription>
+                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className={ideaTone(idea.status)}>{idea.status}</Badge>
+                  {idea.clientName && <Badge variant="secondary">{idea.clientName}</Badge>}
+                  <Badge variant="outline" className="border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-200">{idea.idea_type}</Badge>
                 </div>
-                <Badge variant={statusVariant(idea.status)}>{idea.status}</Badge>
               </div>
             </CardHeader>
             <CardContent className="grid gap-5">
               <div className="grid gap-3 text-sm md:grid-cols-4">
                 <div>
+                  <p className="text-muted-foreground">Client</p>
+                  <p className="font-medium">{idea.clientName ?? "No client"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Type</p>
+                  <p className="font-medium capitalize">{idea.idea_type}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Publishing</p>
+                  <p className="font-medium">{idea.publishing_at ? formatCairoDateTime(idea.publishing_at) : "Not scheduled"}</p>
+                </div>
+                <div>
                   <p className="text-muted-foreground">Created by</p>
                   <p className="font-medium">{idea.creatorName ?? "Unknown"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Assigned to</p>
+                  <p className="text-muted-foreground">Production owner</p>
                   <p className="font-medium">{idea.assigneeName ?? "Unassigned"}</p>
                 </div>
                 <div>
@@ -208,7 +235,17 @@ export async function IdeasSurface({
                   <p className="text-muted-foreground">Updated</p>
                   <p className="font-medium">{formatCairoDateTime(idea.updated_at)}</p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground">Comments</p>
+                  <p className="font-medium">{idea.commentCount}</p>
+                </div>
               </div>
+
+              {idea.final_drive_link && (
+                <a href={idea.final_drive_link} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline">
+                  Open final Drive link
+                </a>
+              )}
 
               {idea.notes && (
                 <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
@@ -221,6 +258,21 @@ export async function IdeasSurface({
                 <form action={updateIdeaAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3 lg:grid-cols-3">
                   <input type="hidden" name="ideaId" value={idea.id} />
                   <input type="hidden" name="redirectTo" value={basePath} />
+                  <div className="space-y-2">
+                    <Label htmlFor={`client-${idea.id}`}>Client</Label>
+                    <select id={`client-${idea.id}`} name="clientId" defaultValue={idea.client_id ?? ""} className={selectClass}>
+                      <option value="">No client</option>
+                      {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`type-${idea.id}`}>Type</Label>
+                    <select id={`type-${idea.id}`} name="ideaType" defaultValue={idea.idea_type} className={selectClass}>
+                      <option value="post">Post</option>
+                      <option value="reel">Reel</option>
+                      <option value="story">Story</option>
+                    </select>
+                  </div>
                   <div className="space-y-2 lg:col-span-2">
                     <Label htmlFor={`title-${idea.id}`}>Title</Label>
                     <Input id={`title-${idea.id}`} name="title" defaultValue={idea.title} />
@@ -242,6 +294,43 @@ export async function IdeasSurface({
                   <div className="space-y-2 lg:col-span-2">
                     <Label htmlFor={`description-${idea.id}`}>Description</Label>
                     <Input id={`description-${idea.id}`} name="description" defaultValue={idea.description} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`urgency-${idea.id}`}>Urgency</Label>
+                    <select id={`urgency-${idea.id}`} name="urgency" defaultValue={idea.urgency} className={selectClass}>
+                      <option value="low">Low</option>
+                      <option value="normal">Normal</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`publishing-${idea.id}`}>Publishing datetime</Label>
+                    <Input id={`publishing-${idea.id}`} name="publishingAt" defaultValue={idea.publishing_at ? idea.publishing_at.slice(0, 16) : ""} type="datetime-local" />
+                  </div>
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor={`headline-${idea.id}`}>Headline</Label>
+                    <Input id={`headline-${idea.id}`} name="headline" defaultValue={idea.headline} />
+                  </div>
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor={`subtext-${idea.id}`}>Subtext</Label>
+                    <Input id={`subtext-${idea.id}`} name="subtext" defaultValue={idea.subtext} />
+                  </div>
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor={`visual-${idea.id}`}>Visual direction</Label>
+                    <Input id={`visual-${idea.id}`} name="visual" defaultValue={idea.visual} />
+                  </div>
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor={`cta-${idea.id}`}>CTA</Label>
+                    <Input id={`cta-${idea.id}`} name="cta" defaultValue={idea.cta} />
+                  </div>
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor={`script-${idea.id}`}>Script / captions</Label>
+                    <Input id={`script-${idea.id}`} name="script" defaultValue={idea.script} />
+                  </div>
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor={`final-${idea.id}`}>Final Drive link</Label>
+                    <Input id={`final-${idea.id}`} name="finalDriveLink" defaultValue={idea.final_drive_link ?? ""} />
                   </div>
                   <div className="space-y-2 lg:col-span-3">
                     <Label htmlFor={`notes-${idea.id}`}>Notes</Label>

@@ -252,6 +252,23 @@ export async function changePasswordAction(input: ResetPasswordInput): Promise<A
   }
 
   const supabase = await createSupabaseServerClient();
+  const initialResolution = await loadAuthProfile(supabase);
+
+  if (initialResolution.state !== "active") {
+    return {
+      success: false,
+      message: "We could not resolve your workspace access. Please sign in again.",
+      redirectTo: "/sign-in",
+    };
+  }
+
+  if (!initialResolution.context.mustChangePassword) {
+    return {
+      success: true,
+      message: "Your password is already up to date.",
+      redirectTo: getDefaultDashboardPath(initialResolution.context.role),
+    };
+  }
 
   const { error: updateError } = await supabase.auth.updateUser({
     password: parsed.data.password,
@@ -279,12 +296,20 @@ export async function changePasswordAction(input: ResetPasswordInput): Promise<A
   );
 
   if (profileError || !passwordFlagCleared) {
-    console.warn("Failed to update must_change_password", profileError);
+    const { error: fallbackError } = await supabase
+      .from("users")
+      .update({ must_change_password: false })
+      .eq("id", initialResolution.context.userId)
+      .eq("company_id", initialResolution.context.companyId);
 
-    return {
-      success: false,
-      message: "Your password was updated, but Contento could not finish the account check. Try again or contact an Admin.",
-    };
+    if (fallbackError) {
+      console.warn("Failed to update must_change_password", profileError ?? fallbackError);
+
+      return {
+        success: false,
+        message: "Your password was updated, but Contento could not finish the account check. Try again or contact an Admin.",
+      };
+    }
   }
 
   const resolution = await loadAuthProfile(supabase);

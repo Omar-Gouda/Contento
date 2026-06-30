@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, CheckCircle2, Send, Star } from "lucide-react";
 
@@ -6,6 +7,7 @@ import {
   rateContentAction,
   reviewContentAction,
   scheduleContentAction,
+  submitContentFinalOutputAction,
   submitContentAction,
 } from "@/lib/workflows/actions";
 import {
@@ -14,8 +16,9 @@ import {
   getWorkflowContentReviews,
 } from "@/lib/workflows/queries";
 import { requirePermission } from "@/lib/auth/context";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
+import { routes } from "@/constants/routes";
 import { Badge } from "@/components/ui/badge";
 import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Button } from "@/components/ui/button";
@@ -41,14 +44,14 @@ function canSubmitStatus(status: string) {
   return status === "draft" || status === "changes_requested_by_team_lead" || status === "changes_requested_by_supervisor";
 }
 
-function reviewOptions(role: "admin" | "supervisor" | "team-lead" | "creator", status: string) {
+function reviewOptions(role: AuthContext["role"], status: string) {
   if (role === "creator") {
     return [];
   }
 
   if (role === "team-lead" && (status === "submitted_to_team_lead" || status === "changes_requested_by_supervisor")) {
     return [
-      { value: "send_to_supervisor", label: "Send to supervisor" },
+      { value: "send_to_supervisor", label: "Send to Account Manager" },
       { value: "changes_requested", label: "Request changes" },
     ];
   }
@@ -66,7 +69,7 @@ function reviewOptions(role: "admin" | "supervisor" | "team-lead" | "creator", s
       { value: "approved", label: "Approve" },
       { value: "changes_requested", label: "Request changes" },
       { value: "rejected", label: "Reject" },
-      { value: "send_to_supervisor", label: "Send to supervisor" },
+      { value: "send_to_supervisor", label: "Send to Account Manager" },
     ];
   }
 
@@ -96,6 +99,7 @@ export default async function ContentDetailPage({
   const canReview = hasPermission(context, "reviews.add_feedback", "limited");
   const canRate = hasPermission(context, "content.rate", "limited");
   const canSchedule = hasPermission(context, "calendar.schedule_content", "limited");
+  const canFinalOutput = hasPermission(context, "content.final_output", "limited");
   const options = reviewOptions(context.role, content.status);
   const canSubmitCurrent = canSubmit && canSubmitStatus(content.status) && content.creator_id === context.userId;
   const canReviewCurrent = canReview && options.length > 0;
@@ -122,11 +126,22 @@ export default async function ContentDetailPage({
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge>{content.status}</Badge>
+              {content.clientName && <Badge variant="secondary">{content.clientName}</Badge>}
               {content.teamName && <Badge variant="secondary">{content.teamName}</Badge>}
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 text-sm md:grid-cols-4">
+          <div>
+            <p className="text-muted-foreground">Client</p>
+            {content.client_id ? (
+              <Link href={routes.clients.detail(content.client_id)} className="font-medium text-primary hover:underline">
+                {content.clientName ?? "Open client"}
+              </Link>
+            ) : (
+              <p className="font-medium">No client</p>
+            )}
+          </div>
           <div>
             <p className="text-muted-foreground">Creator</p>
             <p className="font-medium">{content.creatorName ?? "Unassigned"}</p>
@@ -159,6 +174,16 @@ export default async function ContentDetailPage({
             <p className="text-muted-foreground">Published</p>
             <p className="font-medium">{formatCairoDateTime(content.published_at)}</p>
           </div>
+          <div>
+            <p className="text-muted-foreground">Final Drive</p>
+            {content.final_drive_link ? (
+              <a href={content.final_drive_link} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                Open link
+              </a>
+            ) : (
+              <p className="font-medium">No final link</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -187,11 +212,36 @@ export default async function ContentDetailPage({
         )}
       </div>
 
+      {canFinalOutput && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Final output</CardTitle>
+            <CardDescription>Attach the final Drive link for this content item.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={submitContentFinalOutputAction} className="grid gap-3">
+              <input type="hidden" name="contentId" value={content.id} />
+              <input type="hidden" name="redirectTo" value={`/content/${content.id}`} />
+              <Label htmlFor="finalDriveLink">Final Drive link</Label>
+              <Input
+                id="finalDriveLink"
+                name="finalDriveLink"
+                type="url"
+                defaultValue={content.final_drive_link ?? ""}
+                placeholder="https://drive.google.com/..."
+                required
+              />
+              <Button type="submit" variant="outline">Save final</Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {canReviewCurrent && (
         <Card>
           <CardHeader>
             <CardTitle>Review content</CardTitle>
-            <CardDescription>Move submitted content through the team lead and supervisor review flow.</CardDescription>
+            <CardDescription>Move submitted content through the Team Lead and Account Manager review flow.</CardDescription>
           </CardHeader>
           <CardContent>
             <form action={reviewContentAction} className="grid gap-3 md:grid-cols-[180px_1fr_auto]">

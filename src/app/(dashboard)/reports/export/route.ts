@@ -24,13 +24,15 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type") ?? "all";
   const teamId = url.searchParams.get("team") ?? "all";
-  const reports = await getWorkflowReports(resolution.context, { type, teamId });
-  const header = ["id", "type", "user", "team", "title", "range_start", "range_end", "body", "created_at"];
+  const clientId = url.searchParams.get("client") ?? "all";
+  const reports = await getWorkflowReports(resolution.context, { type, teamId, clientId });
+  const header = ["id", "type", "user", "team", "client", "title", "range_start", "range_end", "body", "created_at"];
   const rows = reports.map((report) => [
     report.id,
     report.report_type,
     report.userName ?? "",
     report.teamName ?? "",
+    report.clientName ?? "",
     report.title,
     report.date_range_start ?? "",
     report.date_range_end ?? "",
@@ -45,7 +47,7 @@ export async function GET(request: Request) {
     action: "reports.exported",
     entity_type: "report",
     entity_id: null,
-    metadata: { type, team_id: teamId, row_count: reports.length },
+    metadata: { type, team_id: teamId, client_id: clientId, row_count: reports.length },
   });
 
   return new Response(csv, {

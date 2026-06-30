@@ -15,10 +15,14 @@ This document defines the planned role-based permission matrix for Contento. It 
 
 | Role | Default Scope |
 | --- | --- |
-| Admin | Full company workspace. |
-| Supervisor | Assigned teams, approvals, reports, analytics, feedback, and activity monitoring. |
-| CC Team Lead | Assigned team workflow, task assignment, progress tracking, content schedule coordination, and escalation. |
-| Creator | Own tasks, ideas, content submissions, reports, calendar, performance, and day off requests. |
+| Admin | Marketing Manager in the UI. Administrative role for one company workspace. Can manage users, teams, settings, workflow, clients, reports, and company-wide data inside that company only. |
+| Supervisor | Account Manager in the UI. Managerial role for assigned teams, client delivery, quality oversight, Account Manager review, reports, analytics, feedback, and activity monitoring. |
+| CC Team Lead | Operational role for own-team daily execution, task assignment, progress tracking, Team Lead review, team calendar, and escalation. |
+| Creator | Content Creator in the UI. Productive role for own tasks, ideas, content drafts/submissions, own reports, own calendar visibility, work hours, and time-off requests. |
+
+Platform Super Admin is not a tenant role. Platform operators manage organizations and platform lifecycle routes only; they are not assigned through company `roles` or tenant `role_permissions`.
+
+The production app also seeds additional agency-facing role labels for Graphic Designer, Video Editor, and Client. Those labels use the same company-scoped permission system and client visibility rules described below.
 
 ## User Management
 
@@ -38,6 +42,16 @@ This document defines the planned role-based permission matrix for Contento. It 
 | `teams.assign_members` | Add or remove users from teams. | Full Access | Limited Access | No Access | No Access |
 | `teams.view_roster` | View team members and role assignments. | Full Access | Limited Access | Limited Access | View Only |
 | `teams.monitor_workload` | Monitor team workload and capacity. | Full Access | Limited Access | Limited Access | No Access |
+
+## Client Workspaces
+
+| Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
+| --- | --- | --- | --- | --- | --- |
+| `clients.view` | View company client workspaces, briefs, and delivery context. | Full Access | Full Access | Limited Access | Limited Access |
+| `clients.manage` | Create and edit client workspaces. | Full Access | Limited Access | No Access | No Access |
+| `clients.assign` | Assign account managers and scoped delivery users to client workspaces. | Full Access | Limited Access | No Access | No Access |
+| `content.final_output` | Attach final Drive links for production handoff. | Full Access | Limited Access | Limited Access | Limited Access |
+| `reports.send_to_client` | Mark reports as shared with the client. | Full Access | Limited Access | No Access | No Access |
 
 ## Task Management
 
@@ -68,6 +82,7 @@ This document defines the planned role-based permission matrix for Contento. It 
 | `content.track_pipeline` | Track content pipeline status. | Full Access | Full Access | Limited Access | Limited Access |
 | `content.archive` | Archive content items. | Full Access | Limited Access | No Access | No Access |
 | `content.rate` | Rate submitted content during review. | Full Access | Full Access | Limited Access | No Access |
+| `content.final_output` | Attach final Drive links for delivered content and tasks. | Full Access | Limited Access | Limited Access | Limited Access |
 
 ## Reviews & Approvals
 
@@ -81,8 +96,8 @@ This document defines the planned role-based permission matrix for Contento. It 
 Review boundaries:
 
 * Admin can review and override submitted content inside company scope.
-* Supervisor reviews content sent by Team Leads to Supervisor review.
-* CC Team Lead reviews own-team submissions only and can request changes or send content to Supervisor review.
+* Account Manager reviews content sent by Team Leads to Account Manager review.
+* CC Team Lead reviews own-team submissions only and can request changes or send content to Account Manager review.
 * Creator can view own submitted content, feedback, and ratings but cannot review or rate own content.
 
 ## Reports
@@ -93,12 +108,13 @@ Review boundaries:
 | `reports.view_own` | View own reports. | Full Access | Full Access | Full Access | Full Access |
 | `reports.view_team` | View assigned team reports. | Full Access | Full Access | Limited Access | No Access |
 | `reports.view_company` | View company-wide reports. | Full Access | View Only | No Access | No Access |
+| `reports.send_to_client` | Mark reports as shared with the client workspace. | Full Access | Limited Access | No Access | No Access |
 
 ## Calendar
 
 | Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
 | --- | --- | --- | --- | --- | --- |
-| `calendar.view` | View content and work calendar. | Full Access | Limited Access | Limited Access | Limited Access |
+| `calendar.view` | View scheduling calendar for task due dates, scheduled content, submitted time off, sick leave, and meetings. | Full Access | Limited Access | Limited Access | Limited Access |
 | `calendar.schedule_content` | Schedule approved content. | Full Access | Limited Access | Limited Access | No Access |
 | `calendar.reschedule_content` | Reschedule content calendar items. | Full Access | Limited Access | Limited Access | No Access |
 | `calendar.filter` | Filter calendar by creator, status, date, or team. | Full Access | Limited Access | Limited Access | Limited Access |
@@ -107,10 +123,10 @@ Review boundaries:
 
 | Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
 | --- | --- | --- | --- | --- | --- |
-| `day_off.submit` | Submit day off requests. | Full Access | Full Access | Full Access | Full Access |
-| `day_off.approve` | Approve or reject day off requests. | Full Access | Limited Access | No Access | No Access |
-| `day_off.cancel_own` | Cancel own pending request. | Full Access | Full Access | Full Access | Full Access |
-| `day_off.view_availability` | View team availability and schedule impact. | Full Access | Limited Access | Limited Access | View Only |
+| `day_off.submit` | Submit day off or sick leave requests. | Full Access | Full Access | Full Access | Full Access |
+| `day_off.approve` | Approve or reject scoped time-off requests. | Full Access | Limited Access | No Access | No Access |
+| `day_off.cancel_own` | Cancel own pending time-off request. | Full Access | Full Access | Full Access | Full Access |
+| `day_off.view_availability` | View own, assigned-team, or company time-off availability by role scope. | Full Access | Limited Access | Limited Access | View Only |
 
 ## Analytics
 
@@ -201,8 +217,12 @@ The current implementation uses this matrix for Teams, Tasks, Ideas, Content, Ca
 * Server actions require the documented create, assign, update, review, schedule, submit, close, or export permission before writing.
 * RLS remains company-scoped and adds task/team, idea-link, content-link, review-scope, rating-scope, and report-scope helper checks for limited team visibility.
 * CC Team Leads are restricted to own-team members, own-team task assignment, and own-team submitted content review.
-* Role dashboards show private user productivity counts; review queues and team/company data live in permission-scoped operational pages.
+* Role dashboards show private or role-scoped productivity counts; review queues and team/company data live in permission-scoped operational pages.
+* Dashboard customization controls live under `/settings/preferences`, not inside dashboard content.
+* The header notification bell shows recent own notifications, unread count, mark-read controls, and a browser-local sound preference.
+* The header no longer contains a fake search field; `/search` remains the standalone scoped search page.
 * Report CSV export requires `exports.reports`, never accepts a browser-provided `company_id`, and writes `reports.exported` to `activity_logs`.
+* Generated reports insert immutable report history rows from real task, content, work-hours, and time-off data plus an optional user note.
 * Notifications, comments, mentions, attachments, saved views, content templates, search, analytics, and dashboard preferences use the final production permissions above.
 * Generic collaboration records are only visible when the user can access the linked entity.
 * Saved views and dashboard preferences are private to the owning user.

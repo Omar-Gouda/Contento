@@ -26,7 +26,7 @@ Current foundation created:
 * TailwindCSS and shadcn/ui setup
 * Landing page, sign in page, and forgot password page
 * Protected dashboard layout foundation
-* Admin, Supervisor, CC Team Lead, and Creator dashboard route foundations
+* Marketing Manager, Account Manager, CC Team Lead, and Content Creator dashboard route foundations
 
 ## Phase 2: Authentication & Authorization
 
@@ -90,6 +90,8 @@ Current Phase 3 foundation created:
 * Current user and Admin work-hours pages
 * Dark mode with light, dark, and system preferences
 * Upgraded dashboard shell and navigation
+* Renamed user-facing roles for Marketing Manager, Account Manager, Content Creator, Graphic Designer, Video Editor, and Client
+* Client workspace routes and client-linked workflow foundations
 * Landing page removed; `/` redirects to `/sign-in`
 * Superior-admin organization bootstrap foundation
 
@@ -99,10 +101,10 @@ Goal: Build dashboards for all roles.
 
 Tasks:
 
-* Admin dashboard
-* Supervisor dashboard
+* Marketing Manager dashboard
+* Account Manager dashboard
 * CC Team Lead dashboard
-* Creator dashboard
+* Content Creator dashboard
 * Stats cards
 * Recent activity
 * Charts
@@ -116,10 +118,11 @@ Deliverables:
 
 Current Phase 4 dashboard foundation:
 
-* Role dashboard routes now link into real operational modules
+* Role dashboard routes now link into real operational modules for Marketing Manager, Account Manager, CC Team Lead, Content Creator, Graphic Designer, Video Editor, and Client
 * Dashboard metrics are personal to the signed-in user instead of exposing team/company progress
-* Sidebar navigation is permission-aware for Teams, Tasks, Ideas, Content, Calendar, Reports, and Work Hours
-* Advanced stats cards, charts, and analytics previews remain deferred
+* Sidebar navigation is permission-aware for Teams, Clients, Tasks, Ideas, Content, Calendar, Reports, and Work Hours
+* Dashboard customization controls moved to `/settings/preferences`
+* Focus and shortcuts widgets were removed in favor of real scoped charts
 
 ## Phase 5: Core Content Workflow
 
@@ -147,11 +150,12 @@ Current Phase 5 workflow implementation:
 * `/admin/teams` supports team creation, editing, archiving, lead assignment, member assignment, roster visibility, and workload statistics
 * `/team` provides a shared scoped team workspace for supervisors, CC Team Leads, and creators with visible rosters and workload signals
 * Supervisors with member-assignment permission can update members on teams visible to their scope; CC Team Leads cannot move users between teams
+* `/clients` and `/clients/[id]` manage client workspaces, client assignments, briefs, branding, and client-linked delivery items
 * `/tasks`, `/tasks/[id]`, and `/admin/tasks` support task creation, assignment, reassignment, status updates, due dates, priority, comments, activity logging, and team filtering
 * CC Team Leads can assign tasks only inside their own led/assigned teams
 * `/ideas`, `/ideas/[id]`, and `/admin/ideas` support idea creation, editing, deletion, assignment, team scoping, notes, status tracking, and activity logging
-* `/content` and `/content/[id]` support content item creation, task/idea linking, team scoping, creator assignment, submission, review history, ratings, and scheduling
-* `/content/reviews` supports the required Creator -> Team Lead -> Supervisor review handoff with feedback, rating, approval, rejection, and change requests
+* `/content` and `/content/[id]` support content item creation, client/task/idea linking, team scoping, creator assignment, submission, review history, ratings, final Drive handoff, and scheduling
+* `/content/reviews` supports the required Content Creator -> Team Lead -> Account Manager review handoff with feedback, rating, approval, rejection, and change requests
 * All records are company-scoped and permission-checked through existing auth context and RLS
 
 ## Phase 6: Reports & Analytics
@@ -176,7 +180,7 @@ Deliverables:
 
 Current Phase 6 reporting implementation:
 
-* `/reports` supports daily, weekly, creator, team, and company report records with optional team and date ranges
+* `/reports` generates daily and weekly report records from live tasks, content decisions, client scope, work hours, and time-off records
 * `/reports/[id]` shows report details inside the same permission scope
 * `/reports/export` exports permission-checked report CSV data and writes an activity log record
 * Advanced charts and analytics remain deferred
@@ -204,7 +208,7 @@ Current Phase 7 implementation:
 * Workflow server actions create activity logs for user, team, task, idea, content, report, and export actions.
 * Platform organization lifecycle changes write `platform_activity_logs`.
 * `/notifications` provides a real notification center with read/unread filters and mark-read actions.
-* Dashboard shell shows unread notification counts.
+* Dashboard shell shows an interactive notification bell with unread counts, recent notifications, mark-read controls, and browser-local sound preference.
 * Task assignment/status, idea submission/status, content submission/review, comment mentions, team membership, and organization lifecycle changes create notifications where relevant.
 
 ## Phase 8: UI/UX Upgrade
@@ -231,11 +235,12 @@ Deliverables:
 Current Phase 8 UI implementation:
 
 * New operational pages use dark-mode-aware cards, tables, filters, empty states, and action forms
-* Dashboard navigation includes permission-aware workflow groups and Admin groups
+* Dashboard navigation includes permission-aware workflow groups, client workspaces, and Admin groups
 * Mobile shell inherits the same route navigation and theme support
-* Search, notifications, profile, settings, templates, and Super Admin pages use the upgraded app surface
+* Search, notifications, profile, settings, preferences, templates, and Super Admin pages use the upgraded app surface
 * Organization branding colors are applied inside tenant workspaces without breaking dark mode
-* Dashboard widgets can be shown, hidden, and reset per user
+* Dashboard widgets can be shown, hidden, and reset per user under `/settings/preferences`
+* Header search input was removed; scoped search remains available on `/search`
 
 ## Phase 9: Production Readiness
 

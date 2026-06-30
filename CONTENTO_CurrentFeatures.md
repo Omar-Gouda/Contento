@@ -29,6 +29,7 @@ Features:
 * Workspace-level permissions
 * First authenticated user can create the initial company workspace
 * First authenticated user becomes active Admin for that workspace
+* Client workspaces and client-linked deliverables are scoped to the owning company
 
 ## 3. Roles
 
@@ -36,10 +37,13 @@ Status: RBAC Foundation Implemented
 
 Roles:
 
-* Admin
-* Supervisor
+* Marketing Manager (Admin)
+* Account Manager (Supervisor)
 * CC Team Lead
-* Creator
+* Content Creator (Creator)
+* Graphic Designer
+* Video Editor
+* Client
 
 Foundation:
 
@@ -55,17 +59,20 @@ Status: Operational Foundation Implemented
 
 Dashboards:
 
-* Admin dashboard
-* Supervisor dashboard
+* Marketing Manager dashboard
+* Account Manager dashboard
 * CC Team Lead dashboard
-* Creator dashboard
+* Content Creator dashboard
+* Graphic Designer dashboard
+* Video Editor dashboard
+* Client dashboard
 
 Current foundation:
 
 * Role dashboards are protected and route-aware
-* Dashboard cards focus on the signed-in user's own tasks, content, reports, submissions, and work-day status
+* Dashboard cards and charts focus on the signed-in user's own or permitted scoped tasks, content, clients, reports, submissions, and work-day status
 * Team and company-wide review/operations views live in scoped operational pages instead of private dashboards
-* Advanced analytics cards and charts remain deferred
+* Dashboard customization lives in `/settings/preferences`
 
 ## 4.1 Teams
 
@@ -83,6 +90,19 @@ Features:
 * CC Team Leads only see and operate inside their own led/assigned team scope
 * Supervisors with member-assignment permission can update members on teams visible to their scope
 
+## 4.2 Client Workspaces
+
+Status: Implemented
+
+Features:
+
+* Create and edit client workspaces
+* Assign account managers and scoped production users
+* Track client briefs, branding, contacts, notes, and requirements
+* Link tasks, ideas, content, reports, and calendar items to clients
+* View client-specific workspace pages and delivery history
+* Preserve structured report metrics and require an explicit internal send action before Client role users can read client-scoped reports
+
 ## 5. User Management
 
 Status: Phase 3 Foundation Implemented
@@ -97,7 +117,8 @@ Features:
 * Reactivate users
 * Assign roles
 * Assign teams
-* Force Admin-created users to change their password on first login
+* Force Marketing Manager-created users to change their password on first login
+* Manage client assignments where permitted
 
 ## 5.1 User Invitations
 
@@ -163,12 +184,14 @@ Features:
 * Assign content to creator
 * Track status
 * Creator submits drafts to Team Lead review
-* Team Lead requests changes or sends own-team content to Supervisor review
+* Team Lead requests changes or sends own-team content to Account Manager review
 * Supervisor approves, rejects, or requests changes
 * Add reviewer feedback
 * Add scoped reviewer ratings for submitted content
 * Link content items to tasks
+* Link content items to clients
 * Schedule approved content into the calendar
+* Attach final Drive links for production handoff
 
 ## 8. Content Calendar
 
@@ -178,12 +201,15 @@ Features:
 
 * Monthly calendar view
 * Weekly calendar view
+* Day calendar view
 * Schedule content
-* Filter by date range through monthly or weekly anchor date
-* View upcoming content
-* View user work-hours visibility
-* View approved day-off visibility
+* View task due dates
+* View scheduled content
+* Submit day off and sick leave requests
+* Review scoped pending time-off requests when the role has approval permission
+* View optional general scheduling events
 * `Africa/Cairo` timezone respected in display
+* Calendar intentionally excludes ideas, reports, work sessions, analytics events, and activity logs
 
 ## 9. Reports
 
@@ -191,12 +217,14 @@ Status: Implemented
 
 Features:
 
-* Daily reports
-* Weekly reports
+* Generated daily reports
+* Generated weekly reports
 * Creator reports
 * Team reports
 * Company reports
+* Client-scoped report history
 * Export reports as CSV
+* Report body is generated from live task, content, work-hours, and time-off data with optional user notes
 
 ## 10. Analytics
 
@@ -211,7 +239,7 @@ Features:
 * Creator performance
 * Team performance
 * Activity trends
-* Role-scoped dashboard metrics for Admin, Supervisor, CC Team Lead, and Creator
+* Role-scoped dashboard metrics for Marketing Manager, Account Manager, CC Team Lead, Content Creator, Graphic Designer, Video Editor, and Client
 * Company-wide Admin analytics for users, active users, teams, open tasks, approval rate, reports, and active work days
 * Team-scoped Supervisor and CC Team Lead metrics
 
@@ -239,9 +267,10 @@ Features:
 * Review requested notification
 * Feedback received notification
 * Notification center at `/notifications`
-* Unread count in the dashboard shell
+* Header notification bell with unread count and recent-notification dropdown
 * Read/unread filtering
 * Mark one or all notifications as read
+* Browser-local notification sound preference
 * Entity links when a notification maps to a task, idea, content item, report, or organization event
 
 ## 13. UI/UX
@@ -326,7 +355,7 @@ Created in Phase 3:
 * Landing page removed; `/` redirects to `/sign-in`
 * Role-based sidebar navigation
 * Admin direct user creation and management page
-* Forced password-change page for Admin-created users
+* Forced password-change page for Marketing Manager-created users
 * User invitation migration and RLS policies
 * Working-hours migration and RPCs
 * Cairo timezone work-date fix
@@ -353,7 +382,7 @@ Created in the current implementation:
 * Content pipeline at `/content`
 * Content detail page at `/content/[id]`
 * Content review queue at `/content/reviews`
-* Two-step content review flow: Creator draft -> Team Lead review -> Supervisor review -> approved/rejected/changes requested
+* Two-step content review flow: Content Creator draft -> Team Lead review -> Account Manager review -> approved/rejected/changes requested
 * Content rating support through `content_ratings` and `content.rate`
 * Content calendar at `/calendar` with month, week, and list views
 * Reports page at `/reports`
@@ -383,6 +412,6 @@ Created in the final production phase:
 * User profile management at `/profile`
 * Review scoring fields on content reviews
 * Content templates at `/content/templates`
-* Dashboard widget customization with user preferences
+* Dashboard widget customization with user preferences under `/settings/preferences`
 * Expanded audit logging for user management and workflow actions
 * GitHub and Vercel readiness documentation, safe `.env.example`, and temporary file cleanup

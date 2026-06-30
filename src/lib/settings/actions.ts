@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
@@ -21,6 +22,13 @@ function colorOrNull(value: string) {
   const trimmed = value.trim();
   return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed : null;
 }
+
+const avatarTypes = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+  ["image/gif", "gif"],
+]);
 
 export async function updateProfileAction(formData: FormData) {
   const context = await requireAuthContext();
@@ -47,6 +55,7 @@ export async function updateProfileAction(formData: FormData) {
 
 export async function uploadAvatarAction(formData: FormData) {
   const context = await requireAuthContext();
+
   const file = formData.get("avatar");
 
   if (!(file instanceof File) || file.size === 0) {
@@ -57,18 +66,30 @@ export async function uploadAvatarAction(formData: FormData) {
     safeRedirect("/profile", "error", "Avatar image must be 5 MB or smaller.");
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() || "png";
-  const path = `${context.companyId}/${context.userId}/${randomUUID()}.${extension}`;
+  const extension = avatarTypes.get(file.type);
+
+  if (!extension) {
+    safeRedirect("/profile", "error", "Avatar must be a JPG, PNG, WebP, or GIF image.");
+  }
+
+  const path = `${context.companyId}/${context.userId}/avatar-${randomUUID()}.${extension}`;
   const supabase = await createSupabaseServerClient();
+  const { data: currentProfile } = await supabase
+    .from("users")
+    .select("avatar_url")
+    .eq("id", context.userId)
+    .eq("company_id", context.companyId)
+    .maybeSingle();
+
   const { error: uploadError } = await supabase.storage
     .from("contento-avatars")
     .upload(path, file, {
-      contentType: file.type || "image/png",
+      contentType: file.type,
       upsert: false,
     });
 
   if (uploadError) {
-    safeRedirect("/profile", "error", "Avatar could not be uploaded.");
+    safeRedirect("/profile", "error", "Avatar could not be uploaded. Try a smaller image or a different file.");
   }
 
   const { error } = await supabase
@@ -78,9 +99,15 @@ export async function uploadAvatarAction(formData: FormData) {
     .eq("company_id", context.companyId);
 
   if (error) {
+    await supabase.storage.from("contento-avatars").remove([path]);
     safeRedirect("/profile", "error", "Avatar could not be saved.");
   }
 
+  if (currentProfile?.avatar_url && !currentProfile.avatar_url.startsWith("http")) {
+    await supabase.storage.from("contento-avatars").remove([currentProfile.avatar_url]);
+  }
+
+  revalidatePath("/profile");
   safeRedirect("/profile", "notice", "Avatar updated.");
 }
 

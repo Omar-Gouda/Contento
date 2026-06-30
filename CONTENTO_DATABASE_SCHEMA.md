@@ -4,11 +4,12 @@ This document describes the planned database architecture for Contento. It is do
 
 ## 1. Database Overview
 
-Contento is a multi-tenant SaaS platform. Each company owns an isolated workspace containing its users, roles, teams, tasks, ideas, content, reviews, reports, calendar events, day off requests, notifications, activity logs, and settings.
+Contento is a multi-tenant SaaS platform. Each company owns an isolated workspace containing its users, roles, teams, clients, tasks, ideas, content, reviews, reports, calendar events, day off requests, notifications, activity logs, and settings.
 
 The database should be designed around a tenant root table, `companies`, and company-scoped tables that include `company_id`. Application requests must resolve the current authenticated user's company from the server-side user profile and use that company context for every read and write.
 
 Company data isolation is required because different companies may use Contento at the same time while storing private operational data. A user from one company must never be able to see, infer, modify, export, or report on another company's users, content, schedules, analytics, approvals, or logs.
+Client workspaces are also company-scoped and can be linked to tasks, ideas, content items, reports, and calendar events without crossing tenant boundaries.
 
 Recommended architecture principles:
 
@@ -50,13 +51,13 @@ Application user profile table. This should connect to Supabase Auth while keepi
 | `avatar_url` | Optional profile image URL. |
 | `role_id` | Current role assigned to the user. |
 | `status` | User state, such as invited, active, suspended, or disabled. |
-| `must_change_password` | Forces Admin-created users to change their temporary password before dashboard access. |
+| `must_change_password` | Forces Marketing Manager-created users to change their temporary password before dashboard access. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
 ### `roles`
 
-Company-scoped role definitions. Default roles should include Admin, Supervisor, CC Team Lead, and Creator.
+Company-scoped role definitions. Current implementation uses Marketing Manager (Admin), Account Manager (Supervisor), CC Team Lead, Content Creator (Creator), Graphic Designer, Video Editor, and Client labels backed by company-scoped role rows.
 
 | Field | Purpose |
 | --- | --- |
@@ -110,6 +111,43 @@ Join table connecting users to teams.
 | `team_id` | Team membership belongs to. |
 | `user_id` | User assigned to the team. |
 
+### `clients`
+
+Company-scoped client workspace records for agency deliverables and client-facing reporting.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the client workspace. |
+| `company_id` | Company that owns the client. |
+| `name` | Client display name. |
+| `slug` | URL-safe client slug. |
+| `logo_url` | Optional client logo asset URL. |
+| `primary_color` | Optional client brand color. |
+| `secondary_color` | Optional client brand color. |
+| `accent_color` | Optional client brand color. |
+| `contact_person` | Primary client contact name. |
+| `contact_email` | Primary client contact email. |
+| `contact_phone` | Primary client contact phone. |
+| `notes` | Client notes and account context. |
+| `brief_drive_link` | Link to the client brief or source folder. |
+| `requirements` | Client requirements and operating notes. |
+| `assigned_account_manager_id` | Account manager owner inside the company. |
+| `status` | Client lifecycle state: active, paused, or archived. |
+| `created_by` | User who created the client workspace. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+
+### `client_assignments`
+
+Join table connecting users to client workspaces.
+
+| Field | Purpose |
+| --- | --- |
+| `client_id` | Client workspace assignment belongs to. |
+| `user_id` | User assigned to the client workspace. |
+| `assignment_role` | Assignment role such as account_manager, content_creator, graphic_designer, video_editor, client_contact, or member. |
+| `created_at` | Assignment timestamp. |
+
 ### `tasks`
 
 Company-scoped task assignment table for creator and team workflow.
@@ -118,6 +156,7 @@ Company-scoped task assignment table for creator and team workflow.
 | --- | --- |
 | `id` | Primary identifier for the task. |
 | `company_id` | Company that owns the task. |
+| `client_id` | Optional client workspace linked to the task. |
 | `title` | Task title. |
 | `description` | Task details. |
 | `assigned_to` | User assigned to complete the task. |
@@ -127,6 +166,9 @@ Company-scoped task assignment table for creator and team workflow.
 | `priority` | Priority: low, normal, high, or urgent. |
 | `team_id` | Optional team associated with the task. |
 | `due_date` | Expected completion date. |
+| `final_drive_link` | Final production Drive URL for delivered work. |
+| `final_output_submitted_at` | Timestamp when the final output link was submitted. |
+| `final_output_submitted_by` | User who submitted the final output link. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
@@ -151,6 +193,7 @@ Company-scoped idea table for creator content concepts.
 | --- | --- |
 | `id` | Primary identifier for the idea. |
 | `company_id` | Company that owns the idea. |
+| `client_id` | Optional client workspace linked to the idea. |
 | `title` | Idea title. |
 | `description` | Idea details. |
 | `created_by` | User who created the idea. |
@@ -158,6 +201,16 @@ Company-scoped idea table for creator content concepts.
 | `team_id` | Optional team associated with the idea. |
 | `status` | Current idea status. |
 | `notes` | Operational notes for the idea. |
+| `idea_type` | Client-facing idea format: post, reel, or story. |
+| `platforms` | Platforms targeted by the idea. |
+| `headline` | Suggested headline or hook. |
+| `subtext` | Supporting copy for the idea. |
+| `visual` | Visual direction or creative guidance. |
+| `cta` | Suggested call to action. |
+| `script` | Suggested script or outline. |
+| `urgency` | Priority: low, normal, high, or urgent. |
+| `publishing_at` | Planned publishing timestamp. |
+| `final_drive_link` | Final Drive link for the creative handoff. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
@@ -169,6 +222,7 @@ Company-scoped content records that move through submission, review, approval, s
 | --- | --- |
 | `id` | Primary identifier for the content item. |
 | `company_id` | Company that owns the content item. |
+| `client_id` | Optional client workspace linked to the content item. |
 | `title` | Content title. |
 | `description` | Content details. |
 | `creator_id` | Creator responsible for the content. |
@@ -180,6 +234,9 @@ Company-scoped content records that move through submission, review, approval, s
 | `approved_at` | Timestamp when approved. |
 | `scheduled_at` | Timestamp when scheduled for publishing. |
 | `published_at` | Timestamp when published. |
+| `final_drive_link` | Final production Drive URL for the content item. |
+| `final_output_submitted_at` | Timestamp when the final output link was submitted. |
+| `final_output_submitted_by` | User who submitted the final output link. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
@@ -218,17 +275,21 @@ Company-scoped rating records attached to submitted content reviews.
 
 ### `reports`
 
-Company-scoped report table for daily, weekly, creator, team, and company reports.
+Company-scoped report table for daily, weekly, creator, team, and company reports. Current report creation generates structured content from real tasks, content decisions, client scope, work hours, and time-off data, then stores a new historical row.
 
 | Field | Purpose |
 | --- | --- |
 | `id` | Primary identifier for the report. |
 | `company_id` | Company that owns the report. |
+| `client_id` | Optional client workspace linked to the report. |
 | `user_id` | User associated with the report. |
 | `team_id` | Optional team associated with the report. |
 | `report_type` | Report category. |
 | `title` | Report title used by lists, details, and exports. |
 | `content` | Report body or structured report payload. |
+| `metrics_json` | Structured metrics summary generated with the report. |
+| `sent_to_client_at` | Timestamp when the report was shared with the client. |
+| `sent_to_client_by` | User who sent the report to the client. |
 | `date_range_start` | Optional report coverage start date. |
 | `date_range_end` | Optional report coverage end date. |
 | `created_at` | Creation timestamp. |
@@ -236,15 +297,16 @@ Company-scoped report table for daily, weekly, creator, team, and company report
 
 ### `calendar_events`
 
-Company-scoped scheduling table for content calendar and work calendar items.
+Company-scoped scheduling table for content calendar items and optional general scheduling events. The product calendar intentionally shows scheduling records only, not reports, ideas, work sessions, analytics, or activity logs.
 
 | Field | Purpose |
 | --- | --- |
 | `id` | Primary identifier for the event. |
 | `company_id` | Company that owns the event. |
+| `client_id` | Optional client workspace linked to the event. |
 | `title` | Event title. |
 | `description` | Event details. |
-| `event_type` | Content, work-hours, day-off, or general event category. |
+| `event_type` | Content, day-off, or general scheduling category. Legacy work-hours events are not shown by the product calendar. |
 | `content_id` | Optional linked content item. |
 | `user_id` | Optional linked user. |
 | `team_id` | Optional linked team. |
@@ -255,17 +317,21 @@ Company-scoped scheduling table for content calendar and work calendar items.
 
 ### `day_off_requests`
 
-Company-scoped day off request table for schedule availability.
+Company-scoped time-off request table for day off and sick leave schedule availability.
 
 | Field | Purpose |
 | --- | --- |
 | `id` | Primary identifier for the request. |
 | `company_id` | Company that owns the request. |
 | `user_id` | User requesting time off. |
+| `request_type` | Request type: `day_off` or `sick_leave`. |
 | `start_date` | First requested day off. |
 | `end_date` | Last requested day off. |
 | `reason` | Optional request reason. |
 | `status` | Current request status. |
+| `reviewed_by` | User who approved or rejected the request. |
+| `reviewed_at` | Timestamp when reviewed. |
+| `updated_at` | Last update timestamp. |
 
 ### `notifications`
 
@@ -675,7 +741,7 @@ Recommended transition behavior:
 * Creator creates content as `Draft`.
 * Creator submits content into `Submitted To Team Lead`.
 * CC Team Lead reviews own-team submissions and moves content to `Changes Requested By Team Lead` or `Sent To Supervisor`.
-* Supervisor reviews `Sent To Supervisor` content and moves it to `Approved`, `Rejected`, or `Changes Requested By Supervisor`.
+* Account Manager reviews `Sent To Supervisor` content and moves it to `Approved`, `Rejected`, or `Changes Requested By Supervisor`; the legacy status names remain for database compatibility.
 * Creator can resubmit requested changes back to `Submitted To Team Lead`.
 * Approved content may move to `Scheduled`, then `Published`.
 * Completed or retired records move to `Archived`.

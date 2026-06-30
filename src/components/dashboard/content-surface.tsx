@@ -3,11 +3,13 @@ import { CalendarClock, CheckCircle2, FileText, Plus, Send, Star } from "lucide-
 
 import {
   createContentAction,
+  submitContentFinalOutputAction,
   rateContentAction,
   reviewContentAction,
   scheduleContentAction,
   submitContentAction,
 } from "@/lib/workflows/actions";
+import { getClients } from "@/lib/clients/queries";
 import { getContentTemplates } from "@/lib/content-templates/queries";
 import {
   getWorkflowContent,
@@ -18,10 +20,10 @@ import {
   getWorkflowTeams,
   getWorkflowUsers,
 } from "@/lib/workflows/queries";
+import { routes } from "@/constants/routes";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
-import { SavedViewsPanel } from "@/components/dashboard/saved-views-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -72,7 +74,7 @@ function reviewOptions(role: AuthContext["role"], status: string) {
 
   if (role === "team-lead" && (status === "submitted_to_team_lead" || status === "changes_requested_by_supervisor")) {
     return [
-      { value: "send_to_supervisor", label: "Send to supervisor" },
+      { value: "send_to_supervisor", label: "Send to Account Manager" },
       { value: "changes_requested", label: "Request changes" },
     ];
   }
@@ -90,7 +92,7 @@ function reviewOptions(role: AuthContext["role"], status: string) {
       { value: "approved", label: "Approve" },
       { value: "changes_requested", label: "Request changes" },
       { value: "rejected", label: "Reject" },
-      { value: "send_to_supervisor", label: "Send to supervisor" },
+      { value: "send_to_supervisor", label: "Send to Account Manager" },
     ];
   }
 
@@ -126,10 +128,10 @@ export async function ContentSurface({
 }: {
   context: AuthContext;
   mode: "pipeline" | "reviews";
-  searchParams: { q?: string; status?: string; team?: string; error?: string; notice?: string };
+  searchParams: { q?: string; status?: string; team?: string; client?: string; error?: string; notice?: string };
 }) {
   const [content, users, tasks, ideas, teams, reviews, ratings, templates] = await Promise.all([
-    getWorkflowContent(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team }),
+    getWorkflowContent(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team, clientId: searchParams.client }),
     getWorkflowUsers(context),
     getWorkflowTasks(context, { status: "all" }),
     getWorkflowIdeas(context, { status: "all" }),
@@ -138,13 +140,16 @@ export async function ContentSurface({
     getWorkflowContentRatings(context),
     getContentTemplates(context),
   ]);
+  const clients = await getClients(context);
   const activeUsers = users.filter((user) => user.status === "active");
   const openTasks = tasks.filter((task) => task.status !== "closed");
   const activeIdeas = ideas.filter((idea) => idea.status !== "archived" && idea.status !== "rejected");
   const activeTeams = teams.filter((team) => team.status === "active");
+  const activeClients = clients.filter((client) => client.status === "active");
   const activeTemplates = templates.filter((template) => template.status === "active");
   const canCreate = hasPermission(context, "content.create", "limited");
   const canSubmit = hasPermission(context, "content.submit", "limited");
+  const canFinalOutput = hasPermission(context, "content.final_output", "limited");
   const canReview = hasPermission(context, "reviews.add_feedback", "limited");
   const canRate = hasPermission(context, "content.rate", "limited");
   const canSchedule = hasPermission(context, "calendar.schedule_content", "limited");
@@ -162,7 +167,7 @@ export async function ContentSurface({
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           {mode === "reviews"
-            ? "Review submitted content through the team lead and supervisor handoff flow."
+            ? "Review submitted content through the Team Lead and Account Manager handoff flow."
             : "Create drafts, submit work to team lead review, and schedule approved content."}
         </p>
       </div>
@@ -173,20 +178,29 @@ export async function ContentSurface({
         <Card>
           <CardHeader>
             <CardTitle>Create content item</CardTitle>
-            <CardDescription>Start a draft, assign a creator, and optionally link it to an active task.</CardDescription>
+            <CardDescription>Start a draft, assign a Content Creator, and optionally link it to an active task.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={createContentAction} className="grid gap-4 lg:grid-cols-3">
+            <form action={createContentAction} className="grid gap-4 lg:grid-cols-4">
               <input type="hidden" name="redirectTo" value="/content" />
               <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="title">Title</Label>
                 <Input id="title" name="title" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="creatorId">Creator</Label>
+                <Label htmlFor="creatorId">Content Creator</Label>
                 <select id="creatorId" name="creatorId" className={selectClass} defaultValue={context.userId}>
                   {activeUsers.map((user) => (
                     <option key={user.id} value={user.id}>{user.displayName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clientId">Client</Label>
+                <select id="clientId" name="clientId" className={selectClass}>
+                  <option value="">No client</option>
+                  {activeClients.map((client) => (
+                    <option key={client.id} value={client.id}>{client.name}</option>
                   ))}
                 </select>
               </div>
@@ -230,7 +244,11 @@ export async function ContentSurface({
                   ))}
                 </select>
               </div>
-              <div className="lg:col-span-3">
+              <div className="space-y-2 lg:col-span-2">
+                <Label htmlFor="finalDriveLink">Final Drive link</Label>
+                <Input id="finalDriveLink" name="finalDriveLink" type="url" placeholder="https://drive.google.com/..." />
+              </div>
+              <div className="lg:col-span-4">
                 <Button type="submit">
                   <Plus />
                   Create content
@@ -248,7 +266,7 @@ export async function ContentSurface({
             <CardDescription>Filter content by status or title.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form action="/content" className="grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
+            <form action="/content" className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_auto]">
               <div className="space-y-2">
                 <Label htmlFor="q">Search</Label>
                 <Input id="q" name="q" defaultValue={searchParams.q ?? ""} />
@@ -267,25 +285,19 @@ export async function ContentSurface({
                   {activeTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
                 </select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="client">Client</Label>
+                <select id="client" name="client" defaultValue={searchParams.client ?? "all"} className={selectClass}>
+                  <option value="all">All clients</option>
+                  {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                </select>
+              </div>
               <div className="flex items-end">
                 <Button type="submit" className="w-full md:w-auto">Apply</Button>
               </div>
             </form>
           </CardContent>
         </Card>
-      )}
-
-      {mode === "pipeline" && (
-        <SavedViewsPanel
-          context={context}
-          module="content"
-          basePath="/content"
-          currentFilters={{
-            q: searchParams.q,
-            status: searchParams.status,
-            team: searchParams.team,
-          }}
-        />
       )}
 
       <div className="grid gap-4">
@@ -306,6 +318,7 @@ export async function ContentSurface({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={statusVariant(item.status)}>{item.status}</Badge>
+                    {item.clientName && <Badge variant="secondary">{item.clientName}</Badge>}
                     {item.taskTitle && <Badge variant="secondary">{item.taskTitle}</Badge>}
                     {item.ideaTitle && <Badge variant="secondary">{item.ideaTitle}</Badge>}
                     {item.teamName && <Badge variant="secondary">{item.teamName}</Badge>}
@@ -316,8 +329,18 @@ export async function ContentSurface({
               <CardContent className="grid gap-5">
                 <div className="grid gap-3 text-sm md:grid-cols-4">
                   <div>
-                    <p className="text-muted-foreground">Creator</p>
+                    <p className="text-muted-foreground">Content Creator</p>
                     <p className="font-medium">{item.creatorName ?? "Unassigned"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Client</p>
+                    {item.client_id ? (
+                      <Link href={routes.clients.detail(item.client_id)} className="font-medium text-primary hover:underline">
+                        {item.clientName ?? "Open client"}
+                      </Link>
+                    ) : (
+                      <p className="font-medium">No client</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Submitted</p>
@@ -330,6 +353,16 @@ export async function ContentSurface({
                   <div>
                     <p className="text-muted-foreground">Scheduled</p>
                     <p className="font-medium">{formatCairoDateTime(item.scheduled_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Final Drive</p>
+                    {item.final_drive_link ? (
+                      <a href={item.final_drive_link} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                        Open link
+                      </a>
+                    ) : (
+                      <p className="font-medium">No final link</p>
+                    )}
                   </div>
                 </div>
 
@@ -358,6 +391,25 @@ export async function ContentSurface({
                         <CalendarClock />
                         Schedule
                       </Button>
+                    </form>
+                  )}
+
+                  {canFinalOutput && (
+                    <form action={submitContentFinalOutputAction} className="flex flex-col gap-2 rounded-lg border bg-secondary/20 p-3">
+                      <input type="hidden" name="contentId" value={item.id} />
+                      <input type="hidden" name="redirectTo" value={basePath} />
+                      <Label htmlFor={`final-${item.id}`}>Final Drive link</Label>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          id={`final-${item.id}`}
+                          name="finalDriveLink"
+                          defaultValue={item.final_drive_link ?? ""}
+                          type="url"
+                          placeholder="https://drive.google.com/..."
+                          required
+                        />
+                        <Button type="submit" variant="outline" size="sm">Save final</Button>
+                      </div>
                     </form>
                   )}
                 </div>

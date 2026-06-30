@@ -16,6 +16,9 @@ This folder contains the database foundation for Contento.
 | `migrations/202606240002_contento_phase_4_scope_fix_review_flow.sql` | Adds Team Lead scope fixes, content handoff statuses, content ratings, `content.rate`, and tighter users/teams/tasks/content/review/rating RLS helpers and policies. |
 | `migrations/202606240003_contento_phase_4_scope_policy_hardening.sql` | Adds explicit same-company link checks to team member, task, and content write policies. |
 | `migrations/202606240004_contento_final_production_saas_readiness.sql` | Adds final production SaaS readiness: `platform_admins`, `platform_activity_logs`, organization disabled/deleted statuses, notifications, attachments, comments, mentions, saved views, content templates, dashboard preferences, review scoring, storage buckets, permissions, indexes, triggers, helper functions, and RLS policies. |
+| `migrations/202606240005_contento_product_review_corrections.sql` | Adds time-off request type/review metadata, time-off indexes, updated trigger, and scoped time-off RLS helper/policies for own/team/company visibility. |
+| `migrations/202606250001_contento_client_revision.sql` | Adds client workspaces, client assignments, client-linked workflow fields, final Drive handoff fields, Graphic Designer / Video Editor / Client roles, client permissions, indexes, helper functions, and RLS policies. |
+| `migrations/202606250002_contento_client_report_send_flow.sql` | Hardens report visibility so Client role users only read client-scoped reports after they are explicitly sent to the client workspace. |
 
 ## RLS Policy Model
 
@@ -31,14 +34,18 @@ Policy principles:
 * Work-hours writes are performed through authenticated RPCs so sign-in, sign-out, and break rules stay database-consistent.
 * Platform admins are stored outside company membership and can only operate through platform-specific routes, helpers, and server-side actions.
 * Organization lifecycle policies allow platform admins to view and update organization status while company users remain scoped to their own active company.
-* Admin-created users are created through server-only Supabase Auth code, then linked to `users` with `must_change_password = true`.
+* Marketing Manager-created users are created through server-only Supabase Auth code, then linked to `users` with `must_change_password = true`.
 * Workflow pages use server actions that resolve `company_id` from the authenticated profile and let RLS enforce tenant boundaries.
-* Task, idea, content, report, comments, mentions, and attachment visibility use scope helpers so Admins stay company-wide, Supervisors and Team Leads stay team-scoped, and Creators stay own-scope.
+* Task, idea, content, report, time-off, comments, mentions, and attachment visibility use scope helpers so Admins stay company-wide, Supervisors and Team Leads stay team-scoped, and Creators stay own-scope.
+* Client workspace visibility is company-scoped and uses `clients`, `client_assignments`, `is_same_company_client()`, and `can_access_client_scope()` so client users only see assigned client workspaces and internal users remain inside company/team/client boundaries.
+* Client-linked task, idea, content, report, and calendar policies validate that referenced clients belong to the same company before inserts or updates are allowed.
+* Client-role report visibility requires `reports.sent_to_client_at`; internal users with report access can prepare reports before sharing them with clients.
 * Notifications are readable and updateable only by their recipient inside the same company.
 * Saved views and dashboard preferences are private to the owning user.
 * Content templates are company-scoped; active templates can be used by permitted creators, while management requires template permissions.
 * `contento-attachments` and `contento-avatars` storage buckets use company/user folder policies.
 * Report CSV export is server-side and requires `exports.reports`.
+* Generated reports are stored as new historical rows based on live task, content, work-hours, and time-off data.
 * Service-role access should remain server-only and must never be exposed to the browser.
 
 ## Working-Hours Rules

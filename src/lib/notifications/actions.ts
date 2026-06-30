@@ -4,18 +4,25 @@ import { redirect } from "next/navigation";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDefaultDashboardPath } from "@/types/roles";
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
 }
 
+function safeRedirect(formData: FormData, fallback = "/notifications"): never {
+  const redirectTo = formString(formData, "redirectTo");
+  redirect(redirectTo.startsWith("/") ? redirectTo : fallback);
+}
+
 export async function markNotificationReadAction(formData: FormData) {
   const context = await requireAuthContext();
+  const fallbackPath = getDefaultDashboardPath(context.role);
   const notificationId = formString(formData, "notificationId");
 
   if (!notificationId) {
-    redirect("/notifications?error=Invalid notification.");
+    redirect(fallbackPath);
   }
 
   const supabase = await createSupabaseServerClient();
@@ -27,14 +34,15 @@ export async function markNotificationReadAction(formData: FormData) {
     .eq("user_id", context.userId);
 
   if (error) {
-    redirect("/notifications?error=Notification could not be updated.");
+    redirect(fallbackPath);
   }
 
-  redirect("/notifications?notice=read");
+  safeRedirect(formData, fallbackPath);
 }
 
-export async function markAllNotificationsReadAction() {
+export async function markAllNotificationsReadAction(formData?: FormData) {
   const context = await requireAuthContext();
+  const fallbackPath = getDefaultDashboardPath(context.role);
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("notifications")
@@ -44,8 +52,12 @@ export async function markAllNotificationsReadAction() {
     .eq("read", false);
 
   if (error) {
-    redirect("/notifications?error=Notifications could not be updated.");
+    redirect(fallbackPath);
   }
 
-  redirect("/notifications?notice=all-read");
+  if (formData) {
+    safeRedirect(formData, fallbackPath);
+  }
+
+  redirect(fallbackPath);
 }

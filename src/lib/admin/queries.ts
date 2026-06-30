@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
 import { getCairoDate } from "@/lib/time";
 import type { Database } from "@/types/database";
+import { getRoleDisplayName } from "@/types/roles";
 
 export type CompanyRole = Database["public"]["Tables"]["roles"]["Row"];
 export type CompanyTeam = Database["public"]["Tables"]["teams"]["Row"];
@@ -100,7 +101,7 @@ export async function getCompanyUsers(
     throw new Error("Unable to load team memberships.");
   }
 
-  const roleById = new Map(roles.map((role) => [role.id, role.name]));
+  const roleById = new Map(roles.map((role) => [role.id, getRoleDisplayName(role.name)]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
   const teamByUserId = new Map(
     ((teamMembers as Database["public"]["Tables"]["team_members"]["Row"][] | null) ?? [])
@@ -148,7 +149,7 @@ export async function getCompanyInvitations(context: AuthContext) {
     throw new Error("Unable to load invitation owners.");
   }
 
-  const roleById = new Map(roles.map((role) => [role.id, role.name]));
+  const roleById = new Map(roles.map((role) => [role.id, getRoleDisplayName(role.name)]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
   const inviterById = new Map(((inviters as Array<{ id: string; email: string }> | null) ?? []).map((user) => [user.id, user.email]));
 

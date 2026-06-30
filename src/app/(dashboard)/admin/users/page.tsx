@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getRoleDisplayName } from "@/types/roles";
 
 export const metadata: Metadata = {
   title: "User management",
@@ -64,7 +65,7 @@ export default async function AdminUsersPage({
           <p className="text-sm font-medium text-primary">Admin</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-normal">User management</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Manage company users, account status, role assignment, and team membership.
+            Manage company users, account status, agency role assignment, and team membership.
           </p>
         </div>
       </div>
@@ -104,7 +105,7 @@ export default async function AdminUsersPage({
                 <option value="">Choose role</option>
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>
-                    {role.name}
+                    {getRoleDisplayName(role.name)}
                   </option>
                 ))}
               </select>
@@ -247,7 +248,7 @@ export default async function AdminUsersPage({
                         >
                           {roles.map((role) => (
                             <option key={role.id} value={role.id}>
-                              {role.name}
+                              {getRoleDisplayName(role.name)}
                             </option>
                           ))}
                         </select>

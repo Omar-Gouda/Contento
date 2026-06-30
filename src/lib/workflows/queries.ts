@@ -1,8 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { routes } from "@/constants/routes";
 import type { AuthContext } from "@/lib/auth/permissions";
 import { CONTENTO_TIME_ZONE, getCairoDate } from "@/lib/time";
 import { activeReviewStatuses, canUseCompanyScope, getVisibleTeamIds, getVisibleUserIds } from "@/lib/workflows/scope";
 import type { Database, Json } from "@/types/database";
+import { getRoleDisplayName } from "@/types/roles";
 
 type UserRow = Pick<
   Database["public"]["Tables"]["users"]["Row"],
@@ -18,9 +20,9 @@ type ContentRow = Database["public"]["Tables"]["content_items"]["Row"];
 type ContentReviewRow = Database["public"]["Tables"]["content_reviews"]["Row"];
 type ContentRatingRow = Database["public"]["Tables"]["content_ratings"]["Row"];
 type CalendarEventRow = Database["public"]["Tables"]["calendar_events"]["Row"];
-type WorkDayRow = Database["public"]["Tables"]["work_days"]["Row"];
 type DayOffRow = Database["public"]["Tables"]["day_off_requests"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
+type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name">;
 
 export type WorkflowUser = UserRow & {
   displayName: string;
@@ -36,6 +38,7 @@ export type WorkflowTeam = Database["public"]["Tables"]["teams"]["Row"] & {
 };
 
 export type WorkflowTask = TaskRow & {
+  clientName: string | null;
   assigneeName: string | null;
   assignedByName: string | null;
   creatorName: string | null;
@@ -48,12 +51,15 @@ export type WorkflowTaskComment = TaskCommentRow & {
 };
 
 export type WorkflowIdea = IdeaRow & {
+  clientName: string | null;
   creatorName: string | null;
   assigneeName: string | null;
   teamName: string | null;
+  commentCount: number;
 };
 
 export type WorkflowContent = ContentRow & {
+  clientName: string | null;
   creatorName: string | null;
   taskTitle: string | null;
   ideaTitle: string | null;
@@ -75,20 +81,31 @@ export type WorkflowContentRating = ContentRatingRow & {
 
 export type CalendarItem = {
   id: string;
-  type: "content" | "work_hours" | "day_off" | "general";
+  type: "task" | "content" | "day_off" | "sick_leave";
   title: string;
   startsAt: string;
   endsAt: string;
   status: string;
   owner: string | null;
+  clientName: string | null;
+  href: string | null;
 };
 
 export type WorkflowReport = ReportRow & {
+  clientName: string | null;
   userName: string | null;
   teamName: string | null;
   title: string;
   body: string;
 };
+
+function calendarEventType(type: CalendarEventRow["event_type"]): CalendarItem["type"] {
+  if (type === "content") {
+    return "content";
+  }
+
+  return "day_off";
+}
 
 function fullName(user: Pick<UserRow, "first_name" | "last_name" | "email"> | null | undefined) {
   if (!user) {
@@ -134,7 +151,7 @@ async function loadUsersAndRoles(context: AuthContext) {
     .map((user) => ({
       ...user,
       displayName: fullName(user) ?? user.email,
-      roleName: user.role_id ? roleById.get(user.role_id) ?? "Unassigned" : "Unassigned",
+      roleName: user.role_id ? getRoleDisplayName(roleById.get(user.role_id)) : "Unassigned",
     }));
 }
 
@@ -237,13 +254,13 @@ export async function getWorkflowTeams(context: AuthContext) {
 
 export async function getWorkflowTasks(
   context: AuthContext,
-  filters: { status?: string; teamId?: string; search?: string } = {}
+  filters: { status?: string; teamId?: string; clientId?: string; search?: string } = {}
 ) {
   const supabase = await createSupabaseServerClient();
   const visibleTeamIds = await getVisibleTeamIds(context);
   let query = supabase
     .from("tasks")
-    .select("id, company_id, title, description, assigned_to, assigned_by, created_by, status, priority, team_id, due_date, created_at, updated_at")
+    .select("id, company_id, client_id, title, description, assigned_to, assigned_by, created_by, status, priority, team_id, due_date, final_drive_link, final_output_submitted_at, final_output_submitted_by, created_at, updated_at")
     .eq("company_id", context.companyId)
     .order("updated_at", { ascending: false });
 
@@ -255,14 +272,19 @@ export async function getWorkflowTasks(
     query = query.eq("team_id", filters.teamId);
   }
 
+  if (filters.clientId && filters.clientId !== "all") {
+    query = query.eq("client_id", filters.clientId);
+  }
+
   if (filters.search) {
     query = query.ilike("title", `%${filters.search.trim()}%`);
   }
 
-  const [{ data: tasks, error }, users, teams, { data: comments }] = await Promise.all([
+  const [{ data: tasks, error }, users, teams, { data: clients }, { data: comments }] = await Promise.all([
     query,
     loadUsersAndRoles(context),
     getWorkflowTeams(context),
+    supabase.from("clients").select("id, name").eq("company_id", context.companyId),
     supabase.from("task_comments").select("task_id").eq("company_id", context.companyId),
   ]);
 
@@ -272,6 +294,7 @@ export async function getWorkflowTasks(
 
   const userById = new Map(users.map((user) => [user.id, user.displayName]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
+  const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
   const commentCounts = new Map<string, number>();
   ((comments as Array<Pick<TaskCommentRow, "task_id">> | null) ?? []).forEach((comment) => {
     commentCounts.set(comment.task_id, (commentCounts.get(comment.task_id) ?? 0) + 1);
@@ -286,11 +309,16 @@ export async function getWorkflowTasks(
       return true;
     }
 
+    if (task.client_id && clientById.has(task.client_id)) {
+      return true;
+    }
+
     return Boolean(task.team_id && visibleTeamIds?.includes(task.team_id));
   });
 
   return scopedTasks.map((task) => ({
     ...task,
+    clientName: task.client_id ? clientById.get(task.client_id) ?? null : null,
     assigneeName: task.assigned_to ? userById.get(task.assigned_to) ?? null : null,
     assignedByName: task.assigned_by ? userById.get(task.assigned_by) ?? null : null,
     creatorName: task.created_by ? userById.get(task.created_by) ?? null : null,
@@ -328,14 +356,14 @@ export async function getWorkflowTaskComments(context: AuthContext, taskIds: str
 
 export async function getWorkflowIdeas(
   context: AuthContext,
-  filters: { status?: string; search?: string; teamId?: string } = {}
+  filters: { status?: string; search?: string; teamId?: string; clientId?: string } = {}
 ) {
   const supabase = await createSupabaseServerClient();
   const visibleTeamIds = await getVisibleTeamIds(context);
   const visibleUserIds = await getVisibleUserIds(context);
   let query = supabase
     .from("ideas")
-    .select("id, company_id, title, description, created_by, assigned_to, team_id, status, notes, created_at, updated_at")
+    .select("id, company_id, client_id, title, description, created_by, assigned_to, team_id, status, notes, idea_type, platforms, headline, subtext, visual, cta, script, urgency, publishing_at, final_drive_link, created_at, updated_at")
     .eq("company_id", context.companyId)
     .order("updated_at", { ascending: false });
 
@@ -351,7 +379,17 @@ export async function getWorkflowIdeas(
     query = query.eq("team_id", filters.teamId);
   }
 
-  const [{ data, error }, users, teams] = await Promise.all([query, loadUsersAndRoles(context), getWorkflowTeams(context)]);
+  if (filters.clientId && filters.clientId !== "all") {
+    query = query.eq("client_id", filters.clientId);
+  }
+
+  const [{ data, error }, users, teams, { data: clients }, { data: comments }] = await Promise.all([
+    query,
+    loadUsersAndRoles(context),
+    getWorkflowTeams(context),
+    supabase.from("clients").select("id, name").eq("company_id", context.companyId),
+    supabase.from("comments").select("entity_id").eq("company_id", context.companyId).eq("entity_type", "idea"),
+  ]);
 
   if (error) {
     throw new Error("Unable to load ideas.");
@@ -359,6 +397,11 @@ export async function getWorkflowIdeas(
 
   const userById = new Map(users.map((user) => [user.id, user.displayName]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
+  const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
+  const commentCounts = new Map<string, number>();
+  ((comments as Array<{ entity_id: string }> | null) ?? []).forEach((comment) => {
+    commentCounts.set(comment.entity_id, (commentCounts.get(comment.entity_id) ?? 0) + 1);
+  });
   const scopedIdeas = ((data as IdeaRow[] | null) ?? []).filter((idea) => {
     if (canUseCompanyScope(context)) {
       return true;
@@ -372,27 +415,33 @@ export async function getWorkflowIdeas(
       return true;
     }
 
+    if (idea.client_id && clientById.has(idea.client_id)) {
+      return true;
+    }
+
     return Boolean(idea.assigned_to && visibleUserIds?.includes(idea.assigned_to));
   });
 
   return scopedIdeas.map((idea) => ({
     ...idea,
+    clientName: idea.client_id ? clientById.get(idea.client_id) ?? null : null,
     creatorName: idea.created_by ? userById.get(idea.created_by) ?? null : null,
     assigneeName: idea.assigned_to ? userById.get(idea.assigned_to) ?? null : null,
     teamName: idea.team_id ? teamById.get(idea.team_id) ?? null : null,
+    commentCount: commentCounts.get(idea.id) ?? 0,
   }));
 }
 
 export async function getWorkflowContent(
   context: AuthContext,
-  filters: { status?: string; search?: string; teamId?: string } = {}
+  filters: { status?: string; search?: string; teamId?: string; clientId?: string } = {}
 ) {
   const supabase = await createSupabaseServerClient();
   const visibleTeamIds = await getVisibleTeamIds(context);
   const visibleUserIds = await getVisibleUserIds(context);
   let query = supabase
     .from("content_items")
-    .select("id, company_id, title, description, creator_id, task_id, idea_id, team_id, status, submitted_at, approved_at, scheduled_at, published_at, created_at, updated_at")
+    .select("id, company_id, client_id, title, description, creator_id, task_id, idea_id, team_id, status, submitted_at, approved_at, scheduled_at, published_at, final_drive_link, final_output_submitted_at, final_output_submitted_by, created_at, updated_at")
     .eq("company_id", context.companyId)
     .order("updated_at", { ascending: false });
 
@@ -408,12 +457,17 @@ export async function getWorkflowContent(
     query = query.eq("team_id", filters.teamId);
   }
 
-  const [{ data, error }, users, { data: tasks }, { data: ideas }, teams, { data: reviews }, { data: ratings }] = await Promise.all([
+  if (filters.clientId && filters.clientId !== "all") {
+    query = query.eq("client_id", filters.clientId);
+  }
+
+  const [{ data, error }, users, { data: tasks }, { data: ideas }, teams, { data: clients }, { data: reviews }, { data: ratings }] = await Promise.all([
     query,
     loadUsersAndRoles(context),
     supabase.from("tasks").select("id, title").eq("company_id", context.companyId),
     supabase.from("ideas").select("id, title").eq("company_id", context.companyId),
     getWorkflowTeams(context),
+    supabase.from("clients").select("id, name").eq("company_id", context.companyId),
     supabase.from("content_reviews").select("content_id").eq("company_id", context.companyId),
     supabase.from("content_ratings").select("content_id, rating_value").eq("company_id", context.companyId),
   ]);
@@ -426,6 +480,7 @@ export async function getWorkflowContent(
   const taskById = new Map(((tasks as Array<Pick<TaskRow, "id" | "title">> | null) ?? []).map((task) => [task.id, task.title]));
   const ideaById = new Map(((ideas as Array<Pick<IdeaRow, "id" | "title">> | null) ?? []).map((idea) => [idea.id, idea.title]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
+  const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
   const reviewCounts = new Map<string, number>();
   ((reviews as Array<Pick<ContentReviewRow, "content_id">> | null) ?? []).forEach((review) => {
     reviewCounts.set(review.content_id, (reviewCounts.get(review.content_id) ?? 0) + 1);
@@ -456,6 +511,10 @@ export async function getWorkflowContent(
       return true;
     }
 
+    if (item.client_id && clientById.has(item.client_id)) {
+      return true;
+    }
+
     return Boolean(item.creator_id && visibleUserIds?.includes(item.creator_id));
   });
 
@@ -464,6 +523,7 @@ export async function getWorkflowContent(
 
     return {
       ...item,
+      clientName: item.client_id ? clientById.get(item.client_id) ?? null : null,
       creatorName: item.creator_id ? userById.get(item.creator_id) ?? null : null,
       taskTitle: item.task_id ? taskById.get(item.task_id) ?? null : null,
       ideaTitle: item.idea_id ? ideaById.get(item.idea_id) ?? null : null,
@@ -540,7 +600,19 @@ export async function getWorkflowContentRatings(context: AuthContext, contentIds
 export function getCalendarRange(view: string | undefined, anchorDate: string | undefined) {
   const base = anchorDate ? new Date(`${anchorDate}T00:00:00`) : new Date(`${getCairoDate()}T00:00:00`);
 
-  if (view === "week" || view === "list") {
+  if (view === "day") {
+    const start = new Date(base);
+    const end = new Date(base);
+    end.setHours(23, 59, 59, 999);
+
+    return {
+      view: "day" as const,
+      start,
+      end,
+    };
+  }
+
+  if (view === "week") {
     const day = base.getDay();
     const start = new Date(base);
     start.setDate(base.getDate() - day);
@@ -549,7 +621,7 @@ export function getCalendarRange(view: string | undefined, anchorDate: string | 
     end.setHours(23, 59, 59, 999);
 
     return {
-      view: view as "week" | "list",
+      view: "week" as const,
       start,
       end,
     };
@@ -573,49 +645,84 @@ export async function getCalendarItems(
   const range = getCalendarRange(options.view, options.date);
   const startIso = range.start.toISOString();
   const endIso = range.end.toISOString();
-  const [{ data: events }, { data: content }, { data: workDays }, { data: dayOff }, users] = await Promise.all([
+  const startDate = range.start.toISOString().slice(0, 10);
+  const endDate = range.end.toISOString().slice(0, 10);
+  const [
+    { data: events },
+    { data: tasks },
+    { data: content },
+    { data: dayOff },
+    users,
+  ] = await Promise.all([
     supabase
       .from("calendar_events")
-      .select("id, company_id, title, description, event_type, content_id, user_id, team_id, start_date, end_date, created_by, updated_at")
+      .select("id, company_id, client_id, title, description, event_type, content_id, user_id, team_id, start_date, end_date, created_by, updated_at")
       .eq("company_id", context.companyId)
+      .in("event_type", ["content", "day_off"])
       .lte("start_date", endIso)
       .gte("end_date", startIso)
       .order("start_date", { ascending: true }),
     supabase
+      .from("tasks")
+      .select("id, title, assigned_to, status, due_date, client_id")
+      .eq("company_id", context.companyId)
+      .not("due_date", "is", null)
+      .gte("due_date", startDate)
+      .lte("due_date", endDate),
+    supabase
       .from("content_items")
-      .select("id, title, creator_id, status, scheduled_at")
+      .select("id, title, creator_id, status, scheduled_at, submitted_at, client_id")
       .eq("company_id", context.companyId)
       .not("scheduled_at", "is", null)
       .gte("scheduled_at", startIso)
       .lte("scheduled_at", endIso),
     supabase
-      .from("work_days")
-      .select("id, user_id, work_date, status, first_sign_in_at, last_sign_out_at")
-      .eq("company_id", context.companyId)
-      .gte("work_date", range.start.toISOString().slice(0, 10))
-      .lte("work_date", range.end.toISOString().slice(0, 10)),
-    supabase
       .from("day_off_requests")
-      .select("id, user_id, start_date, end_date, status")
+      .select("id, user_id, request_type, start_date, end_date, status")
       .eq("company_id", context.companyId)
-      .lte("start_date", range.end.toISOString().slice(0, 10))
-      .gte("end_date", range.start.toISOString().slice(0, 10)),
+      .lte("start_date", endDate)
+      .gte("end_date", startDate),
     loadUsersAndRoles(context),
   ]);
 
   const userById = new Map(users.map((user) => [user.id, user.displayName]));
+  const { data: clients } = await supabase.from("clients").select("id, name").eq("company_id", context.companyId);
+  const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
+  const eventContentIds = new Set(
+    ((events as CalendarEventRow[] | null) ?? [])
+      .map((event) => event.content_id)
+      .filter((contentId): contentId is string => Boolean(contentId))
+  );
   const items: CalendarItem[] = [
     ...(((events as CalendarEventRow[] | null) ?? []).map((event) => ({
       id: event.id,
-      type: event.event_type,
+      type: calendarEventType(event.event_type),
       title: event.title,
       startsAt: event.start_date,
       endsAt: event.end_date,
       status: event.event_type,
       owner: event.user_id ? userById.get(event.user_id) ?? null : null,
+      clientName: event.client_id ? clientById.get(event.client_id) ?? null : null,
+      href: event.content_id ? `${routes.content.home}/${event.content_id}` : null,
     }))),
-    ...(((content as Array<Pick<ContentRow, "id" | "title" | "creator_id" | "status" | "scheduled_at">> | null) ?? [])
-      .filter((item) => item.scheduled_at)
+    ...(((tasks as Array<Pick<TaskRow, "id" | "title" | "assigned_to" | "status" | "due_date" | "client_id">> | null) ?? [])
+      .filter((task) => task.due_date)
+      .map((task) => ({
+        id: task.id,
+        type: "task" as const,
+        title: task.title,
+        startsAt: `${task.due_date}T09:00:00`,
+        endsAt: `${task.due_date}T10:00:00`,
+        status: task.status,
+        owner: task.assigned_to ? userById.get(task.assigned_to) ?? null : null,
+        clientName: task.client_id ? clientById.get(task.client_id) ?? null : null,
+        href: `${routes.tasks}/${task.id}`,
+      }))),
+    ...(((content as Array<Pick<ContentRow, "id" | "title" | "creator_id" | "status" | "scheduled_at" | "submitted_at" | "client_id">> | null) ?? [])
+      .filter((item) => {
+        const eventDate = item.scheduled_at;
+        return Boolean(eventDate && eventDate >= startIso && eventDate <= endIso && !eventContentIds.has(item.id));
+      })
       .map((item) => ({
         id: item.id,
         type: "content" as const,
@@ -624,26 +731,21 @@ export async function getCalendarItems(
         endsAt: item.scheduled_at as string,
         status: item.status,
         owner: item.creator_id ? userById.get(item.creator_id) ?? null : null,
+        clientName: item.client_id ? clientById.get(item.client_id) ?? null : null,
+        href: `${routes.content.home}/${item.id}`,
       }))),
-    ...(((workDays as Array<Pick<WorkDayRow, "id" | "user_id" | "work_date" | "status" | "first_sign_in_at" | "last_sign_out_at">> | null) ?? [])
-      .map((day) => ({
-        id: day.id,
-        type: "work_hours" as const,
-        title: `${userById.get(day.user_id) ?? "User"} work day`,
-        startsAt: day.first_sign_in_at ?? `${day.work_date}T00:00:00`,
-        endsAt: day.last_sign_out_at ?? day.first_sign_in_at ?? `${day.work_date}T23:59:00`,
-        status: day.status,
-        owner: userById.get(day.user_id) ?? null,
-      }))),
-    ...(((dayOff as Array<Pick<DayOffRow, "id" | "user_id" | "start_date" | "end_date" | "status">> | null) ?? [])
+    ...(((dayOff as Array<Pick<DayOffRow, "id" | "user_id" | "request_type" | "start_date" | "end_date" | "status">> | null) ?? [])
+      .filter((request) => request.user_id === context.userId || userById.has(request.user_id))
       .map((request) => ({
         id: request.id,
-        type: "day_off" as const,
-        title: `${userById.get(request.user_id) ?? "User"} day off`,
+        type: request.request_type,
+        title: `${userById.get(request.user_id) ?? "User"} ${request.request_type.replace("_", " ")}`,
         startsAt: `${request.start_date}T00:00:00`,
         endsAt: `${request.end_date}T23:59:00`,
         status: request.status,
         owner: userById.get(request.user_id) ?? null,
+        clientName: null,
+        href: `${routes.calendar}?view=day&date=${request.start_date}#time-off-${request.id}`,
       }))),
   ];
 
@@ -656,12 +758,12 @@ export async function getCalendarItems(
 
 export async function getWorkflowReports(
   context: AuthContext,
-  filters: { type?: string; teamId?: string } = {}
+  filters: { type?: string; teamId?: string; clientId?: string } = {}
 ) {
   const supabase = await createSupabaseServerClient();
   let query = supabase
     .from("reports")
-    .select("id, company_id, user_id, team_id, report_type, title, content, date_range_start, date_range_end, created_at, updated_at")
+    .select("id, company_id, client_id, user_id, team_id, report_type, title, content, metrics_json, sent_to_client_at, sent_to_client_by, date_range_start, date_range_end, created_at, updated_at")
     .eq("company_id", context.companyId)
     .order("created_at", { ascending: false });
 
@@ -673,7 +775,16 @@ export async function getWorkflowReports(
     query = query.eq("team_id", filters.teamId);
   }
 
-  const [{ data, error }, users, teams] = await Promise.all([query, loadUsersAndRoles(context), getWorkflowTeams(context)]);
+  if (filters.clientId && filters.clientId !== "all") {
+    query = query.eq("client_id", filters.clientId);
+  }
+
+  const [{ data, error }, users, teams, { data: clients }] = await Promise.all([
+    query,
+    loadUsersAndRoles(context),
+    getWorkflowTeams(context),
+    supabase.from("clients").select("id, name").eq("company_id", context.companyId),
+  ]);
 
   if (error) {
     throw new Error("Unable to load reports.");
@@ -681,8 +792,10 @@ export async function getWorkflowReports(
 
   const userById = new Map(users.map((user) => [user.id, user.displayName]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
+  const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
   return ((data as ReportRow[] | null) ?? []).map((report) => ({
     ...report,
+    clientName: report.client_id ? clientById.get(report.client_id) ?? null : null,
     userName: report.user_id ? userById.get(report.user_id) ?? null : null,
     teamName: report.team_id ? teamById.get(report.team_id) ?? null : null,
     title: report.title || reportText(report.content, "title"),

@@ -1,14 +1,25 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
-import Link from "next/link";
-import { Bell, Building2, Menu, Search, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { Building2, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 
 import { SignOutButton } from "@/components/forms/sign-out-button";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { routes } from "@/constants/routes";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import type { AuthContext } from "@/lib/auth/permissions";
+import type { NotificationRow } from "@/lib/notifications/queries";
 import { cn } from "@/lib/utils";
+import { getRoleDisplayName } from "@/types/roles";
 import { DashboardNavigation } from "./dashboard-navigation";
+import { NotificationMenu } from "./notification-menu";
 import { SiteLogo } from "./site-logo";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -16,87 +27,152 @@ export function DashboardShell({
   children,
   context,
   unreadNotificationCount,
+  recentNotifications = [],
   branding,
 }: {
   children: ReactNode;
   context: AuthContext;
   unreadNotificationCount?: number;
+  recentNotifications?: NotificationRow[];
   branding?: {
+    companyName?: string | null;
     primaryColor: string | null;
     secondaryColor: string | null;
     accentColor: string | null;
   } | null;
 }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.localStorage.getItem("contento-sidebar-collapsed") === "true";
+  });
   const brandingStyle = {
     ...(branding?.primaryColor ? { "--primary": branding.primaryColor, "--sidebar-primary": branding.primaryColor } : {}),
     ...(branding?.secondaryColor ? { "--secondary": branding.secondaryColor, "--sidebar-accent": branding.secondaryColor } : {}),
     ...(branding?.accentColor ? { "--accent": branding.accentColor } : {}),
   } as CSSProperties;
 
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("contento-sidebar-collapsed", String(next));
+      return next;
+    });
+  }
+
   return (
     <div className="min-h-svh bg-background" style={brandingStyle}>
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-sidebar-border bg-sidebar px-4 py-5 lg:flex lg:flex-col">
-        <div className="px-2">
-          <SiteLogo />
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 hidden border-r border-sidebar-border bg-sidebar px-4 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col",
+          sidebarCollapsed ? "w-20" : "w-72"
+        )}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-2 px-2">
+          <div className="min-w-0">
+            <SiteLogo showText={!sidebarCollapsed} />
+            {!sidebarCollapsed && (
+              <p className="mt-1 truncate pl-10 text-xs text-sidebar-foreground/55">
+                {branding?.companyName ?? "Workspace"}
+              </p>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </Button>
         </div>
         <Separator className="my-5" />
-        <DashboardNavigation context={context} />
-        <div className="mt-auto rounded-lg border border-sidebar-border bg-background/70 p-3 shadow-sm">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <ShieldCheck className="size-4 text-primary" />
-            Active workspace
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          <DashboardNavigation context={context} collapsed={sidebarCollapsed} />
+        </div>
+        <div className="mt-5 shrink-0 space-y-3">
+          <div
+            className={cn(
+              "rounded-lg border border-sidebar-border bg-background/70 p-3 shadow-sm",
+              sidebarCollapsed && "flex justify-center p-2"
+            )}
+            title={context.email}
+          >
+            <div className={cn("flex items-center gap-2 text-sm font-medium", sidebarCollapsed && "justify-center")}>
+              <ShieldCheck className="size-4 text-primary" />
+              {!sidebarCollapsed && "Active workspace"}
+            </div>
+            {!sidebarCollapsed && <p className="mt-2 truncate text-xs text-muted-foreground">{context.email}</p>}
           </div>
-          <p className="mt-2 truncate text-xs text-muted-foreground">{context.email}</p>
+          {!sidebarCollapsed && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-background/70 p-2 shadow-sm">
+              <ThemeToggle />
+              <SignOutButton />
+            </div>
+          )}
         </div>
       </aside>
 
-      <div className="lg:pl-72">
+      <div className={cn("transition-[padding] duration-300 ease-out", sidebarCollapsed ? "lg:pl-20" : "lg:pl-72")}>
         <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur-xl">
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-            <details className="group relative lg:hidden">
-              <summary className={cn(buttonVariants({ variant: "outline", size: "icon" }), "list-none")}>
+            <Sheet>
+              <SheetTrigger
+                render={
+                  <Button type="button" variant="outline" size="icon" className="lg:hidden" aria-label="Open navigation" />
+                }
+              >
                 <Menu />
-                <span className="sr-only">Open navigation</span>
-              </summary>
-              <div className="absolute left-0 top-11 w-72 rounded-lg border bg-popover p-3 shadow-xl">
-                <DashboardNavigation context={context} />
-              </div>
-            </details>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[20rem] gap-0 p-0 sm:max-w-[20rem]">
+                <SheetHeader className="border-b px-4 py-4">
+                  <SheetTitle>
+                    <SiteLogo />
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+                  <DashboardNavigation context={context} />
+                </div>
+                <div className="border-t p-4">
+                  <div className="mb-3 rounded-lg border bg-secondary/40 p-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <ShieldCheck className="size-4 text-primary" />
+                      {getRoleDisplayName(context.role)} access
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{context.email}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ThemeToggle />
+                    <SignOutButton />
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
 
             <div className="hidden min-w-0 items-center gap-3 lg:flex">
               <div className="flex size-9 items-center justify-center rounded-lg border bg-secondary text-primary">
                 <Building2 className="size-4" />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">Contento workspace</p>
+                <p className="truncate text-sm font-medium">{branding?.companyName ?? "Contento workspace"}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {context.roleName} access
+                  {getRoleDisplayName(context.role)} access
                 </p>
               </div>
             </div>
 
-            <Link
-              href={routes.search}
-              className="hidden w-full max-w-md items-center gap-2 rounded-lg border bg-secondary/45 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary md:flex"
-            >
-              <Search className="size-4" />
-              Search company-scoped records
-            </Link>
-
             <div className="ml-auto flex items-center gap-2">
-              <ThemeToggle />
-              <Link
-                href={routes.notifications}
-                className={cn(buttonVariants({ variant: "outline", size: "icon" }), "relative")}
-                aria-label="Notifications"
-              >
-                <Bell />
-                {Boolean(unreadNotificationCount) && (
-                  <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                    {unreadNotificationCount}
-                  </span>
-                )}
-              </Link>
+              <div className="hidden lg:block">
+                <ThemeToggle />
+              </div>
+              <NotificationMenu
+                unreadCount={unreadNotificationCount ?? 0}
+                notifications={recentNotifications}
+              />
               <div className="hidden sm:block">
                 <SignOutButton />
               </div>

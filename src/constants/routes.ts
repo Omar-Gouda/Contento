@@ -16,6 +16,13 @@ export const routes = {
   search: "/search",
   settings: "/settings",
   team: "/team",
+  users: {
+    detail: (id: string) => `/users/${id}`,
+  },
+  clients: {
+    home: "/clients",
+    detail: (id: string) => `/clients/${id}`,
+  },
   tasks: "/tasks",
   ideas: "/ideas",
   content: {
@@ -40,8 +47,14 @@ export const routes = {
   },
   dashboards: {
     admin: "/admin",
+    marketingManager: "/marketing-manager",
     supervisor: "/supervisor",
+    accountManager: "/account-manager",
     teamLead: "/team-lead",
     creator: "/creator",
+    contentCreator: "/content-creator",
+    graphicDesigner: "/graphic-designer",
+    videoEditor: "/video-editor",
+    client: "/client",
   },
 } as const;

@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import { RoleDashboardFoundation } from "@/components/dashboard/role-dashboard-foundation";
 import { roleDashboards } from "@/config/site";
 import { requireDashboardAccess } from "@/lib/auth/context";
-import { getDashboardWidgets } from "@/lib/dashboard/preferences";
-import { getDashboardSummary } from "@/lib/dashboard/queries";
+import { getDashboardCharts, getDashboardSections, getDashboardSummary } from "@/lib/dashboard/queries";
 
 export const metadata: Metadata = {
   title: "CC Team Lead dashboard",
@@ -12,10 +11,11 @@ export const metadata: Metadata = {
 
 export default async function TeamLeadDashboardPage() {
   const context = await requireDashboardAccess("team-lead");
-  const [summary, widgets] = await Promise.all([
+  const [summary, charts, sections] = await Promise.all([
     getDashboardSummary(context),
-    getDashboardWidgets(context),
+    getDashboardCharts(context),
+    getDashboardSections(context),
   ]);
 
-  return <RoleDashboardFoundation dashboard={roleDashboards["team-lead"]} summary={summary} widgets={widgets} currentPath="/team-lead" />;
+  return <RoleDashboardFoundation dashboard={roleDashboards["team-lead"]} summary={summary} charts={charts} sections={sections} />;
 }

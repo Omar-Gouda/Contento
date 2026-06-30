@@ -67,6 +67,39 @@ export type Database = {
         created_at: string;
         updated_at: string;
       }>;
+      clients: Table<{
+        id: string;
+        company_id: string;
+        name: string;
+        slug: string | null;
+        logo_url: string | null;
+        primary_color: string | null;
+        secondary_color: string | null;
+        accent_color: string | null;
+        contact_person: string | null;
+        contact_email: string | null;
+        contact_phone: string | null;
+        notes: string;
+        brief_drive_link: string | null;
+        requirements: string;
+        assigned_account_manager_id: string | null;
+        status: "active" | "paused" | "archived";
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      client_assignments: Table<{
+        client_id: string;
+        user_id: string;
+        assignment_role:
+          | "account_manager"
+          | "content_creator"
+          | "graphic_designer"
+          | "video_editor"
+          | "client_contact"
+          | "member";
+        created_at: string;
+      }>;
       team_members: Table<{
         team_id: string;
         user_id: string;
@@ -74,6 +107,7 @@ export type Database = {
       tasks: Table<{
         id: string;
         company_id: string;
+        client_id: string | null;
         title: string;
         description: string;
         assigned_to: string | null;
@@ -83,6 +117,9 @@ export type Database = {
         priority: Database["public"]["Enums"]["task_priority"];
         team_id: string | null;
         due_date: string | null;
+        final_drive_link: string | null;
+        final_output_submitted_at: string | null;
+        final_output_submitted_by: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -97,6 +134,7 @@ export type Database = {
       ideas: Table<{
         id: string;
         company_id: string;
+        client_id: string | null;
         title: string;
         description: string;
         created_by: string | null;
@@ -104,12 +142,23 @@ export type Database = {
         team_id: string | null;
         status: Database["public"]["Enums"]["idea_status"];
         notes: string;
+        idea_type: "post" | "reel" | "story";
+        platforms: string[];
+        headline: string;
+        subtext: string;
+        visual: string;
+        cta: string;
+        script: string;
+        urgency: "low" | "normal" | "high" | "urgent";
+        publishing_at: string | null;
+        final_drive_link: string | null;
         created_at: string;
         updated_at: string;
       }>;
       content_items: Table<{
         id: string;
         company_id: string;
+        client_id: string | null;
         title: string;
         description: string;
         creator_id: string | null;
@@ -121,6 +170,9 @@ export type Database = {
         approved_at: string | null;
         scheduled_at: string | null;
         published_at: string | null;
+        final_drive_link: string | null;
+        final_output_submitted_at: string | null;
+        final_output_submitted_by: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -150,11 +202,15 @@ export type Database = {
       reports: Table<{
         id: string;
         company_id: string;
+        client_id: string | null;
         user_id: string | null;
         team_id: string | null;
         report_type: Database["public"]["Enums"]["report_type"];
         title: string;
         content: Json;
+        metrics_json: Json;
+        sent_to_client_at: string | null;
+        sent_to_client_by: string | null;
         date_range_start: string | null;
         date_range_end: string | null;
         created_at: string;
@@ -163,6 +219,7 @@ export type Database = {
       calendar_events: Table<{
         id: string;
         company_id: string;
+        client_id: string | null;
         title: string;
         description: string;
         event_type: Database["public"]["Enums"]["calendar_event_type"];
@@ -178,10 +235,14 @@ export type Database = {
         id: string;
         company_id: string;
         user_id: string;
+        request_type: "day_off" | "sick_leave";
         start_date: string;
         end_date: string;
         reason: string;
         status: Database["public"]["Enums"]["day_off_status"];
+        reviewed_by: string | null;
+        reviewed_at: string | null;
+        updated_at: string;
       }>;
       notifications: Table<{
         id: string;
@@ -447,6 +508,19 @@ export type Database = {
         Args: {
           target_entity_type: string;
           target_entity_id: string;
+        };
+        Returns: boolean;
+      };
+      can_access_client_scope: {
+        Args: {
+          target_client_id: string | null;
+          target_company_id: string;
+        };
+        Returns: boolean;
+      };
+      is_same_company_client: {
+        Args: {
+          target_client_id: string | null;
         };
         Returns: boolean;
       };

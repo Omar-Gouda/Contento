@@ -3,8 +3,13 @@ import type { AuthContext } from "@/lib/auth/permissions";
 import type { Database } from "@/types/database";
 
 export type NotificationFilter = "all" | "unread" | "read";
+export type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 
-export async function getNotifications(context: AuthContext, filter: NotificationFilter = "all") {
+export async function getNotifications(
+  context: AuthContext,
+  filter: NotificationFilter = "all",
+  options: { limit?: number } = {}
+) {
   const supabase = await createSupabaseServerClient();
   let query = supabase
     .from("notifications")
@@ -21,13 +26,21 @@ export async function getNotifications(context: AuthContext, filter: Notificatio
     query = query.eq("read", true);
   }
 
+  if (options.limit) {
+    query = query.limit(options.limit);
+  }
+
   const { data, error } = await query;
 
   if (error) {
     throw new Error("Unable to load notifications.");
   }
 
-  return (data as Database["public"]["Tables"]["notifications"]["Row"][] | null) ?? [];
+  return (data as NotificationRow[] | null) ?? [];
+}
+
+export async function getRecentNotifications(context: AuthContext, limit = 5) {
+  return getNotifications(context, "all", { limit });
 }
 
 export async function getUnreadNotificationCount(context: AuthContext) {

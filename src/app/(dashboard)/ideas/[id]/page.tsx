@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Save, Trash2 } from "lucide-react";
 
@@ -15,6 +16,7 @@ import {
 import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
+import { routes } from "@/constants/routes";
 import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,10 +77,23 @@ export default async function IdeaDetailPage({
               <CardTitle>Idea state</CardTitle>
               <CardDescription>Review ownership, assignment, team scope, and notes.</CardDescription>
             </div>
-            <Badge>{idea.status}</Badge>
+            <div className="flex flex-wrap gap-2">
+              <Badge>{idea.status}</Badge>
+              {idea.clientName && <Badge variant="secondary">{idea.clientName}</Badge>}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-4 text-sm md:grid-cols-4">
+          <div>
+            <p className="text-muted-foreground">Client</p>
+            {idea.client_id ? (
+              <Link href={routes.clients.detail(idea.client_id)} className="font-medium text-primary hover:underline">
+                {idea.clientName ?? "Open client"}
+              </Link>
+            ) : (
+              <p className="font-medium">No client</p>
+            )}
+          </div>
           <div>
             <p className="text-muted-foreground">Created by</p>
             <p className="font-medium">{idea.creatorName ?? "Unknown"}</p>
@@ -143,6 +158,19 @@ export default async function IdeaDetailPage({
                 <Label htmlFor="notes">Notes</Label>
                 <Input id="notes" name="notes" defaultValue={idea.notes} />
               </div>
+              <input type="hidden" name="clientId" value={idea.client_id ?? ""} />
+              <input type="hidden" name="ideaType" value={idea.idea_type} />
+              {idea.platforms.map((platform) => (
+                <input key={platform} type="hidden" name="platforms" value={platform} />
+              ))}
+              <input type="hidden" name="headline" value={idea.headline ?? ""} />
+              <input type="hidden" name="subtext" value={idea.subtext ?? ""} />
+              <input type="hidden" name="visual" value={idea.visual ?? ""} />
+              <input type="hidden" name="cta" value={idea.cta ?? ""} />
+              <input type="hidden" name="script" value={idea.script ?? ""} />
+              <input type="hidden" name="urgency" value={idea.urgency} />
+              <input type="hidden" name="publishingAt" value={idea.publishing_at ?? ""} />
+              <input type="hidden" name="finalDriveLink" value={idea.final_drive_link ?? ""} />
               <Button type="submit" variant="outline">
                 <Save />
                 Save idea

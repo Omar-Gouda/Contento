@@ -1,6 +1,6 @@
 # Contento
 
-Contento is a production-ready multi-company SaaS platform for content operations teams. The current implementation covers authentication, onboarding, platform Super Admin operations, organization lifecycle management, role-based route protection, Admin user management, working-hours tracking, teams, tasks, ideas, content review, calendar, reports, notifications, collaboration, saved views, search, analytics, organization branding, profile settings, dark mode, and a modern dashboard shell.
+Contento is a production-ready multi-company SaaS platform for content operations teams. The current implementation covers authentication, onboarding, platform Super Admin operations, organization lifecycle management, role-based route protection, Marketing Manager / Account Manager / Content Creator role labeling, Admin user management, client workspaces, working-hours tracking, teams, tasks, ideas, content review, calendar, reports, notifications, collaboration, saved views, search, analytics, organization branding, profile settings, dark mode, and a modern dashboard shell.
 
 ## Getting Started
 
@@ -47,10 +47,12 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - `/` redirects to `/sign-in`
 - `/sign-in`, `/forgot-password`, `/reset-password`
 - `/auth/callback`
-- `/change-password` forced password change for Admin-created users
+- `/change-password` forced password change for Marketing Manager-created users
 - `/onboarding` first company workspace setup
 - `/account-inactive`, `/organization-disabled`, `/organization-unavailable`
-- `/admin`, `/supervisor`, `/team-lead`, `/creator`
+- `/marketing-manager`, `/account-manager`, `/team-lead`, `/content-creator`, `/graphic-designer`, `/video-editor`, `/client`
+- Legacy dashboard aliases remain available at `/admin`, `/supervisor`, and `/creator`
+- `/clients`, `/clients/[id]`
 - `/admin/users`, `/admin/invitations`, `/admin/teams`, `/admin/tasks`, `/admin/ideas`, `/admin/work-hours`
 - `/team`
 - `/tasks`, `/tasks/[id]`
@@ -69,21 +71,22 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Supabase authentication with sign in, reset password, sign out, protected routes, role redirects, onboarding, account-state pages, and forced password changes.
 - Platform Super Admin route family with organization listing, details, analytics, lifecycle controls, platform audit logs, and first Org Admin creation.
 - Organization lifecycle states: active, disabled, and deleted. Disabled and deleted organizations are blocked from tenant dashboards.
-- Company-scoped RBAC with Admin, Supervisor, CC Team Lead, and Creator defaults.
+- Company-scoped RBAC with Marketing Manager, Account Manager, CC Team Lead, Content Creator, Graphic Designer, Video Editor, and Client role labels backed by tenant role keys.
 - Admin user creation, status changes, role assignment, team assignment, and audit logging.
+- Client workspaces with company profiles, assignments, and client-linked task, idea, content, report, and calendar visibility.
 - Working-hours tracking from sign-in/sign-out, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, and Admin company view.
-- Teams, tasks, ideas, content pipeline, content reviews, review scoring, calendar, reports, and CSV report export.
-- In-app notification center with unread count, read/unread filtering, mark-read actions, and entity links.
+- Teams, client workspaces, tasks, ideas, content pipeline, content reviews, review scoring, scheduling calendar, generated reports, and CSV report export.
+- In-app notification center and header bell with unread count, recent-notification dropdown, read/unread filtering, mark-read actions, entity links, and browser-local sound preference.
 - Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
-- Global search across accessible users, teams, tasks, ideas, content, and reports.
+- Standalone global search across accessible users, teams, tasks, ideas, content, and reports.
 - Advanced list filters with saved views for tasks, ideas, content, and reports.
 - Real dashboard analytics backed by current database counts and role scope.
 - Organization branding and company settings for logo, colors, work target, break allowance, and timezone.
 - User profile page with profile updates, avatar upload, role/team context, password change, and work-hours link.
 - Content templates with create, edit, archive, and use-on-content-create flows.
-- Dashboard customization with show/hide widget preferences and reset support.
+- Dashboard customization at `/settings/preferences` with show/hide widget preferences and reset support.
 - `next-themes` dark mode with light, dark, and system preferences.
-- Responsive dashboard shell with permission-aware navigation, active states, notification/search shortcuts, and mobile navigation.
+- Responsive dashboard shell with permission-aware navigation, active states, notification interactions, collapsible sidebar, and mobile navigation.
 
 ## Supabase
 
@@ -102,6 +105,9 @@ supabase/
     202606240002_contento_phase_4_scope_fix_review_flow.sql
     202606240003_contento_phase_4_scope_policy_hardening.sql
     202606240004_contento_final_production_saas_readiness.sql
+    202606240005_contento_product_review_corrections.sql
+    202606250001_contento_client_revision.sql
+    202606250002_contento_client_report_send_flow.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.

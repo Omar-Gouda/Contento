@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { CalendarDays, ClipboardList, FileBarChart, Lightbulb, PanelsTopLeft, Sparkles } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  Building2,
+  ClipboardList,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,39 +15,301 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { RoleDashboard } from "@/types/roles";
-import type { DashboardSummaryMetric } from "@/lib/dashboard/queries";
-import { routes } from "@/constants/routes";
+import type {
+  DashboardChartSection,
+  DashboardSections,
+  DashboardSummaryMetric,
+  DashboardWorkItem,
+} from "@/lib/dashboard/queries";
 import { cn } from "@/lib/utils";
-import {
-  defaultDashboardWidgets,
-  resetDashboardWidgetsAction,
-  updateDashboardWidgetsAction,
-  type DashboardWidgetId,
-} from "@/lib/dashboard/preferences";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import type { RoleDashboard } from "@/types/roles";
 
-const quickLinks = [
-  { href: routes.tasks, label: "Tasks", icon: ClipboardList },
-  { href: routes.ideas, label: "Ideas", icon: Lightbulb },
-  { href: routes.content.home, label: "Content", icon: PanelsTopLeft },
-  { href: routes.calendar, label: "Calendar", icon: CalendarDays },
-  { href: routes.reports, label: "Reports", icon: FileBarChart },
-];
+function statusTone(status: string) {
+  if (["approved", "published", "completed", "closed", "sent"].includes(status)) {
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200";
+  }
+
+  if (["pending", "assigned", "submitted", "under_review"].includes(status)) {
+    return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200";
+  }
+
+  if (["rejected", "archived", "blocked"].includes(status) || status.includes("changes_requested")) {
+    return "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200";
+  }
+
+  if (["scheduled", "in_progress"].includes(status)) {
+    return "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200";
+  }
+
+  if (status === "draft") {
+    return "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-200";
+  }
+
+  return "border-border bg-secondary text-secondary-foreground";
+}
+
+function formatDashboardDate(value: string | null) {
+  if (!value) {
+    return "No date";
+  }
+
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: value.includes("T") ? "numeric" : undefined,
+    minute: value.includes("T") ? "2-digit" : undefined,
+  }).format(date);
+}
+
+function EmptyState({
+  label,
+  href,
+  action,
+}: {
+  label: string;
+  href?: string;
+  action?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed bg-secondary/25 px-4 py-8 text-center">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      {href && action && (
+        <Link href={href} className="mt-3 inline-flex text-sm font-medium text-primary hover:underline">
+          {action}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  description,
+  icon: Icon,
+}: {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="size-4" />
+      </div>
+    </div>
+  );
+}
+
+function DashboardChart({ chart }: { chart: DashboardChartSection }) {
+  const maxValue = Math.max(...chart.data.map((item) => item.value), 1);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>{chart.title}</CardTitle>
+            <CardDescription>{chart.description}</CardDescription>
+          </div>
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <BarChart3 className="size-4" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {chart.data.map((item) => {
+          const percentage = Math.max(4, Math.round((item.value / maxValue) * 100));
+
+          return (
+            <div key={item.label} className="grid gap-1.5">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate font-medium">{item.label}</span>
+                <span className="tabular-nums text-muted-foreground">{item.value}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percentage}%` }} />
+              </div>
+              {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ClientSection({ sections }: { sections: DashboardSections }) {
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader>
+        <SectionHeader
+          title="Clients"
+          description="Client spaces that currently matter to your role."
+          icon={Building2}
+        />
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-2">
+          {sections.clients.slice(0, 4).map((client) => (
+            <Link
+              key={client.id}
+              href={client.href}
+              className="rounded-lg border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-secondary text-sm font-semibold">
+                  {client.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={client.logoUrl} alt="" className="size-full object-cover" />
+                  ) : (
+                    client.name.slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-foreground">{client.name}</p>
+                    <Badge variant="outline" className={cn("shrink-0 capitalize", statusTone(client.status))}>
+                      {client.status}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {client.accountManagerName ? `Account Manager: ${client.accountManagerName}` : "No account manager assigned"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-md bg-secondary/60 p-2">
+                  <p className="font-semibold text-foreground">{client.openTasks}</p>
+                  <p className="text-muted-foreground">Tasks</p>
+                </div>
+                <div className="rounded-md bg-secondary/60 p-2">
+                  <p className="font-semibold text-foreground">{client.openIdeas}</p>
+                  <p className="text-muted-foreground">Ideas</p>
+                </div>
+                <div className="rounded-md bg-secondary/60 p-2">
+                  <p className="truncate font-semibold text-foreground">{formatDashboardDate(client.upcomingPublishingAt)}</p>
+                  <p className="text-muted-foreground">Next</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WorkItemList({
+  items,
+}: {
+  items: DashboardWorkItem[];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <SectionHeader
+          title="Priority work"
+          description="The next tasks, reviews, ideas, and reports that need movement."
+          icon={ClipboardList}
+        />
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {items.length ? (
+          items.map((item) => (
+            <Link
+              key={`${item.href}-${item.id}`}
+              href={item.href}
+              className="rounded-lg border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {[item.clientName, item.actionLabel].filter(Boolean).join(" / ") || item.label}
+                  </p>
+                </div>
+                <Badge variant="outline" className={cn("shrink-0 capitalize", statusTone(item.status))}>
+                  {item.status.replaceAll("_", " ")}
+                </Badge>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="capitalize">{item.label.replaceAll("_", " ")}</span>
+                <span>{formatDashboardDate(item.date)}</span>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <EmptyState label="No active work needs your attention right now." href="/tasks" action="Open task queue" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function NotificationsSection({ sections }: { sections: DashboardSections }) {
+  if (!sections.notifications.length) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <SectionHeader title="Notifications" description="Recent alerts from your workspace." icon={Bell} />
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {sections.notifications.slice(0, 4).map((notification) => {
+          const content = (
+            <div
+              className={cn(
+                "rounded-lg border bg-card p-3",
+                !notification.read && "border-amber-500/30 bg-amber-500/10"
+              )}
+            >
+              <p className="line-clamp-2 text-sm font-semibold text-foreground">{notification.title}</p>
+              {notification.message && (
+                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>
+              )}
+              <p className="mt-3 text-xs text-muted-foreground">{formatDashboardDate(notification.created_at)}</p>
+            </div>
+          );
+
+          return notification.link_href ? (
+            <Link key={notification.id} href={notification.link_href} className="transition-colors hover:text-primary">
+              {content}
+            </Link>
+          ) : (
+            <div key={notification.id}>{content}</div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function RoleDashboardFoundation({
   dashboard,
   summary,
-  widgets = defaultDashboardWidgets,
-  currentPath,
+  charts,
+  sections,
 }: {
   dashboard: RoleDashboard;
   summary: DashboardSummaryMetric[];
-  widgets?: DashboardWidgetId[];
-  currentPath: string;
+  charts: DashboardChartSection[];
+  sections: DashboardSections;
 }) {
-  const visibleWidgets = new Set(widgets);
+  const visibleSummary = summary.slice(0, 4);
+  const visibleCharts = charts.filter((chart) => chart.data.some((item) => item.value > 0)).slice(0, 3);
+  const priorityItems = [...sections.reviewItems, ...sections.workItems, ...sections.reports].slice(0, 6);
 
   return (
     <section className="animate-in fade-in-0 duration-500">
@@ -51,103 +318,39 @@ export function RoleDashboardFoundation({
         <h1 className="mt-4 text-3xl font-semibold tracking-normal text-foreground">
           {dashboard.title}
         </h1>
+        <p className="mt-2 text-sm font-medium text-primary">Welcome back. The deadlines missed you.</p>
         <p className="mt-3 text-base leading-7 text-muted-foreground">
           {dashboard.description}
         </p>
       </div>
 
-      {visibleWidgets.has("summary") && (
-        <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {summary.map((metric) => (
-            <Card key={metric.label}>
-              <CardHeader>
-                <CardTitle>{metric.value}</CardTitle>
-                <CardDescription>{metric.label}</CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                {metric.description}
-              </CardContent>
-            </Card>
+      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {visibleSummary.map((metric) => (
+          <Card key={metric.label}>
+            <CardHeader>
+              <CardTitle>{metric.value}</CardTitle>
+              <CardDescription>{metric.label}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {metric.description}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {visibleCharts.length > 0 && (
+        <div className="mb-4 grid gap-4 lg:grid-cols-2">
+          {visibleCharts.map((chart) => (
+            <DashboardChart key={chart.title} chart={chart} />
           ))}
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        {visibleWidgets.has("focus") && (
-          <Card>
-            <CardHeader>
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkles className="size-5" />
-              </div>
-              <CardTitle>My focus</CardTitle>
-              <CardDescription>
-                A private workspace for your current responsibilities, own work, and next useful actions.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-3">
-                {dashboard.primaryFocus.map((focus) => (
-                  <div key={focus} className="rounded-lg border bg-secondary/45 p-3 text-sm">
-                    {focus}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {visibleWidgets.has("shortcuts") && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Operational shortcuts</CardTitle>
-              <CardDescription>
-                Jump into the workflow modules available for this workspace.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {quickLinks.map((item) => {
-                  const Icon = item.icon;
-
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(buttonVariants({ variant: "outline" }), "justify-start")}
-                    >
-                      <Icon className="size-4" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {sections.clients.length > 0 && <ClientSection sections={sections} />}
+        <WorkItemList items={priorityItems} />
+        <NotificationsSection sections={sections} />
       </div>
-
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle>Dashboard customization</CardTitle>
-          <CardDescription>Choose the widgets shown on this role dashboard.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <form action={updateDashboardWidgetsAction} className="grid gap-3 sm:grid-cols-3">
-            <input type="hidden" name="redirectTo" value={currentPath} />
-            {defaultDashboardWidgets.map((widget) => (
-              <Label key={widget} className="flex items-center gap-2 rounded-lg border bg-secondary/30 px-3 py-2 text-sm">
-                <input type="checkbox" name="widgets" value={widget} defaultChecked={visibleWidgets.has(widget)} />
-                {widget}
-              </Label>
-            ))}
-            <Button type="submit" variant="outline">Save widgets</Button>
-          </form>
-          <form action={resetDashboardWidgetsAction}>
-            <input type="hidden" name="redirectTo" value={currentPath} />
-            <Button type="submit" variant="ghost">Reset</Button>
-          </form>
-        </CardContent>
-      </Card>
     </section>
   );
 }

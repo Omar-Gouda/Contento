@@ -13,40 +13,45 @@ export const siteConfig = {
 };
 
 export const dashboardNavItems = [
-  { label: "Admin", href: routes.dashboards.admin },
-  { label: "Supervisor", href: routes.dashboards.supervisor },
-  { label: "CC Team Lead", href: routes.dashboards.teamLead },
-  { label: "Creator", href: routes.dashboards.creator },
+  { label: "Marketing Manager", href: routes.dashboards.marketingManager },
+  { label: "Account Manager", href: routes.dashboards.accountManager },
+  { label: "Team Lead", href: routes.dashboards.teamLead },
+  { label: "Content Creator", href: routes.dashboards.contentCreator },
+  { label: "Graphic Designer", href: routes.dashboards.graphicDesigner },
+  { label: "Video Editor", href: routes.dashboards.videoEditor },
+  { label: "Client", href: routes.dashboards.client },
 ];
 
 export const roleDashboards: Record<RoleDashboard["role"], RoleDashboard> = {
   admin: {
     role: "admin",
-    title: "Admin dashboard",
+    title: "Marketing Manager dashboard",
     eyebrow: "Company control center",
     description:
-      "Workspace, user, analytics, reports, exports, settings, and audit-log surfaces will live here.",
+      "A clear command view for clients, teams, approvals, reports, and the work that needs a decision today.",
     primaryFocus: [
-      "Manage users and roles",
-      "Monitor activity logs",
-      "Review analytics and exports",
+      "Manage clients and users",
+      "Monitor delivery health",
+      "Approve high-impact work",
     ],
+    category: "leadership",
   },
   supervisor: {
     role: "supervisor",
-    title: "Supervisor dashboard",
-    eyebrow: "Approvals and performance",
+    title: "Account Manager dashboard",
+    eyebrow: "Client delivery",
     description:
-      "Team performance, pending reviews, feedback, reports, and activity monitoring will be organized here.",
+      "Client portfolios, briefs, deadlines, handoffs, and approval signals stay visible without making the day noisy.",
     primaryFocus: [
-      "Review creator submissions",
-      "Approve or return content",
-      "Track reports and team activity",
+      "Own client relationships",
+      "Route work to production",
+      "Keep timelines moving",
     ],
+    category: "operations",
   },
   "team-lead": {
     role: "team-lead",
-    title: "CC Team Lead dashboard",
+    title: "Team Lead dashboard",
     eyebrow: "Daily team workflow",
     description:
       "Task assignment, team content pipeline, daily progress, calendar, and team reports will be managed here.",
@@ -55,17 +60,58 @@ export const roleDashboards: Record<RoleDashboard["role"], RoleDashboard> = {
       "Track daily progress",
       "Escalate workflow issues",
     ],
+    category: "operations",
   },
   creator: {
     role: "creator",
-    title: "Creator dashboard",
+    title: "Content Creator dashboard",
     eyebrow: "Personal workbench",
     description:
-      "Assigned tasks, ideas, submissions, calendar, personal reports, and performance surfaces will live here.",
+      "Your assigned ideas, captions, scripts, content submissions, and delivery dates in one focused workbench.",
     primaryFocus: [
       "Submit ideas and content",
       "Update task status",
       "Review personal performance",
     ],
+    category: "production",
+  },
+  "graphic-designer": {
+    role: "graphic-designer",
+    title: "Graphic Designer dashboard",
+    eyebrow: "Visual production",
+    description:
+      "Design tasks, final artwork links, deadlines, and review requests stay organized around each client.",
+    primaryFocus: [
+      "Deliver visual assets",
+      "Attach final Drive links",
+      "Track design revisions",
+    ],
+    category: "production",
+  },
+  "video-editor": {
+    role: "video-editor",
+    title: "Video Editor dashboard",
+    eyebrow: "Video production",
+    description:
+      "Editing assignments, final video links, deadlines, and review handoffs are kept close to the client brief.",
+    primaryFocus: [
+      "Deliver final edits",
+      "Attach video Drive links",
+      "Track review handoffs",
+    ],
+    category: "production",
+  },
+  client: {
+    role: "client",
+    title: "Client dashboard",
+    eyebrow: "Brand review",
+    description:
+      "Review assigned ideas, scheduled content, reports, and client-facing delivery updates for your brand.",
+    primaryFocus: [
+      "Review ideas and content",
+      "Follow publishing dates",
+      "Read client reports",
+    ],
+    category: "client",
   },
 };
