@@ -17,5 +17,13 @@ export default async function VideoEditorDashboardPage() {
     getDashboardSections(context),
   ]);
 
-  return <RoleDashboardFoundation dashboard={roleDashboards["video-editor"]} summary={summary} charts={charts} sections={sections} />;
+  return (
+    <RoleDashboardFoundation
+      dashboard={roleDashboards["video-editor"]}
+      summary={summary}
+      charts={charts}
+      sections={sections}
+      titleOverride={`${context.displayName}'s Dashboard`}
+    />
+  );
 }

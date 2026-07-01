@@ -35,6 +35,14 @@ export function PageMessage({
               ? "User created successfully."
             : status === "updated"
               ? "The update was saved."
+            : status === "clocked-in"
+              ? "You are clocked in."
+            : status === "clocked-out"
+              ? "You are clocked out."
+            : status === "break-started"
+              ? "Break started."
+            : status === "break-ended"
+              ? "Break ended."
               : status}
         </AlertDescription>
       </Alert>

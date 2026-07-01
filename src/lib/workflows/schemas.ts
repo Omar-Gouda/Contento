@@ -101,6 +101,13 @@ export const ideaStatusSchema = z.object({
   redirectTo: z.string().trim().default("/ideas"),
 });
 
+export const ideaReviewSchema = z.object({
+  ideaId: z.string().trim().uuid(),
+  decision: z.enum(["under_review", "approved", "rejected", "revision_requested"]),
+  feedback: z.string().trim().max(2000, "Feedback must be 2000 characters or fewer.").default(""),
+  redirectTo: z.string().trim().default("/reviews/ideas"),
+});
+
 export const ideaDeleteSchema = z.object({
   ideaId: z.string().trim().uuid(),
   redirectTo: z.string().trim().default("/ideas"),
@@ -133,14 +140,14 @@ export const contentReviewSchema = z.object({
   accuracyScore: z.coerce.number().int().min(1).max(5).optional().nullable(),
   overallRating: z.coerce.number().int().min(1).max(5).optional().nullable(),
   scoreComment: z.string().trim().max(1000, "Score comment must be 1000 characters or fewer.").default(""),
-  redirectTo: z.string().trim().default("/content/reviews"),
+  redirectTo: z.string().trim().default("/reviews/content"),
 });
 
 export const contentRatingSchema = z.object({
   contentId: z.string().trim().uuid(),
   ratingValue: z.coerce.number().int().min(1).max(5),
   comment: z.string().trim().max(1000, "Rating comment must be 1000 characters or fewer.").default(""),
-  redirectTo: z.string().trim().default("/content/reviews"),
+  redirectTo: z.string().trim().default("/reviews/content"),
 });
 
 export const contentScheduleSchema = z.object({

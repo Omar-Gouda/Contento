@@ -207,11 +207,11 @@ function getReviewItems(context: AuthContext): NavigationItem[] {
   const items: NavigationItem[] = [];
 
   if (hasPermission(context, "ideas.review", "full")) {
-    items.push({ label: "Ideas review", href: routes.admin.ideas, icon: Lightbulb });
+    items.push({ label: "Ideas review", href: routes.reviews.ideas, icon: Lightbulb });
   }
 
   if (hasPermission(context, "reviews.view_submissions", "view")) {
-    items.push({ label: "Content review", href: routes.content.reviews, icon: CheckSquare });
+    items.push({ label: "Content review", href: routes.reviews.content, icon: CheckSquare });
   }
 
   return items;

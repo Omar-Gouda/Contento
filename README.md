@@ -57,7 +57,9 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - `/team`
 - `/tasks`, `/tasks/[id]`
 - `/ideas`, `/ideas/[id]`
-- `/content`, `/content/[id]`, `/content/reviews`, `/content/templates`
+- `/content`, `/content/[id]`, `/content/templates`
+- `/reviews/ideas`, `/reviews/content`
+- Legacy `/content/reviews` redirects to `/reviews/content`
 - `/calendar`
 - `/reports`, `/reports/[id]`, `/reports/export`
 - `/notifications`
@@ -72,16 +74,17 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Platform Super Admin route family with organization listing, details, analytics, lifecycle controls, platform audit logs, and first Org Admin creation.
 - Organization lifecycle states: active, disabled, and deleted. Disabled and deleted organizations are blocked from tenant dashboards.
 - Company-scoped RBAC with Marketing Manager, Account Manager, CC Team Lead, Content Creator, Graphic Designer, Video Editor, and Client role labels backed by tenant role keys.
-- Admin user creation, status changes, role assignment, team assignment, Marketing Manager user deletion with keep/remove content choices, and audit logging.
-- Client workspaces with company profiles, assignments, and client-linked task, idea, content, report, and calendar visibility.
-- Working-hours tracking from sign-in/sign-out, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, and Admin company view.
-- Teams, client workspaces, tasks, ideas, content pipeline, content reviews, review scoring, scheduling calendar, role-scoped generated reports, and CSV report export.
+- Admin user creation, status changes, role assignment, team/client assignment, Client-user plus client-profile creation, Marketing Manager user deletion with keep/remove content choices, and audit logging.
+- Client workspaces with company profile cards, assignments, and client-linked task, idea, content, report, and calendar visibility. New client profiles are created from the Client role flow in user management.
+- Working-hours tracking with explicit Clock In / Clock Out controls, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, header status menu, and Admin company view.
+- Teams, client workspaces, tasks, ideas, dedicated idea/content review queues, content pipeline, review scoring, scheduling calendar, role-scoped generated reports, and CSV report export.
+- Role-aware Marketing Manager user creation changes team/client assignment fields based on the selected role and links Client users to client profiles.
 - Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, and browser-local sound preference.
 - Header organization chat drawer for same-company users and assigned client-scope conversations.
 - Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
 - Standalone global search across accessible users, teams, tasks, ideas, content, and reports.
 - Advanced list filters with saved views for tasks, ideas, content, and reports.
-- Real dashboard analytics backed by current database counts and role scope.
+- Real dashboard analytics backed by current database counts and role scope, with personalized dashboard titles and Client portal titles.
 - Organization branding and company settings for logo, colors, work target, break allowance, and timezone.
 - User profile page with profile updates, avatar upload, role/team context, password change, and work-hours link.
 - Content templates with create, edit, archive, and use-on-content-create flows.

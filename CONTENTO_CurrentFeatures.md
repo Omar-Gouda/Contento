@@ -373,11 +373,14 @@ Created in Phase 3:
 * Landing page removed; `/` redirects to `/sign-in`
 * Role-based sidebar navigation
 * Admin direct user creation and management page
+* Role-aware user creation form with client assignment fields for Account Managers and production roles
+* Client role user creation creates both the client login and linked client profile
 * Forced password-change page for Marketing Manager-created users
 * User invitation migration and RLS policies
 * Working-hours migration and RPCs
 * Cairo timezone work-date fix
 * Reviewable break history
+* Explicit Clock In / Clock Out work-hours UX with header status controls
 * Current user work-hours page
 * Admin company work-hours page
 * Superior-admin organization bootstrap foundation
@@ -399,14 +402,17 @@ Created in the current implementation:
 * Admin idea management at `/admin/ideas`
 * Content pipeline at `/content`
 * Content detail page at `/content/[id]`
-* Content review queue at `/content/reviews`
+* Dedicated idea review queue at `/reviews/ideas`
+* Dedicated content review queue at `/reviews/content`
+* Legacy `/content/reviews` redirects to `/reviews/content`
 * Two-step content review flow: Content Creator draft -> Team Lead review -> Account Manager review -> approved/rejected/changes requested
 * Content rating support through `content_ratings` and `content.rate`
-* Content calendar at `/calendar` with month, week, and list views
+* Content calendar at `/calendar` with month, week, and day views for task due dates, idea publishing dates, scheduled content, day off, and sick leave
 * Reports page at `/reports`
 * Report detail page at `/reports/[id]`
 * CSV report export route at `/reports/export`
 * Lightweight role dashboard summaries backed by scoped database counts
+* Personalized dashboard titles using the current user's name; Client dashboards use the client portal name when available
 * Workflow migration for team leads/status, task priority/comments, idea assignment/notes, content schedule timestamps, calendar links, RLS helpers, and workflow indexes
 * Shared operations completion migration for team creators, task assigners, idea team links, content idea/team links, report titles/team/date ranges, report export activity logs, and permission aliases
 * Phase 4 scope-fix migration for private dashboards, Team Lead own-team boundaries, scoped task/content review helpers, content review handoff statuses, content ratings, and tightened RLS policies

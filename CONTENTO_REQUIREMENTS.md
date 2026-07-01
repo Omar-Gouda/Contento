@@ -243,13 +243,14 @@ Platform role for organization lifecycle only. Super Admin can create organizati
 ### User Management Workflow
 
 1. Marketing Manager creates or invites a user inside the company workspace.
-2. Marketing Manager assigns role and optional team.
-3. Marketing Manager-created users receive temporary password access and must change password on first login.
-4. User sees dashboard based on role and company status.
+2. Marketing Manager assigns role, optional team, and role-specific client scope where applicable.
+3. If the selected role is Client, the same flow creates a linked client profile and client-contact assignment.
+4. Marketing Manager-created users receive temporary password access and must change password on first login.
+5. User sees dashboard based on role and company status.
 
 ### Client Workspace Workflow
 
-1. Marketing Manager creates a client workspace inside the company.
+1. Marketing Manager creates a client workspace inside the company by creating a Client role user.
 2. Users can be assigned to the client workspace based on role and responsibility.
 3. Tasks, ideas, content, reports, and calendar events can be linked to that client.
 4. Client users see only their assigned client workspace and shared delivery information.
@@ -262,6 +263,13 @@ Platform role for organization lifecycle only. Super Admin can create organizati
 3. CC Team Lead requests changes or sends content to Account Manager review.
 4. Account Manager adds feedback/rating and approves, rejects, or requests changes.
 5. Activity is logged.
+
+### Idea Review Workflow
+
+1. Submitted ideas appear in the dedicated `/reviews/ideas` queue.
+2. Permitted reviewers can approve, decline, or request revision with feedback.
+3. Production and Client roles can add comments where their permissions and client/team scope allow it.
+4. Idea publishing dates appear on the Cairo calendar when set.
 
 ## 8. Data Requirements
 

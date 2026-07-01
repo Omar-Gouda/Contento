@@ -260,11 +260,13 @@ export function RoleDashboardFoundation({
   summary,
   charts,
   sections,
+  titleOverride,
 }: {
   dashboard: RoleDashboard;
   summary: DashboardSummaryMetric[];
   charts: DashboardChartSection[];
   sections: DashboardSections;
+  titleOverride?: string;
 }) {
   const visibleSummary = summary.slice(0, 4);
   const visibleCharts = charts.filter((chart) => chart.data.some((item) => item.value > 0)).slice(0, 3);
@@ -275,7 +277,7 @@ export function RoleDashboardFoundation({
       <div className="mb-6 max-w-3xl">
         <Badge variant="secondary">{dashboard.eyebrow}</Badge>
         <h1 className="mt-4 text-3xl font-semibold tracking-normal text-foreground">
-          {dashboard.title}
+          {titleOverride ?? dashboard.title}
         </h1>
         <p className="mt-2 text-sm font-medium text-primary">Welcome back. The deadlines missed you.</p>
         <p className="mt-3 text-base leading-7 text-muted-foreground">

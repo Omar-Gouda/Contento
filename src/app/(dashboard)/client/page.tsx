@@ -17,5 +17,13 @@ export default async function ClientDashboardPage() {
     getDashboardSections(context),
   ]);
 
-  return <RoleDashboardFoundation dashboard={roleDashboards.client} summary={summary} charts={charts} sections={sections} />;
+  return (
+    <RoleDashboardFoundation
+      dashboard={roleDashboards.client}
+      summary={summary}
+      charts={charts}
+      sections={sections}
+      titleOverride={sections.clients[0]?.name ? `${sections.clients[0].name} Portal` : `${context.displayName}'s Dashboard`}
+    />
+  );
 }

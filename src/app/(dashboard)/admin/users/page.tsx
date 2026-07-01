@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { Search, UserPlus } from "lucide-react";
+import { Search } from "lucide-react";
 
 import {
-  createCompanyUserAction,
   updateUserRoleAction,
   updateUserStatusAction,
   updateUserTeamAction,
@@ -13,7 +12,9 @@ import {
   getCompanyUsers,
 } from "@/lib/admin/queries";
 import { requirePermission } from "@/lib/auth/context";
+import { getClients } from "@/lib/clients/queries";
 import { PageMessage } from "@/components/admin/page-message";
+import { RoleAwareUserCreateForm } from "@/components/admin/role-aware-user-create-form";
 import { UserTerminationControls } from "@/components/admin/user-termination-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getRoleDisplayName } from "@/types/roles";
+import { normalizeRoleName } from "@/types/roles";
 
 export const metadata: Metadata = {
   title: "User management",
@@ -53,11 +55,19 @@ export default async function AdminUsersPage({
 }) {
   const params = await searchParams;
   const context = await requirePermission("users.view_activity", "full");
-  const [users, roles, teams] = await Promise.all([
+  const [users, roles, teams, clients] = await Promise.all([
     getCompanyUsers(context, { search: params.q, status: params.status }),
     getCompanyRoles(context),
     getCompanyTeams(context),
+    getClients(context),
   ]);
+  const accountManagers = users
+    .filter((user) => normalizeRoleName(user.roleName) === "supervisor")
+    .map((user) => ({
+      id: user.id,
+      displayName: `${user.first_name} ${user.last_name}`.trim() || user.email,
+      status: user.status,
+    }));
 
   return (
     <section className="space-y-6">
@@ -79,100 +89,7 @@ export default async function AdminUsersPage({
           <CardDescription>Create a company-scoped account with a Contento role and status.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={createCompanyUserAction} className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2 lg:col-span-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name="firstName" autoComplete="given-name" required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name="lastName" autoComplete="family-name" required />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="roleId">Role</Label>
-              <select
-                id="roleId"
-                name="roleId"
-                required
-                className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">Choose role</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {getRoleDisplayName(role.name)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="teamId">Team</Label>
-              <select
-                id="teamId"
-                name="teamId"
-                className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">No team</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="newUserStatus">Status</Label>
-              <select
-                id="newUserStatus"
-                name="status"
-                defaultValue="active"
-                className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {userStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="temporaryPassword">Temporary password</Label>
-              <Input
-                id="temporaryPassword"
-                name="temporaryPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmTemporaryPassword">Confirm temporary password</Label>
-              <Input
-                id="confirmTemporaryPassword"
-                name="confirmTemporaryPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-              />
-            </div>
-
-            <div className="flex items-end">
-              <Button type="submit">
-                <UserPlus />
-                Create user
-              </Button>
-            </div>
-          </form>
+          <RoleAwareUserCreateForm roles={roles} teams={teams} clients={clients} accountManagers={accountManagers} />
         </CardContent>
       </Card>
 

@@ -30,6 +30,10 @@ export const routes = {
     reviews: "/content/reviews",
     templates: "/content/templates",
   },
+  reviews: {
+    ideas: "/reviews/ideas",
+    content: "/reviews/content",
+  },
   calendar: "/calendar",
   reports: "/reports",
   admin: {

@@ -223,11 +223,14 @@ Superior Admin and Platform Admin are not tenant roles and are not assigned thro
 The current implementation uses this matrix for Teams, Tasks, Ideas, Content, Calendar, Reports, and report exports:
 
 * Admin-only `/admin/teams`, `/admin/tasks`, and `/admin/ideas` routes rely on Admin route protection plus the documented permission keys.
-* Shared `/team`, `/tasks`, `/tasks/[id]`, `/ideas`, `/ideas/[id]`, `/content`, `/content/[id]`, `/content/reviews`, `/calendar`, `/reports`, and `/reports/[id]` routes require the matching view permission before rendering.
+* Shared `/team`, `/tasks`, `/tasks/[id]`, `/ideas`, `/ideas/[id]`, `/content`, `/content/[id]`, `/reviews/ideas`, `/reviews/content`, `/calendar`, `/reports`, and `/reports/[id]` routes require the matching view permission before rendering.
 * Server actions require the documented create, assign, update, review, schedule, submit, close, or export permission before writing.
 * RLS remains company-scoped and adds task/team, idea-link, content-link, review-scope, rating-scope, and report-scope helper checks for limited team visibility.
 * CC Team Leads are restricted to own-team members, own-team task assignment, and own-team submitted content review.
 * Role dashboards show private or role-scoped productivity counts; review queues and team/company data live in permission-scoped operational pages.
+* Marketing Manager user creation is role-aware: Client users must be linked to a client profile, Account Managers can receive client ownership, and production roles can receive client assignment rows.
+* The notification bell is a dropdown trigger, not a navigation link; notification item links navigate only when the item itself is opened.
+* Work-hours are explicit: authentication starts the login session, while working time starts only after Clock In and ends on Clock Out.
 * Dashboard customization controls live under `/settings/preferences`, not inside dashboard content.
 * The header notification bell shows recent own notifications, unread count, mark-read controls, and a browser-local sound preference.
 * The header no longer contains a fake search field; `/search` remains the standalone scoped search page.

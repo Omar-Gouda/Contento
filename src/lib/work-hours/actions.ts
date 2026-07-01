@@ -11,7 +11,7 @@ export type WorkHoursActionResult = {
   message: string;
 };
 
-export async function recordSignInForSupabaseClient(supabase: SupabaseClient<Database>) {
+export async function clockInForSupabaseClient(supabase: SupabaseClient<Database>) {
   try {
     const { error } = await supabase.rpc("record_work_sign_in", {});
 
@@ -23,7 +23,7 @@ export async function recordSignInForSupabaseClient(supabase: SupabaseClient<Dat
   }
 }
 
-export async function recordSignOutForSupabaseClient(supabase: SupabaseClient<Database>) {
+export async function clockOutForSupabaseClient(supabase: SupabaseClient<Database>) {
   try {
     const { data, error } = await supabase.rpc("record_work_sign_out", {});
 
@@ -37,6 +37,31 @@ export async function recordSignOutForSupabaseClient(supabase: SupabaseClient<Da
     console.warn("Contento work-hours sign-out tracking failed", error);
     return "tracking_failed";
   }
+}
+
+export async function recordSignInForSupabaseClient(supabase: SupabaseClient<Database>) {
+  return clockInForSupabaseClient(supabase);
+}
+
+export async function recordSignOutForSupabaseClient(supabase: SupabaseClient<Database>) {
+  return clockOutForSupabaseClient(supabase);
+}
+
+export async function clockInAndRefreshAction() {
+  const supabase = await createSupabaseServerClient();
+  await clockInForSupabaseClient(supabase);
+  redirect("/profile/work-hours?notice=clocked-in");
+}
+
+export async function clockOutAndRefreshAction() {
+  const supabase = await createSupabaseServerClient();
+  const status = await clockOutForSupabaseClient(supabase);
+
+  if (status === "active_break") {
+    redirect("/profile/work-hours?error=active-break");
+  }
+
+  redirect("/profile/work-hours?notice=clocked-out");
 }
 
 export async function startBreakAction(): Promise<WorkHoursActionResult> {
@@ -75,10 +100,10 @@ export async function endBreakAction(): Promise<WorkHoursActionResult> {
 
 export async function startBreakAndRefreshAction() {
   await startBreakAction();
-  redirect("/profile/work-hours");
+  redirect("/profile/work-hours?notice=break-started");
 }
 
 export async function endBreakAndRefreshAction() {
   await endBreakAction();
-  redirect("/profile/work-hours");
+  redirect("/profile/work-hours?notice=break-ended");
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Clock, Coffee, LogOut, TimerReset } from "lucide-react";
 
 import {
+  clockInAndRefreshAction,
+  clockOutAndRefreshAction,
   endBreakAndRefreshAction,
   startBreakAndRefreshAction,
 } from "@/lib/work-hours/actions";
@@ -31,7 +33,7 @@ export const metadata: Metadata = {
 export default async function ProfileWorkHoursPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const params = await searchParams;
   const context = await requirePermission("work_hours.view_own", "view");
@@ -51,13 +53,14 @@ export default async function ProfileWorkHoursPage({
 
       <PageMessage
         error={params.error === "active-break" ? "End your active break before signing out." : undefined}
+        status={params.notice}
       />
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader>
             <Clock className="size-5 text-primary" />
-            <CardTitle>First sign-in</CardTitle>
+            <CardTitle>Clock in</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">
             {formatCairoTime(workHours.workDay?.first_sign_in_at)}
@@ -121,6 +124,13 @@ export default async function ProfileWorkHoursPage({
                   End break
                 </Button>
               </form>
+            ) : !activeWork ? (
+              <form action={clockInAndRefreshAction}>
+                <Button type="submit">
+                  <Clock />
+                  Clock in
+                </Button>
+              </form>
             ) : (
               <form action={startBreakAndRefreshAction}>
                 <Button type="submit" variant="outline" disabled={!activeWork}>
@@ -129,7 +139,15 @@ export default async function ProfileWorkHoursPage({
                 </Button>
               </form>
             )}
-            <SignOutButton />
+            {activeWork && !activeBreak && (
+              <form action={clockOutAndRefreshAction}>
+                <Button type="submit" variant="outline">
+                  <LogOut />
+                  Clock out
+                </Button>
+              </form>
+            )}
+            <SignOutButton hasActiveWorkSession={activeWork} hasActiveBreak={activeBreak} />
           </div>
         </CardContent>
       </Card>

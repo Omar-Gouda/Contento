@@ -153,7 +153,7 @@ export async function ContentSurface({
   const canReview = hasPermission(context, "reviews.add_feedback", "limited");
   const canRate = hasPermission(context, "content.rate", "limited");
   const canSchedule = hasPermission(context, "calendar.schedule_content", "limited");
-  const basePath = mode === "reviews" ? "/content/reviews" : "/content";
+  const basePath = mode === "reviews" ? routes.reviews.content : routes.content.home;
   const reviewableContent = mode === "reviews"
     ? content.filter((item) => isVisibleInReviewMode(context, item.status, item.creator_id))
     : content;
@@ -417,7 +417,7 @@ export async function ContentSurface({
                 {canReviewItem && (
                   <form action={reviewContentAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
                     <input type="hidden" name="contentId" value={item.id} />
-                    <input type="hidden" name="redirectTo" value="/content/reviews" />
+                    <input type="hidden" name="redirectTo" value={routes.reviews.content} />
                     <div className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
                       <div className="space-y-2">
                         <Label htmlFor={`decision-${item.id}`}>Decision</Label>
@@ -474,7 +474,7 @@ export async function ContentSurface({
                 {canRateItem && (
                   <form action={rateContentAction} className="grid gap-3 rounded-lg border bg-background p-3">
                     <input type="hidden" name="contentId" value={item.id} />
-                    <input type="hidden" name="redirectTo" value="/content/reviews" />
+                    <input type="hidden" name="redirectTo" value={routes.reviews.content} />
                     <div className="grid gap-3 md:grid-cols-[140px_1fr_auto]">
                       <div className="space-y-2">
                         <Label htmlFor={`rating-${item.id}`}>Rating</Label>

@@ -15,6 +15,7 @@ import {
   contentSubmitSchema,
   generatedReportSchema,
   ideaDeleteSchema,
+  ideaReviewSchema,
   ideaSchema,
   ideaStatusSchema,
   reportSchema,
@@ -45,6 +46,11 @@ import type { Database, Json } from "@/types/database";
 type ContentActionRow = Pick<
   Database["public"]["Tables"]["content_items"]["Row"],
   "id" | "company_id" | "client_id" | "title" | "creator_id" | "team_id" | "status"
+>;
+
+type IdeaActionRow = Pick<
+  Database["public"]["Tables"]["ideas"]["Row"],
+  "id" | "company_id" | "client_id" | "title" | "created_by" | "assigned_to" | "team_id" | "status"
 >;
 
 function formString(formData: FormData, key: string) {
@@ -152,6 +158,22 @@ async function assertIdeaInCompany(ideaId: string | null, companyId: string) {
   if (error || !data) {
     throw new Error("Idea does not belong to this company.");
   }
+}
+
+async function loadIdeaForAction(ideaId: string, companyId: string) {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("ideas")
+    .select("id, company_id, client_id, title, created_by, assigned_to, team_id, status")
+    .eq("id", ideaId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("Idea does not belong to this company.");
+  }
+
+  return data as IdeaActionRow;
 }
 
 async function assertClientInCompany(clientId: string | null, companyId: string) {
@@ -888,6 +910,91 @@ export async function updateIdeaStatusAction(formData: FormData) {
   safeRedirect(parsed.data.redirectTo, "notice", "Idea status updated.");
 }
 
+export async function reviewIdeaAction(formData: FormData) {
+  const decision = formString(formData, "decision");
+  const context = ["approved", "rejected", "revision_requested", "under_review"].includes(decision)
+    ? await requirePermission("ideas.change_status", "limited")
+    : await requirePermission("comments.create", "limited");
+  const parsed = ideaReviewSchema.safeParse({
+    ideaId: formString(formData, "ideaId"),
+    decision,
+    feedback: formString(formData, "feedback"),
+    redirectTo: formString(formData, "redirectTo") || "/reviews/ideas",
+  });
+
+  if (!parsed.success) {
+    safeRedirect(formString(formData, "redirectTo"), "error", parsed.error.issues[0]?.message ?? "Invalid idea review.");
+  }
+
+  let idea: IdeaActionRow;
+  try {
+    idea = await loadIdeaForAction(parsed.data.ideaId, context.companyId);
+    await assertAssignmentScope(context, idea.team_id, idea.assigned_to);
+  } catch {
+    safeRedirect(parsed.data.redirectTo, "error", "This idea is outside your review scope.");
+  }
+
+  if (!["submitted", "under_review"].includes(idea.status)) {
+    safeRedirect(parsed.data.redirectTo, "error", "Only submitted ideas can be reviewed from this page.");
+  }
+
+  const nextStatus = parsed.data.decision === "revision_requested"
+    ? "submitted"
+    : parsed.data.decision;
+  const supabase = await createSupabaseServerClient();
+
+  if (parsed.data.feedback) {
+    const { error: commentError } = await supabase.from("comments").insert({
+      company_id: context.companyId,
+      entity_type: "idea",
+      entity_id: parsed.data.ideaId,
+      author_id: context.userId,
+      body: parsed.data.feedback,
+    });
+
+    if (commentError) {
+      safeRedirect(parsed.data.redirectTo, "error", "Feedback could not be saved.");
+    }
+  }
+
+  const { error } = await supabase
+    .from("ideas")
+    .update({ status: nextStatus })
+    .eq("id", parsed.data.ideaId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    safeRedirect(parsed.data.redirectTo, "error", "Idea review decision could not be saved.");
+  }
+
+  await logActivity(context, "ideas.reviewed", "idea", parsed.data.ideaId, {
+    decision: parsed.data.decision,
+    status: nextStatus,
+  });
+  await Promise.all([
+    notifyUser(
+      context,
+      idea.created_by,
+      "Idea review updated",
+      `${idea.title} is now ${nextStatus}.`,
+      "idea",
+      parsed.data.ideaId,
+      `/ideas/${parsed.data.ideaId}`
+    ),
+    notifyUser(
+      context,
+      idea.assigned_to,
+      "Idea review updated",
+      `${idea.title} is now ${nextStatus}.`,
+      "idea",
+      parsed.data.ideaId,
+      `/ideas/${parsed.data.ideaId}`
+    ),
+  ]);
+
+  safeRedirect(parsed.data.redirectTo, "notice", "Idea review saved.");
+}
+
 export async function deleteIdeaAction(formData: FormData) {
   const context = await requirePermission("ideas.update", "limited");
   const parsed = ideaDeleteSchema.safeParse({
@@ -1070,7 +1177,7 @@ export async function reviewContentAction(formData: FormData) {
     accuracyScore: formString(formData, "accuracyScore") || undefined,
     overallRating: formString(formData, "overallRating") || undefined,
     scoreComment: formString(formData, "scoreComment"),
-    redirectTo: formString(formData, "redirectTo") || "/content/reviews",
+    redirectTo: formString(formData, "redirectTo") || "/reviews/content",
   });
 
   if (!parsed.success) {
@@ -1137,7 +1244,7 @@ export async function rateContentAction(formData: FormData) {
     contentId: formString(formData, "contentId"),
     ratingValue: formString(formData, "ratingValue"),
     comment: formString(formData, "comment"),
-    redirectTo: formString(formData, "redirectTo") || "/content/reviews",
+    redirectTo: formString(formData, "redirectTo") || "/reviews/content",
   });
 
   if (!parsed.success) {

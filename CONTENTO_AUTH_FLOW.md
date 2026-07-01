@@ -67,8 +67,10 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 | `/ideas` | Shared idea management for permitted users. | Implemented in Phase 4-10 workflow foundation. |
 | `/admin/ideas` | Admin company-wide idea management. | Implemented in Phase 4-10 workflow foundation. |
 | `/content` | Content pipeline creation, submission, and scheduling. | Implemented in Phase 4-10 workflow foundation. |
-| `/content/reviews` | Content review, approval, rejection, feedback, and change requests. | Implemented in Phase 4-10 workflow foundation. |
-| `/calendar` | Month, week, and day scheduling calendar for task due dates, scheduled content, time off, sick leave, and meetings. | Implemented in Phase 4-10 workflow foundation and corrected in product review. |
+| `/reviews/ideas` | Submitted idea review, approval, revision request, decline, and feedback. | Implemented in major fix phase. |
+| `/reviews/content` | Content review, approval, rejection, feedback, rating, and change requests. | Implemented in Phase 4-10 workflow foundation and moved to a dedicated review route. |
+| `/content/reviews` | Legacy content review URL. | Redirects to `/reviews/content`. |
+| `/calendar` | Month, week, and day scheduling calendar for task due dates, idea publishing dates, scheduled content, time off, and sick leave. | Implemented in Phase 4-10 workflow foundation and corrected in product review. |
 | `/reports` | Auto-generated report creation and review. | Implemented in Phase 4-10 workflow foundation and corrected in product review. |
 | `/reports/export` | Permission-checked CSV report export. | Implemented in Phase 4-10 workflow foundation. |
 | `/notifications` | Notification center. | Implemented in final production phase. |

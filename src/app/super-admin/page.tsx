@@ -10,7 +10,7 @@ import { getPlatformOverview } from "@/lib/super-admin/queries";
 import { formatCairoDateTime } from "@/lib/time";
 
 export const metadata: Metadata = {
-  title: "Super Admin",
+  title: "Platform Dashboard",
 };
 
 export default async function SuperAdminPage() {
@@ -21,7 +21,7 @@ export default async function SuperAdminPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-primary">Platform</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal">Super Admin</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal">Platform Dashboard</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Monitor organization lifecycle, platform activity, and tenant readiness without joining workspaces.
           </p>

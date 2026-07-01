@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { loadAuthProfile } from "@/lib/auth/context";
 import { hasSupabaseRuntimeConfig } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { recordSignInForSupabaseClient } from "@/lib/work-hours/actions";
 import { getDefaultDashboardPath } from "@/types/roles";
 
 export async function GET(request: NextRequest) {
@@ -34,7 +33,6 @@ export async function GET(request: NextRequest) {
       }
 
       if (resolution.state === "active") {
-        await recordSignInForSupabaseClient(supabase);
         const destination = resolution.context.mustChangePassword
           ? "/change-password"
           : getDefaultDashboardPath(resolution.context.role);

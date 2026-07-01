@@ -87,7 +87,7 @@ export type WorkflowContentRating = ContentRatingRow & {
 
 export type CalendarItem = {
   id: string;
-  type: "task" | "content" | "day_off" | "sick_leave";
+  type: "task" | "idea" | "content" | "day_off" | "sick_leave";
   title: string;
   startsAt: string;
   endsAt: string;
@@ -656,6 +656,7 @@ export async function getCalendarItems(
   const [
     { data: events },
     { data: tasks },
+    { data: ideas },
     { data: content },
     { data: dayOff },
     users,
@@ -675,6 +676,13 @@ export async function getCalendarItems(
       .not("due_date", "is", null)
       .gte("due_date", startDate)
       .lte("due_date", endDate),
+    supabase
+      .from("ideas")
+      .select("id, title, assigned_to, created_by, status, publishing_at, client_id")
+      .eq("company_id", context.companyId)
+      .not("publishing_at", "is", null)
+      .gte("publishing_at", startIso)
+      .lte("publishing_at", endIso),
     supabase
       .from("content_items")
       .select("id, title, creator_id, status, scheduled_at, submitted_at, client_id")
@@ -723,6 +731,23 @@ export async function getCalendarItems(
         owner: task.assigned_to ? userById.get(task.assigned_to) ?? null : null,
         clientName: task.client_id ? clientById.get(task.client_id) ?? null : null,
         href: `${routes.tasks}/${task.id}`,
+      }))),
+    ...(((ideas as Array<Pick<IdeaRow, "id" | "title" | "assigned_to" | "created_by" | "status" | "publishing_at" | "client_id">> | null) ?? [])
+      .filter((idea) => idea.publishing_at)
+      .map((idea) => ({
+        id: idea.id,
+        type: "idea" as const,
+        title: idea.title,
+        startsAt: idea.publishing_at as string,
+        endsAt: idea.publishing_at as string,
+        status: idea.status,
+        owner: idea.assigned_to
+          ? userById.get(idea.assigned_to) ?? null
+          : idea.created_by
+            ? userById.get(idea.created_by) ?? null
+            : null,
+        clientName: idea.client_id ? clientById.get(idea.client_id) ?? null : null,
+        href: `${routes.ideas}/${idea.id}`,
       }))),
     ...(((content as Array<Pick<ContentRow, "id" | "title" | "creator_id" | "status" | "scheduled_at" | "submitted_at" | "client_id">> | null) ?? [])
       .filter((item) => {

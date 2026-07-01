@@ -33,7 +33,7 @@ Policy principles:
 * `role_permissions` includes an `access_level` so Full Access, Limited Access, and View Only can be represented without hardcoding access in application code.
 * Helper functions such as `current_company_id()`, `has_role()`, `has_permission()`, and entity-scope helpers are used by policies and application code.
 * First-workspace onboarding uses a narrow `SECURITY DEFINER` RPC because a signed-in user without a Contento profile cannot pass tenant RLS for direct table inserts.
-* Work-hours writes are performed through authenticated RPCs so sign-in, sign-out, and break rules stay database-consistent.
+* Work-hours writes are performed through authenticated RPCs so explicit Clock In, Clock Out, and break rules stay database-consistent.
 * Platform admins are stored outside company membership and can only operate through platform-specific routes, helpers, and server-side actions.
 * Organization lifecycle policies allow platform admins to view and update organization status while company users remain scoped to their own active company.
 * Marketing Manager-created users are created through server-only Supabase Auth code, then linked to `users` with `must_change_password = true`.
@@ -54,9 +54,9 @@ Policy principles:
 
 ## Working-Hours Rules
 
-* A work day starts when an active company user signs in.
+* A work day starts when an active company user explicitly clocks in.
 * `work_days.work_date` is derived from `Africa/Cairo`, while timestamps remain `timestamptz`.
-* Sign-out closes the active work session and updates daily totals.
+* Clock Out closes the active work session and updates daily totals. Sign-out still performs a defensive close if an active session reaches the server.
 * Users can start one break at a time only while a work session is active.
 * Daily break allowance is 90 minutes by default and can be configured in company settings.
 * Break time over the allowance is counted as missing time.

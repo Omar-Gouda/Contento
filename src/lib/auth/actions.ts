@@ -17,7 +17,6 @@ import {
 import { hasSupabaseRuntimeConfig } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  recordSignInForSupabaseClient,
   recordSignOutForSupabaseClient,
 } from "@/lib/work-hours/actions";
 import { getDefaultDashboardPath } from "@/types/roles";
@@ -118,8 +117,6 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
     const acceptedResolution = await loadAuthProfile(supabase);
 
     if (acceptedResolution.state === "active") {
-      await recordSignInForSupabaseClient(supabase);
-
       return {
         success: true,
         message: "Signed in successfully.",
@@ -166,8 +163,6 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
       message: "We could not resolve your workspace access. Please try again.",
     };
   }
-
-  await recordSignInForSupabaseClient(supabase);
 
   return {
     success: true,
@@ -409,8 +404,6 @@ export async function completeOnboardingAction(input: OnboardingInput): Promise<
       message: "Your workspace was created, but your profile could not be resolved yet. Sign in again to continue.",
     };
   }
-
-  await recordSignInForSupabaseClient(supabase);
 
   return {
     success: true,
