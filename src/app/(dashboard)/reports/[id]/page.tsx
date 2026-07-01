@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requirePermission } from "@/lib/auth/context";
-import { hasPermission } from "@/lib/auth/permissions";
+import { requireAuthContext } from "@/lib/auth/context";
+import { AuthorizationError, hasPermission } from "@/lib/auth/permissions";
+import { canOpenReports } from "@/lib/workflows/scope";
 import { sendReportToClientAction } from "@/lib/workflows/actions";
 import { getWorkflowReportById } from "@/lib/workflows/queries";
 import { formatCairoDateTime } from "@/lib/time";
@@ -44,7 +45,12 @@ export default async function ReportDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const context = await requirePermission("reports.view_own", "view");
+  const context = await requireAuthContext();
+
+  if (!canOpenReports(context)) {
+    throw new AuthorizationError();
+  }
+
   const report = await getWorkflowReportById(context, id);
 
   if (!report) {

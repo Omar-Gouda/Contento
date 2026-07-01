@@ -123,16 +123,19 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
 function SignInLockScreen({ children }: { children: ReactNode }) {
   const startY = useRef(0);
+  const startTime = useRef(0);
+  const dragDistanceRef = useRef(0);
   const pointerId = useRef<number | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [dragProgress, setDragProgress] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const threshold = 100;
-  const maxDrag = 180;
-  const progress = Math.min(Math.abs(dragOffset) / maxDrag, 1);
+  const threshold = 72;
+  const fastSwipeVelocity = 0.52;
+  const maxDrag = 170;
   const heroTransform = unlocked ? "translate3d(0, -100%, 0)" : `translate3d(0, ${dragOffset}px, 0)`;
-  const contentOpacity = unlocked ? 0 : Math.max(0.42, 1 - progress * 0.72);
+  const contentOpacity = unlocked ? 0 : Math.max(0.42, 1 - dragProgress * 0.72);
   const contentLift = unlocked ? "-40px" : `${dragOffset * 0.16}px`;
   const transitionClass = useMemo(
     () => reducedMotion || dragging
@@ -166,6 +169,8 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
   function revealForm() {
     setDragging(false);
     setDragOffset(0);
+    setDragProgress(0);
+    dragDistanceRef.current = 0;
     setUnlocked(true);
   }
 
@@ -176,6 +181,9 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
 
     pointerId.current = event.pointerId;
     startY.current = event.clientY;
+    startTime.current = performance.now();
+    dragDistanceRef.current = 0;
+    setDragProgress(0);
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -185,8 +193,11 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
       return;
     }
 
-    const delta = event.clientY - startY.current;
-    setDragOffset(Math.max(Math.min(delta * 0.16, 18), -maxDrag));
+    const upwardDistance = Math.max(startY.current - event.clientY, 0);
+    const downwardResistance = Math.max(event.clientY - startY.current, 0) * 0.12;
+    dragDistanceRef.current = upwardDistance;
+    setDragProgress(Math.min(upwardDistance / maxDrag, 1));
+    setDragOffset(upwardDistance > 0 ? -Math.min(upwardDistance, maxDrag) : Math.min(downwardResistance, 18));
   }
 
   function finishDrag(event: ReactPointerEvent<HTMLElement>) {
@@ -194,7 +205,9 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
       return;
     }
 
-    const shouldUnlock = Math.abs(dragOffset) >= threshold;
+    const elapsed = Math.max(performance.now() - startTime.current, 1);
+    const velocity = dragDistanceRef.current / elapsed;
+    const shouldUnlock = dragDistanceRef.current >= threshold || (dragDistanceRef.current >= 28 && velocity >= fastSwipeVelocity);
     pointerId.current = null;
     setDragging(false);
 
@@ -208,6 +221,8 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
     }
 
     setDragOffset(0);
+    setDragProgress(0);
+    dragDistanceRef.current = 0;
   }
 
   return (

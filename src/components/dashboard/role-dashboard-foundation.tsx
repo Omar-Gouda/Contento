@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   BarChart3,
-  Bell,
   Building2,
   ClipboardList,
   type LucideIcon,
@@ -256,46 +255,6 @@ function WorkItemList({
   );
 }
 
-function NotificationsSection({ sections }: { sections: DashboardSections }) {
-  if (!sections.notifications.length) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <SectionHeader title="Notifications" description="Recent alerts from your workspace." icon={Bell} />
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        {sections.notifications.slice(0, 4).map((notification) => {
-          const content = (
-            <div
-              className={cn(
-                "rounded-lg border bg-card p-3",
-                !notification.read && "border-amber-500/30 bg-amber-500/10"
-              )}
-            >
-              <p className="line-clamp-2 text-sm font-semibold text-foreground">{notification.title}</p>
-              {notification.message && (
-                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{notification.message}</p>
-              )}
-              <p className="mt-3 text-xs text-muted-foreground">{formatDashboardDate(notification.created_at)}</p>
-            </div>
-          );
-
-          return notification.link_href ? (
-            <Link key={notification.id} href={notification.link_href} className="transition-colors hover:text-primary">
-              {content}
-            </Link>
-          ) : (
-            <div key={notification.id}>{content}</div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
 export function RoleDashboardFoundation({
   dashboard,
   summary,
@@ -349,7 +308,6 @@ export function RoleDashboardFoundation({
       <div className="grid gap-4 xl:grid-cols-2">
         {sections.clients.length > 0 && <ClientSection sections={sections} />}
         <WorkItemList items={priorityItems} />
-        <NotificationsSection sections={sections} />
       </div>
     </section>
   );

@@ -30,7 +30,14 @@ import {
   timeOffRequestSchema,
   timeOffReviewSchema,
 } from "@/lib/workflows/schemas";
-import { assertAssignmentScope, assertTeamScope, assertUserScope, creatorSubmissionStatuses } from "@/lib/workflows/scope";
+import {
+  assertAssignmentScope,
+  assertTeamScope,
+  assertUserScope,
+  creatorSubmissionStatuses,
+  getVisibleClientIds,
+} from "@/lib/workflows/scope";
+import { getWorkflowReportById } from "@/lib/workflows/queries";
 import { getCairoDate, minutesLabel } from "@/lib/time";
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { Database, Json } from "@/types/database";
@@ -162,6 +169,18 @@ async function assertClientInCompany(clientId: string | null, companyId: string)
 
   if (error || !data) {
     throw new Error("Client does not belong to this company.");
+  }
+}
+
+async function assertClientScopeForReport(context: AuthContext, clientId: string | null) {
+  if (!clientId || context.role === "admin") {
+    return;
+  }
+
+  const visibleClientIds = await getVisibleClientIds(context);
+
+  if (!visibleClientIds?.includes(clientId)) {
+    throw new Error("Client is outside your report scope.");
   }
 }
 
@@ -1399,6 +1418,7 @@ export async function generateReportAction(formData: FormData) {
     await assertClientInCompany(clientId, context.companyId);
     await assertUserScope(context, reportUserId);
     await assertTeamScope(context, teamId);
+    await assertClientScopeForReport(context, clientId);
   } catch {
     safeRedirect("/reports", "error", "Report scope must stay inside your company and role access.");
   }
@@ -1673,8 +1693,11 @@ export async function createReportAction(formData: FormData) {
     await assertUserInCompany(reportUserId, context.companyId);
     await assertTeamInCompany(parsed.data.teamId, context.companyId);
     await assertClientInCompany(clientId, context.companyId);
+    await assertUserScope(context, reportUserId);
+    await assertTeamScope(context, parsed.data.teamId);
+    await assertClientScopeForReport(context, clientId);
   } catch {
-    safeRedirect("/reports", "error", "Report user and team must belong to your company.");
+    safeRedirect("/reports", "error", "Report user, team, and client must stay inside your role scope.");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -1718,6 +1741,12 @@ export async function sendReportToClientAction(formData: FormData) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const visibleReport = await getWorkflowReportById(context, parsed.data.reportId);
+
+  if (!visibleReport) {
+    safeRedirect(parsed.data.redirectTo, "error", "This report is outside your review scope.");
+  }
+
   const { data: report, error: loadError } = await supabase
     .from("reports")
     .select("id, client_id")

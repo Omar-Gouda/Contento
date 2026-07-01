@@ -218,7 +218,14 @@ function getReviewItems(context: AuthContext): NavigationItem[] {
 }
 
 function getReportItems(context: AuthContext): NavigationItem[] {
-  if (!hasPermission(context, "reports.view_own", "view")) {
+  const canOpenReports =
+    hasPermission(context, "reports.view_company", "view") ||
+    hasPermission(context, "reports.view_team", "view") ||
+    hasPermission(context, "reports.view_own", "view") ||
+    hasPermission(context, "reports.send_to_client", "limited") ||
+    hasPermission(context, "reports.submit", "limited");
+
+  if (!canOpenReports) {
     return [];
   }
 
@@ -411,12 +418,11 @@ export function DashboardNavigation({ context, collapsed = false }: { context: A
       pathname,
     };
   });
-  const derivedOpenGroupId = openGroupState.pathname !== pathname && activeRouteGroupId
-    ? activeRouteGroupId
-    : openGroupState.groupId;
+  const routeChanged = openGroupState.pathname !== pathname;
+  const derivedOpenGroupId = routeChanged && activeRouteGroupId ? activeRouteGroupId : openGroupState.groupId;
   const visibleOpenGroupId = derivedOpenGroupId && groups.some((group) => group.id === derivedOpenGroupId)
     ? derivedOpenGroupId
-    : activeRouteGroupId;
+    : activeRouteGroupId ?? groups[0]?.id ?? null;
 
   function toggleGroup(group: NavigationGroup) {
     setOpenGroupState((current) => {

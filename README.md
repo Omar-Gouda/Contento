@@ -1,6 +1,6 @@
 # Contento
 
-Contento is a production-ready multi-company SaaS platform for content operations teams. The current implementation covers authentication, onboarding, platform Super Admin operations, organization lifecycle management, role-based route protection, Marketing Manager / Account Manager / Content Creator role labeling, Admin user management, client workspaces, working-hours tracking, teams, tasks, ideas, content review, calendar, reports, notifications, collaboration, saved views, search, analytics, organization branding, profile settings, dark mode, and a modern dashboard shell.
+Contento is a production-ready multi-company SaaS platform for content operations teams. The current implementation covers authentication, onboarding, platform Super Admin operations, organization lifecycle management, role-based route protection, Marketing Manager / Account Manager / Content Creator role labeling, Admin user management, client workspaces, working-hours tracking, teams, tasks, ideas, content review, calendar, scoped reports, header notifications, organization chat, collaboration, saved views, search, analytics, organization branding, profile settings, dark mode, and a modern dashboard shell.
 
 ## Getting Started
 
@@ -72,11 +72,12 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Platform Super Admin route family with organization listing, details, analytics, lifecycle controls, platform audit logs, and first Org Admin creation.
 - Organization lifecycle states: active, disabled, and deleted. Disabled and deleted organizations are blocked from tenant dashboards.
 - Company-scoped RBAC with Marketing Manager, Account Manager, CC Team Lead, Content Creator, Graphic Designer, Video Editor, and Client role labels backed by tenant role keys.
-- Admin user creation, status changes, role assignment, team assignment, and audit logging.
+- Admin user creation, status changes, role assignment, team assignment, Marketing Manager user deletion with keep/remove content choices, and audit logging.
 - Client workspaces with company profiles, assignments, and client-linked task, idea, content, report, and calendar visibility.
 - Working-hours tracking from sign-in/sign-out, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, and Admin company view.
-- Teams, client workspaces, tasks, ideas, content pipeline, content reviews, review scoring, scheduling calendar, generated reports, and CSV report export.
-- In-app notification center and header bell with unread count, recent-notification dropdown, read/unread filtering, mark-read actions, entity links, and browser-local sound preference.
+- Teams, client workspaces, tasks, ideas, content pipeline, content reviews, review scoring, scheduling calendar, role-scoped generated reports, and CSV report export.
+- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, and browser-local sound preference.
+- Header organization chat drawer for same-company users and assigned client-scope conversations.
 - Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
 - Standalone global search across accessible users, teams, tasks, ideas, content, and reports.
 - Advanced list filters with saved views for tasks, ideas, content, and reports.
@@ -108,6 +109,8 @@ supabase/
     202606240005_contento_product_review_corrections.sql
     202606250001_contento_client_revision.sql
     202606250002_contento_client_report_send_flow.sql
+    202606300001_contento_client_permission_hotfix.sql
+    202607010001_contento_ux_permission_chat_hotfix.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.

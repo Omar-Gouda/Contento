@@ -48,6 +48,15 @@ export const updateUserTeamSchema = z.object({
   teamId: optionalUuidSchema,
 });
 
+export const terminateUserSchema = z.object({
+  userId: z.string().trim().uuid(),
+  mode: z.enum(["keep_content", "remove_content"]),
+  confirmation: z.string().trim().default(""),
+}).refine((value) => value.mode !== "remove_content" || value.confirmation === "DELETE", {
+  message: "Type DELETE to permanently remove owned work.",
+  path: ["confirmation"],
+});
+
 export const updateInvitationStatusSchema = z.object({
   invitationId: z.string().trim().uuid(),
   status: z.enum(["cancelled", "expired"]),

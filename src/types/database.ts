@@ -258,6 +258,25 @@ export type Database = {
         created_at: string;
         updated_at: string;
       }>;
+      chat_conversations: Table<{
+        id: string;
+        company_id: string;
+        client_id: string | null;
+        participant_one_id: string;
+        participant_two_id: string;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      chat_messages: Table<{
+        id: string;
+        company_id: string;
+        conversation_id: string;
+        sender_id: string;
+        body: string;
+        read_at: string | null;
+        created_at: string;
+      }>;
       activity_logs: Table<{
         id: string;
         company_id: string;
@@ -515,6 +534,24 @@ export type Database = {
         Args: {
           target_client_id: string | null;
           target_company_id: string;
+        };
+        Returns: boolean;
+      };
+      current_user_shares_client_with: {
+        Args: {
+          target_user_id: string;
+        };
+        Returns: boolean;
+      };
+      can_chat_with_user: {
+        Args: {
+          target_user_id: string;
+        };
+        Returns: boolean;
+      };
+      can_access_chat_conversation: {
+        Args: {
+          target_conversation_id: string;
         };
         Returns: boolean;
       };

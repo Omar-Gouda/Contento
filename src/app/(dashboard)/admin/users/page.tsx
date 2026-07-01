@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin/queries";
 import { requirePermission } from "@/lib/auth/context";
 import { PageMessage } from "@/components/admin/page-message";
+import { UserTerminationControls } from "@/components/admin/user-termination-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -277,21 +278,28 @@ export default async function AdminUsersPage({
                       <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
                     </td>
                     <td className="border-b px-3 py-4">
-                      <form action={updateUserStatusAction} className="flex gap-2">
-                        <input type="hidden" name="userId" value={user.id} />
-                        <select
-                          name="status"
-                          defaultValue={user.status === "invited" ? "active" : user.status}
-                          className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
-                        >
-                          {userStatuses.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                        <Button type="submit" size="sm">Update</Button>
-                      </form>
+                      <div className="flex flex-wrap gap-2">
+                        <form action={updateUserStatusAction} className="flex gap-2">
+                          <input type="hidden" name="userId" value={user.id} />
+                          <select
+                            name="status"
+                            defaultValue={user.status === "invited" ? "active" : user.status}
+                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                          >
+                            {userStatuses.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                          <Button type="submit" size="sm">Update</Button>
+                        </form>
+                        <UserTerminationControls
+                          userId={user.id}
+                          userName={`${user.first_name} ${user.last_name}`.trim() || user.email}
+                          disabled={user.id === context.userId}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -352,6 +352,35 @@ Company-scoped notification table for assignment, review, approval, rejection, a
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
+### `chat_conversations`
+
+Company-scoped direct chat conversation table. Conversations have two participants and may optionally be tied to a client workspace when a Client role user is involved.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the conversation. |
+| `company_id` | Company that owns the conversation. |
+| `client_id` | Optional client workspace scope. |
+| `participant_one_id` | First participant user. |
+| `participant_two_id` | Second participant user. |
+| `created_by` | User who started the conversation. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last activity timestamp. |
+
+### `chat_messages`
+
+Company-scoped message table for organization chat conversations.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the message. |
+| `company_id` | Company that owns the message. |
+| `conversation_id` | Conversation that owns the message. |
+| `sender_id` | User who sent the message. |
+| `body` | Message text. |
+| `read_at` | Reserved timestamp for future read receipts. |
+| `created_at` | Creation timestamp. |
+
 ### `attachments`
 
 Company-scoped file metadata for files attached to tasks, ideas, content, and reports. File bytes live in Supabase Storage.
