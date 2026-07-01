@@ -9,8 +9,9 @@ import {
   getWorkflowTeams,
   getWorkflowUsers,
 } from "@/lib/workflows/queries";
-import { requirePermission } from "@/lib/auth/context";
-import { hasPermission } from "@/lib/auth/permissions";
+import { requireAuthContext } from "@/lib/auth/context";
+import { AuthorizationError, hasPermission } from "@/lib/auth/permissions";
+import { canOpenReports } from "@/lib/workflows/scope";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,12 @@ export default async function ReportsPage({
   searchParams: Promise<{ type?: string; team?: string; client?: string; error?: string; notice?: string }>;
 }) {
   const params = await searchParams;
-  const context = await requirePermission("reports.view_own", "view");
+  const context = await requireAuthContext();
+
+  if (!canOpenReports(context)) {
+    throw new AuthorizationError();
+  }
+
   const [reports, users, teams, clients] = await Promise.all([
     getWorkflowReports(context, { type: params.type, teamId: params.team, clientId: params.client }),
     getWorkflowUsers(context),

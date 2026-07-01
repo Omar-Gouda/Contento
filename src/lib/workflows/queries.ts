@@ -2,7 +2,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { routes } from "@/constants/routes";
 import type { AuthContext } from "@/lib/auth/permissions";
 import { CONTENTO_TIME_ZONE, getCairoDate } from "@/lib/time";
-import { activeReviewStatuses, canUseCompanyScope, getVisibleTeamIds, getVisibleUserIds } from "@/lib/workflows/scope";
+import {
+  activeReviewStatuses,
+  canUseCompanyScope,
+  getVisibleClientIds,
+  getVisibleTeamIds,
+  getVisibleUserIds,
+} from "@/lib/workflows/scope";
 import type { Database, Json } from "@/types/database";
 import { getRoleDisplayName } from "@/types/roles";
 
@@ -779,11 +785,22 @@ export async function getWorkflowReports(
     query = query.eq("client_id", filters.clientId);
   }
 
-  const [{ data, error }, users, teams, { data: clients }] = await Promise.all([
+  const [
+    { data, error },
+    users,
+    teams,
+    { data: clients },
+    visibleUserIds,
+    visibleTeamIds,
+    visibleClientIds,
+  ] = await Promise.all([
     query,
     loadUsersAndRoles(context),
     getWorkflowTeams(context),
     supabase.from("clients").select("id, name").eq("company_id", context.companyId),
+    getVisibleUserIds(context),
+    getVisibleTeamIds(context),
+    getVisibleClientIds(context),
   ]);
 
   if (error) {
@@ -793,10 +810,49 @@ export async function getWorkflowReports(
   const userById = new Map(users.map((user) => [user.id, user.displayName]));
   const teamById = new Map(teams.map((team) => [team.id, team.name]));
   const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
-  return ((data as ReportRow[] | null) ?? []).map((report) => ({
+  const accessibleClientIds = visibleClientIds ? new Set(visibleClientIds) : null;
+  const scopedReports = ((data as ReportRow[] | null) ?? []).filter((report) => {
+    if (canUseCompanyScope(context)) {
+      return true;
+    }
+
+    if (context.role === "client") {
+      return Boolean(report.client_id && report.sent_to_client_at && accessibleClientIds?.has(report.client_id));
+    }
+
+    if (report.user_id === context.userId) {
+      return true;
+    }
+
+    if (context.role === "supervisor") {
+      if (report.client_id && accessibleClientIds?.has(report.client_id)) {
+        return true;
+      }
+
+      if (report.user_id && visibleUserIds?.includes(report.user_id)) {
+        return true;
+      }
+
+      return Boolean(report.team_id && visibleTeamIds?.includes(report.team_id));
+    }
+
+    if (context.role === "team-lead") {
+      if (report.user_id && visibleUserIds?.includes(report.user_id)) {
+        return true;
+      }
+
+      return Boolean(report.team_id && visibleTeamIds?.includes(report.team_id));
+    }
+
+    return false;
+  });
+
+  return scopedReports.map((report) => ({
     ...report,
     clientName: report.client_id ? clientById.get(report.client_id) ?? null : null,
-    userName: report.user_id ? userById.get(report.user_id) ?? null : null,
+    userName: report.user_id
+      ? userById.get(report.user_id) ?? "Unknown User"
+      : report.report_type === "company" ? "Company" : "Unknown User",
     teamName: report.team_id ? teamById.get(report.team_id) ?? null : null,
     title: report.title || reportText(report.content, "title"),
     body: reportText(report.content, "body"),

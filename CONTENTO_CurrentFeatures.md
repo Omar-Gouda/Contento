@@ -119,6 +119,7 @@ Features:
 * Assign teams
 * Force Marketing Manager-created users to change their password on first login
 * Manage client assignments where permitted
+* Marketing Manager can delete users through a confirmation modal with keep-content or remove-content options
 
 ## 5.1 User Invitations
 
@@ -225,6 +226,9 @@ Features:
 * Client-scoped report history
 * Export reports as CSV
 * Report body is generated from live task, content, work-hours, and time-off data with optional user notes
+* Marketing Manager can view company reports
+* Account Manager report visibility is limited to assigned users, assigned teams, and assigned clients
+* Client users only see reports explicitly sent to their assigned client workspace
 
 ## 10. Analytics
 
@@ -272,6 +276,19 @@ Features:
 * Mark one or all notifications as read
 * Browser-local notification sound preference
 * Entity links when a notification maps to a task, idea, content item, report, or organization event
+* Dashboard notification widgets are removed in favor of the header notification dropdown
+
+## 12.1 Organization Chat
+
+Status: Foundation Implemented
+
+Features:
+
+* Header chat drawer
+* Direct conversations between active users in the same organization
+* Client-scoped chat support for assigned client conversations
+* Conversation list, message area, message input, sender names, avatars, and Cairo timestamps
+* Company, participant, and client-scope RLS policies
 
 ## 13. UI/UX
 
@@ -288,8 +305,9 @@ Features:
 * Error states
 * Smooth animations
 * Dark mode with light, dark, and system preferences
-* Theme toggle in app shell
+* Theme toggle and sign out controls live in the header
 * `/` redirects to sign in after landing page removal
+* Smoother sign-in lock-screen reveal with lower drag threshold and velocity-based unlock
 
 ## 14. Exporting
 

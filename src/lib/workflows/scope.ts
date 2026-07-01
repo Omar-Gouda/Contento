@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { AuthContext } from "@/lib/auth/permissions";
+import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 
 type IdRow = { id: string };
 type TeamMemberIdRow = { team_id: string; user_id?: string };
@@ -21,6 +21,16 @@ export const creatorSubmissionStatuses = [
 
 export function canUseCompanyScope(context: AuthContext) {
   return context.role === "admin";
+}
+
+export function canOpenReports(context: AuthContext) {
+  return (
+    hasPermission(context, "reports.view_company", "view") ||
+    hasPermission(context, "reports.view_team", "view") ||
+    hasPermission(context, "reports.view_own", "view") ||
+    hasPermission(context, "reports.send_to_client", "limited") ||
+    hasPermission(context, "reports.submit", "limited")
+  );
 }
 
 export async function getVisibleTeamIds(context: AuthContext) {
@@ -67,6 +77,20 @@ export async function getVisibleUserIds(context: AuthContext) {
     .in("team_id", teamIds);
 
   return Array.from(new Set([context.userId, ...(((data as TeamMemberIdRow[] | null) ?? []).map((row) => row.user_id).filter(Boolean) as string[])]));
+}
+
+export async function getVisibleClientIds(context: AuthContext) {
+  if (canUseCompanyScope(context)) {
+    return null;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("company_id", context.companyId);
+
+  return ((data as IdRow[] | null) ?? []).map((client) => client.id);
 }
 
 export async function assertTeamScope(context: AuthContext, teamId: string | null) {

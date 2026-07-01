@@ -34,6 +34,8 @@ The production app also seeds additional agency-facing role labels for Graphic D
 | `users.assign_role` | Assign or change user roles. | Full Access | No Access | No Access | No Access |
 | `users.view_activity` | View user activity and profile context. | Full Access | Limited Access | Limited Access | View Only |
 
+Marketing Manager user deletion uses `users.disable` Full Access plus server-only service-role deletion. The UI requires an explicit choice to keep historical work or permanently remove owned work, and users cannot delete themselves.
+
 ## Team Management
 
 | Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
@@ -114,6 +116,8 @@ Review boundaries:
 | `reports.view_company` | View company-wide reports. | Full Access | View Only | No Access | No Access |
 | `reports.send_to_client` | Mark reports as shared with the client workspace. | Full Access | Limited Access | No Access | No Access |
 
+Report visibility is additionally scope-checked. Marketing Manager can see all company reports. Account Manager can see assigned user, assigned team, and assigned client reports only. Client users can see only reports explicitly sent to their assigned client workspace. Production roles remain limited to own reports unless later granted a narrower assigned scope.
+
 ## Calendar
 
 | Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
@@ -178,6 +182,8 @@ Working-hours visibility uses Cairo work dates (`Africa/Cairo`). Current UI expo
 | `notifications.manage` | Manage own notification read state. | Full Access | Full Access | Full Access | Full Access |
 | `attachments.manage` | Upload and delete scoped entity attachments. | Full Access | Limited Access | Limited Access | Limited Access |
 | `comments.create` | Add comments to accessible tasks, ideas, content, and reports. | Full Access | Limited Access | Limited Access | Limited Access |
+
+Organization chat is available to active same-company users through participant-scoped RLS. Client users and client-facing chats are additionally constrained to assigned client scope.
 | `comments.delete` | Soft-delete accessible comments where permitted. | Full Access | Limited Access | Limited Access | No Access |
 | `mentions.create` | Mention same-company users who can access the entity. | Full Access | Limited Access | Limited Access | Limited Access |
 

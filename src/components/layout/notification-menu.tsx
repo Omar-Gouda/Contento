@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, CheckCheck } from "lucide-react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/lib/notifications/actions";
 import type { NotificationRow } from "@/lib/notifications/queries";
-import { cn } from "@/lib/utils";
 
 const notificationSoundKey = "contento-notification-sound-enabled";
 
@@ -74,8 +73,9 @@ export function NotificationMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={cn(buttonVariants({ variant: "outline", size: "icon" }), "relative")}
-        aria-label="Notifications"
+        render={
+          <Button type="button" variant="outline" size="icon" className="relative" aria-label="Notifications" />
+        }
       >
         <Bell />
         {unreadCount > 0 && (
@@ -128,9 +128,12 @@ export function NotificationMenu({
             </div>
           ))}
           {!notifications.length && (
-            <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-              No notifications yet.
-            </p>
+            <div className="rounded-lg border border-dashed px-3 py-6 text-center">
+              <p className="text-sm font-medium">All clear</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                New task, review, mention, and workspace updates will appear here.
+              </p>
+            </div>
           )}
         </div>
         <DropdownMenuSeparator />

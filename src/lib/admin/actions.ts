@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/context";
 import {
   createCompanyUserSchema,
   inviteUserSchema,
+  terminateUserSchema,
   updateInvitationStatusSchema,
   updateUserRoleSchema,
   updateUserStatusSchema,
@@ -435,4 +436,85 @@ export async function updateUserTeamAction(formData: FormData) {
     team_id: parsed.data.teamId,
   });
   redirectWith("/admin/users", "notice", "updated");
+}
+
+export async function terminateUserAction(formData: FormData) {
+  const context = await requirePermission("users.disable", "full");
+  const parsed = terminateUserSchema.safeParse({
+    userId: getFormString(formData, "userId"),
+    mode: getFormString(formData, "mode"),
+    confirmation: getFormString(formData, "confirmation"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/users", "error", parsed.error.issues[0]?.message ?? "Invalid termination request.");
+  }
+
+  if (context.role !== "admin") {
+    redirectWith("/admin/users", "error", "Only Marketing Managers can delete company users.");
+  }
+
+  if (parsed.data.userId === context.userId) {
+    redirectWith("/admin/users", "error", "You cannot delete your own account through this flow.");
+  }
+
+  if (!hasSupabaseAdminConfig()) {
+    redirectWith("/admin/users", "error", "Supabase service role is required to delete users.");
+  }
+
+  try {
+    await assertUserInCompany(parsed.data.userId, context.companyId);
+  } catch {
+    redirectWith("/admin/users", "error", "User does not belong to your company.");
+  }
+
+  const admin = createSupabaseAdminClient();
+
+  if (parsed.data.mode === "remove_content") {
+    const deleteSteps = [
+      admin
+        .from("reports")
+        .delete()
+        .eq("company_id", context.companyId)
+        .eq("user_id", parsed.data.userId),
+      admin
+        .from("content_items")
+        .delete()
+        .eq("company_id", context.companyId)
+        .or(`creator_id.eq.${parsed.data.userId},final_output_submitted_by.eq.${parsed.data.userId}`),
+      admin
+        .from("ideas")
+        .delete()
+        .eq("company_id", context.companyId)
+        .or(`created_by.eq.${parsed.data.userId},assigned_to.eq.${parsed.data.userId}`),
+      admin
+        .from("tasks")
+        .delete()
+        .eq("company_id", context.companyId)
+        .or(`assigned_to.eq.${parsed.data.userId},assigned_by.eq.${parsed.data.userId},created_by.eq.${parsed.data.userId},final_output_submitted_by.eq.${parsed.data.userId}`),
+    ];
+
+    const deleteResults = await Promise.all(deleteSteps);
+    const deleteError = deleteResults.find((result) => result.error)?.error;
+
+    if (deleteError) {
+      redirectWith("/admin/users", "error", "Owned work could not be removed safely.");
+    }
+  }
+
+  await logAdminActivity(context.companyId, context.userId, "users.terminated", "user", parsed.data.userId, {
+    mode: parsed.data.mode,
+  });
+
+  const { error: authDeleteError } = await admin.auth.admin.deleteUser(parsed.data.userId);
+
+  if (authDeleteError) {
+    redirectWith("/admin/users", "error", "Supabase Auth user could not be deleted.");
+  }
+
+  redirectWith(
+    "/admin/users",
+    "notice",
+    parsed.data.mode === "remove_content" ? "deleted-with-content" : "deleted-keep-content"
+  );
 }

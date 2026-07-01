@@ -15,11 +15,13 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { AuthContext } from "@/lib/auth/permissions";
+import type { OrganizationChatData } from "@/lib/chat/queries";
 import type { NotificationRow } from "@/lib/notifications/queries";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName } from "@/types/roles";
 import { DashboardNavigation } from "./dashboard-navigation";
 import { NotificationMenu } from "./notification-menu";
+import { OrganizationChatDrawer } from "./organization-chat-drawer";
 import { SiteLogo } from "./site-logo";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -28,12 +30,14 @@ export function DashboardShell({
   context,
   unreadNotificationCount,
   recentNotifications = [],
+  chatData,
   branding,
 }: {
   children: ReactNode;
   context: AuthContext;
   unreadNotificationCount?: number;
   recentNotifications?: NotificationRow[];
+  chatData?: OrganizationChatData;
   branding?: {
     companyName?: string | null;
     primaryColor: string | null;
@@ -108,12 +112,6 @@ export function DashboardShell({
             </div>
             {!sidebarCollapsed && <p className="mt-2 truncate text-xs text-muted-foreground">{context.email}</p>}
           </div>
-          {!sidebarCollapsed && (
-            <div className="flex items-center justify-between gap-2 rounded-lg border border-sidebar-border bg-background/70 p-2 shadow-sm">
-              <ThemeToggle />
-              <SignOutButton />
-            </div>
-          )}
         </div>
       </aside>
 
@@ -145,10 +143,6 @@ export function DashboardShell({
                     </div>
                     <p className="mt-1 truncate text-xs text-muted-foreground">{context.email}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ThemeToggle />
-                    <SignOutButton />
-                  </div>
                 </div>
               </SheetContent>
             </Sheet>
@@ -166,15 +160,22 @@ export function DashboardShell({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <div className="hidden lg:block">
+              <div>
                 <ThemeToggle />
               </div>
               <NotificationMenu
                 unreadCount={unreadNotificationCount ?? 0}
                 notifications={recentNotifications}
               />
+              <OrganizationChatDrawer
+                data={chatData ?? { conversations: [], recipients: [] }}
+                currentUserId={context.userId}
+              />
               <div className="hidden sm:block">
                 <SignOutButton />
+              </div>
+              <div className="sm:hidden">
+                <SignOutButton compact />
               </div>
               <Button type="button" variant="outline" size="icon" aria-label="Security status">
                 <ShieldCheck />
