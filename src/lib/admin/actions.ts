@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes, createHash } from "crypto";
+import { randomBytes, createHash, randomUUID } from "crypto";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -17,7 +17,8 @@ import {
 import { hasSupabaseAdminConfig } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Json } from "@/types/database";
+import type { Database, Json } from "@/types/database";
+import { normalizeRoleName, type UserRole } from "@/types/roles";
 
 function getFormString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -40,7 +41,7 @@ async function assertRoleInCompany(roleId: string, companyId: string) {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("roles")
-    .select("id")
+    .select("id, name")
     .eq("id", roleId)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -48,6 +49,8 @@ async function assertRoleInCompany(roleId: string, companyId: string) {
   if (error || !data) {
     throw new Error("Role does not belong to this company.");
   }
+
+  return data.name;
 }
 
 async function assertTeamInCompany(teamId: string | null, companyId: string) {
@@ -80,6 +83,104 @@ async function assertUserInCompany(userId: string, companyId: string) {
   if (error || !data) {
     throw new Error("User does not belong to this company.");
   }
+}
+
+async function assertClientsInCompany(clientIds: string[], companyId: string) {
+  if (!clientIds.length) {
+    return;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("company_id", companyId)
+    .in("id", clientIds);
+
+  if (error || (data?.length ?? 0) !== clientIds.length) {
+    throw new Error("One or more clients do not belong to this company.");
+  }
+}
+
+function clientAssignmentRoleForRole(
+  role: UserRole
+): Database["public"]["Tables"]["client_assignments"]["Row"]["assignment_role"] {
+  if (role === "supervisor") {
+    return "account_manager";
+  }
+
+  if (role === "creator") {
+    return "content_creator";
+  }
+
+  if (role === "graphic-designer") {
+    return "graphic_designer";
+  }
+
+  if (role === "video-editor") {
+    return "video_editor";
+  }
+
+  if (role === "client") {
+    return "client_contact";
+  }
+
+  return "member";
+}
+
+function normalizeClientSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 120) || "client";
+}
+
+function slugWithSuffix(baseSlug: string, suffix: string) {
+  const prefix = baseSlug
+    .slice(0, Math.max(1, 120 - suffix.length))
+    .replace(/-+$/g, "") || "client";
+
+  return `${prefix}${suffix}`.slice(0, 120);
+}
+
+async function clientSlugExists(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  companyId: string,
+  slug: string
+) {
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("slug", slug)
+    .limit(1);
+
+  if (error) {
+    throw new Error("Unable to validate client slug.");
+  }
+
+  return Boolean(data?.length);
+}
+
+async function uniqueClientSlug(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  companyId: string,
+  clientName: string
+) {
+  const baseSlug = normalizeClientSlug(clientName);
+  let candidate = baseSlug;
+
+  for (let suffixNumber = 2; suffixNumber <= 20; suffixNumber += 1) {
+    if (!(await clientSlugExists(supabase, companyId, candidate))) {
+      return candidate;
+    }
+
+    candidate = slugWithSuffix(baseSlug, `-${suffixNumber}`);
+  }
+
+  return slugWithSuffix(baseSlug, `-${randomBytes(2).toString("hex")}`);
 }
 
 async function logAdminActivity(
@@ -203,6 +304,17 @@ export async function createCompanyUserAction(formData: FormData) {
     lastName: getFormString(formData, "lastName"),
     roleId: getFormString(formData, "roleId"),
     teamId: getFormString(formData, "teamId"),
+    clientIds: Array.from(
+      new Set(formData.getAll("clientIds").filter((value): value is string => typeof value === "string" && Boolean(value)))
+    ),
+    clientName: getFormString(formData, "clientName"),
+    clientLogoUrl: getFormString(formData, "clientLogoUrl"),
+    clientPrimaryColor: getFormString(formData, "clientPrimaryColor"),
+    clientSecondaryColor: getFormString(formData, "clientSecondaryColor"),
+    clientContactPhone: getFormString(formData, "clientContactPhone"),
+    clientBriefDriveLink: getFormString(formData, "clientBriefDriveLink"),
+    clientNotes: getFormString(formData, "clientNotes"),
+    assignedAccountManagerId: getFormString(formData, "assignedAccountManagerId"),
     status: getFormString(formData, "status") || "active",
     temporaryPassword: getFormString(formData, "temporaryPassword"),
     confirmTemporaryPassword: getFormString(formData, "confirmTemporaryPassword"),
@@ -216,11 +328,26 @@ export async function createCompanyUserAction(formData: FormData) {
     redirectWith("/admin/users", "error", "Supabase service role is required to create users.");
   }
 
+  let roleName = "";
   try {
-    await assertRoleInCompany(parsed.data.roleId, context.companyId);
+    roleName = await assertRoleInCompany(parsed.data.roleId, context.companyId);
     await assertTeamInCompany(parsed.data.teamId, context.companyId);
+    await assertClientsInCompany(parsed.data.clientIds, context.companyId);
+    if (parsed.data.assignedAccountManagerId) {
+      await assertUserInCompany(parsed.data.assignedAccountManagerId, context.companyId);
+    }
   } catch {
-    redirectWith("/admin/users", "error", "Choose a valid company role and team.");
+    redirectWith("/admin/users", "error", "Choose valid company role, team, client, and account manager values.");
+  }
+
+  const normalizedRole = normalizeRoleName(roleName);
+
+  if (!normalizedRole) {
+    redirectWith("/admin/users", "error", "Selected role could not be resolved.");
+  }
+
+  if (normalizedRole === "client" && !parsed.data.clientName.trim()) {
+    redirectWith("/admin/users", "error", "Client/company name is required for Client users.");
   }
 
   const supabase = await createSupabaseServerClient();
@@ -280,10 +407,123 @@ export async function createCompanyUserAction(formData: FormData) {
     }
   }
 
+  let createdClientId: string | null = null;
+
+  if (normalizedRole === "client") {
+    createdClientId = randomUUID();
+    let clientSlug = "";
+
+    try {
+      clientSlug = await uniqueClientSlug(supabase, context.companyId, parsed.data.clientName);
+    } catch {
+      await admin.from("team_members").delete().eq("user_id", createdAuthUserId);
+      await admin.from("users").delete().eq("id", createdAuthUserId);
+      await admin.auth.admin.deleteUser(createdAuthUserId);
+      redirectWith("/admin/users", "error", "Client slug could not be generated.");
+    }
+
+    const contactPerson = [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ").trim();
+    const { error: clientError } = await supabase.from("clients").insert({
+      id: createdClientId,
+      company_id: context.companyId,
+      name: parsed.data.clientName,
+      slug: clientSlug,
+      logo_url: parsed.data.clientLogoUrl,
+      primary_color: parsed.data.clientPrimaryColor,
+      secondary_color: parsed.data.clientSecondaryColor,
+      accent_color: null,
+      contact_person: contactPerson || null,
+      contact_email: parsed.data.email,
+      contact_phone: parsed.data.clientContactPhone || null,
+      brief_drive_link: parsed.data.clientBriefDriveLink,
+      notes: parsed.data.clientNotes,
+      requirements: "",
+      assigned_account_manager_id: parsed.data.assignedAccountManagerId,
+      status: "active",
+      created_by: context.userId,
+    });
+
+    if (clientError) {
+      await admin.from("team_members").delete().eq("user_id", createdAuthUserId);
+      await admin.from("users").delete().eq("id", createdAuthUserId);
+      await admin.auth.admin.deleteUser(createdAuthUserId);
+      redirectWith("/admin/users", "error", "Client profile could not be created for this Client user.");
+    }
+
+    const clientAssignmentRows: Database["public"]["Tables"]["client_assignments"]["Insert"][] = [
+      {
+        client_id: createdClientId,
+        user_id: createdAuthUserId,
+        assignment_role: "client_contact",
+      },
+    ];
+
+    if (parsed.data.assignedAccountManagerId) {
+      clientAssignmentRows.push({
+        client_id: createdClientId,
+        user_id: parsed.data.assignedAccountManagerId,
+        assignment_role: "account_manager",
+      });
+    }
+
+    const { error: assignmentError } = await supabase.from("client_assignments").insert(clientAssignmentRows);
+
+    if (assignmentError) {
+      await admin.from("client_assignments").delete().eq("client_id", createdClientId);
+      await admin.from("clients").delete().eq("id", createdClientId);
+      await admin.from("team_members").delete().eq("user_id", createdAuthUserId);
+      await admin.from("users").delete().eq("id", createdAuthUserId);
+      await admin.auth.admin.deleteUser(createdAuthUserId);
+      redirectWith("/admin/users", "error", "Client login was created, but client access could not be linked.");
+    }
+  }
+
+  const assignableRole = ["supervisor", "creator", "graphic-designer", "video-editor", "client"].includes(normalizedRole);
+  if (normalizedRole !== "client" && assignableRole && parsed.data.clientIds.length > 0) {
+    if (normalizedRole === "supervisor") {
+      const { error: accountManagerError } = await supabase
+        .from("clients")
+        .update({ assigned_account_manager_id: createdAuthUserId })
+        .eq("company_id", context.companyId)
+        .in("id", parsed.data.clientIds);
+
+      if (accountManagerError) {
+        await admin.from("team_members").delete().eq("user_id", createdAuthUserId);
+        await admin.from("users").delete().eq("id", createdAuthUserId);
+        await admin.auth.admin.deleteUser(createdAuthUserId);
+        redirectWith("/admin/users", "error", "Account Manager clients could not be assigned.");
+      }
+    }
+
+    const { error: clientAssignmentError } = await supabase.from("client_assignments").insert(
+      parsed.data.clientIds.map((clientId) => ({
+        client_id: clientId,
+        user_id: createdAuthUserId,
+        assignment_role: clientAssignmentRoleForRole(normalizedRole),
+      }))
+    );
+
+    if (clientAssignmentError) {
+      await admin.from("client_assignments").delete().eq("user_id", createdAuthUserId);
+      if (normalizedRole === "supervisor") {
+        await admin
+          .from("clients")
+          .update({ assigned_account_manager_id: null })
+          .eq("assigned_account_manager_id", createdAuthUserId);
+      }
+      await admin.from("team_members").delete().eq("user_id", createdAuthUserId);
+      await admin.from("users").delete().eq("id", createdAuthUserId);
+      await admin.auth.admin.deleteUser(createdAuthUserId);
+      redirectWith("/admin/users", "error", "User client access could not be assigned.");
+    }
+  }
+
   await logAdminActivity(context.companyId, context.userId, "users.created", "user", createdAuthUserId, {
     email: parsed.data.email,
     role_id: parsed.data.roleId,
     team_id: parsed.data.teamId,
+    client_ids: parsed.data.clientIds,
+    created_client_id: createdClientId,
     status: parsed.data.status,
   });
   redirectWith("/admin/users", "notice", "created");

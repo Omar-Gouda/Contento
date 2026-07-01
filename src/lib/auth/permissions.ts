@@ -14,6 +14,9 @@ export type PermissionGrant = {
 export type AuthContext = {
   userId: string;
   email: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
   companyId: string;
   roleId: string;
   roleName: string;

@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -86,7 +85,7 @@ export function NotificationMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="w-80 p-2">
         <div className="flex items-center justify-between gap-3 px-1.5 py-1">
-          <DropdownMenuLabel className="px-0 py-0">Notifications</DropdownMenuLabel>
+          <div className="text-sm font-semibold">Notifications</div>
           {unreadCount > 0 && (
             <form action={markAllNotificationsReadAction}>
               <input type="hidden" name="redirectTo" value={pathname} />

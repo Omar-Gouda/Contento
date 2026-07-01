@@ -17,6 +17,7 @@ import {
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { OrganizationChatData } from "@/lib/chat/queries";
 import type { NotificationRow } from "@/lib/notifications/queries";
+import type { CurrentWorkHours } from "@/lib/work-hours/queries";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName } from "@/types/roles";
 import { DashboardNavigation } from "./dashboard-navigation";
@@ -24,6 +25,7 @@ import { NotificationMenu } from "./notification-menu";
 import { OrganizationChatDrawer } from "./organization-chat-drawer";
 import { SiteLogo } from "./site-logo";
 import { ThemeToggle } from "./theme-toggle";
+import { WorkHoursStatusMenu } from "./work-hours-status-menu";
 
 export function DashboardShell({
   children,
@@ -32,12 +34,14 @@ export function DashboardShell({
   recentNotifications = [],
   chatData,
   branding,
+  workHours,
 }: {
   children: ReactNode;
   context: AuthContext;
   unreadNotificationCount?: number;
   recentNotifications?: NotificationRow[];
   chatData?: OrganizationChatData;
+  workHours?: CurrentWorkHours | null;
   branding?: {
     companyName?: string | null;
     primaryColor: string | null;
@@ -167,15 +171,23 @@ export function DashboardShell({
                 unreadCount={unreadNotificationCount ?? 0}
                 notifications={recentNotifications}
               />
+              {workHours !== undefined && <WorkHoursStatusMenu workHours={workHours} />}
               <OrganizationChatDrawer
                 data={chatData ?? { conversations: [], recipients: [] }}
                 currentUserId={context.userId}
               />
               <div className="hidden sm:block">
-                <SignOutButton />
+                <SignOutButton
+                  hasActiveWorkSession={Boolean(workHours?.activeWorkSession)}
+                  hasActiveBreak={Boolean(workHours?.activeBreakSession)}
+                />
               </div>
               <div className="sm:hidden">
-                <SignOutButton compact />
+                <SignOutButton
+                  compact
+                  hasActiveWorkSession={Boolean(workHours?.activeWorkSession)}
+                  hasActiveBreak={Boolean(workHours?.activeBreakSession)}
+                />
               </div>
               <Button type="button" variant="outline" size="icon" aria-label="Security status">
                 <ShieldCheck />

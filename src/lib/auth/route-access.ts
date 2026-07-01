@@ -16,6 +16,7 @@ const sharedProtectedRoutes = [
   "/tasks",
   "/ideas",
   "/content",
+  "/reviews",
   "/calendar",
   "/reports",
   "/notifications",

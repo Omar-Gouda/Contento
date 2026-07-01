@@ -7,6 +7,20 @@ const optionalUuidSchema = z
   .transform((value) => (value ? value : null))
   .pipe(z.string().uuid().nullable());
 
+const optionalUrlSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value ? value : null))
+  .pipe(z.string().url("Enter a valid URL.").nullable());
+
+const colorSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value ? value : null))
+  .pipe(z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #2563eb.").nullable());
+
 export const inviteUserSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
   roleId: z.string().trim().uuid("Choose a valid role."),
@@ -20,6 +34,15 @@ export const createCompanyUserSchema = z.object({
   lastName: z.string().trim().min(1, "Last name is required.").max(80, "Last name is too long."),
   roleId: z.string().trim().uuid("Choose a valid role."),
   teamId: optionalUuidSchema,
+  clientIds: z.array(z.string().trim().uuid()).default([]),
+  clientName: z.string().trim().max(160, "Client name is too long.").default(""),
+  clientLogoUrl: optionalUrlSchema,
+  clientPrimaryColor: colorSchema,
+  clientSecondaryColor: colorSchema,
+  clientContactPhone: z.string().trim().max(60, "Contact phone is too long.").default(""),
+  clientBriefDriveLink: optionalUrlSchema,
+  clientNotes: z.string().trim().max(3000, "Client notes are too long.").default(""),
+  assignedAccountManagerId: optionalUuidSchema,
   status: z.enum(["active", "suspended", "disabled"]),
   temporaryPassword: z
     .string()

@@ -17,5 +17,13 @@ export default async function AccountManagerDashboardPage() {
     getDashboardSections(context),
   ]);
 
-  return <RoleDashboardFoundation dashboard={roleDashboards.supervisor} summary={summary} charts={charts} sections={sections} />;
+  return (
+    <RoleDashboardFoundation
+      dashboard={roleDashboards.supervisor}
+      summary={summary}
+      charts={charts}
+      sections={sections}
+      titleOverride={`${context.displayName}'s Dashboard`}
+    />
+  );
 }

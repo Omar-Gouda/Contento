@@ -32,6 +32,7 @@ const selectClass =
 
 const eventStyles: Record<CalendarItem["type"], string> = {
   task: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200",
+  idea: "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-200",
   content: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200",
   day_off: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
   sick_leave: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200",

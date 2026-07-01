@@ -291,6 +291,10 @@ export async function saveClientAction(formData: FormData) {
     safeRedirect("/clients", "error", "Only Marketing Managers and Account Managers can create clients.");
   }
 
+  if (isCreate && context.role !== "admin") {
+    safeRedirect("/clients", "error", "Client profiles are created when Marketing Managers create Client users.");
+  }
+
   if (!isCreate && !canUpdateClient) {
     safeRedirect(redirectTo, "error", "You do not have permission to update client profiles.");
   }

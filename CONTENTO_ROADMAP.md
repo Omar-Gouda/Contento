@@ -155,7 +155,8 @@ Current Phase 5 workflow implementation:
 * CC Team Leads can assign tasks only inside their own led/assigned teams
 * `/ideas`, `/ideas/[id]`, and `/admin/ideas` support idea creation, editing, deletion, assignment, team scoping, notes, status tracking, and activity logging
 * `/content` and `/content/[id]` support content item creation, client/task/idea linking, team scoping, creator assignment, submission, review history, ratings, final Drive handoff, and scheduling
-* `/content/reviews` supports the required Content Creator -> Team Lead -> Account Manager review handoff with feedback, rating, approval, rejection, and change requests
+* `/reviews/ideas` provides a dedicated submitted-idea review queue with decision and feedback controls
+* `/reviews/content` supports the required Content Creator -> Team Lead -> Account Manager review handoff with feedback, rating, approval, rejection, and change requests
 * All records are company-scoped and permission-checked through existing auth context and RLS
 
 ## Phase 6: Reports & Analytics

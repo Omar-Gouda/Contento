@@ -17,6 +17,8 @@ type ProfileRow = {
   id: string;
   company_id: string;
   email: string;
+  first_name: string;
+  last_name: string;
   role_id: string | null;
   status: AuthContext["status"];
   must_change_password: boolean | null;
@@ -122,7 +124,7 @@ export async function loadAuthProfile(
 
   const { data: profile, error: profileError } = await supabase
     .from("users")
-    .select("id, company_id, email, role_id, status, must_change_password")
+    .select("id, company_id, email, first_name, last_name, role_id, status, must_change_password")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -257,6 +259,9 @@ export async function loadAuthProfile(
     context: {
       userId: profileRow.id,
       email: profileRow.email,
+      firstName: profileRow.first_name,
+      lastName: profileRow.last_name,
+      displayName: [profileRow.first_name, profileRow.last_name].filter(Boolean).join(" ").trim() || profileRow.email,
       companyId: profileRow.company_id,
       roleId: profileRow.role_id,
       roleName: roleRow.name,

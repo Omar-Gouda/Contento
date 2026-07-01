@@ -141,6 +141,9 @@ Company-scoped client workspace records for agency deliverables and client-facin
 
 Join table connecting users to client workspaces.
 
+Marketing Manager user creation now writes client assignments when the selected role requires client scope:
+Account Manager assignments use `account_manager`, Content Creator uses `content_creator`, Graphic Designer uses `graphic_designer`, Video Editor uses `video_editor`, and Client users use `client_contact`.
+
 | Field | Purpose |
 | --- | --- |
 | `client_id` | Client workspace assignment belongs to. |
@@ -213,6 +216,8 @@ Company-scoped idea table for creator content concepts.
 | `final_drive_link` | Final Drive link for the creative handoff. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
+
+`publishing_at` is included in the Cairo calendar as an idea publishing event when present.
 
 ### `content_items`
 
