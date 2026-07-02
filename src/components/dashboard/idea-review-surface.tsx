@@ -8,6 +8,8 @@ import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { routes } from "@/constants/routes";
 import { PageMessage } from "@/components/admin/page-message";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -51,22 +53,20 @@ export async function IdeaReviewSurface({
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-primary">Reviews</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal">Idea reviews</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Review submitted ideas, leave clear feedback, and move approved concepts toward production.
-        </p>
-      </div>
-
-      <PageMessage error={searchParams.error} status={searchParams.notice} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Review filters</CardTitle>
-          <CardDescription>Only submitted and under-review ideas appear here.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <PageHeader
+        eyebrow="Reviews"
+        title="Idea reviews"
+        description="Review submitted ideas, leave clear feedback, and move approved concepts toward production."
+        actions={
+          <PageActions>
+            <FilterPanel
+              title="Review filters"
+              description="Only submitted and under-review ideas appear here."
+              activeFilters={[
+                { label: "Search", value: searchParams.q },
+                { label: "Status", value: searchParams.status },
+              ]}
+            >
           <form action={routes.reviews.ideas} className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
             <div className="space-y-2">
               <Label htmlFor="q">Search</Label>
@@ -89,11 +89,15 @@ export async function IdeaReviewSurface({
               </select>
             </div>
             <div className="flex items-end">
-              <Button type="submit">Apply</Button>
+              <Button type="submit" className="w-fit">Apply</Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+            </FilterPanel>
+          </PageActions>
+        }
+      />
+
+      <PageMessage error={searchParams.error} status={searchParams.notice} />
 
       <div className="grid gap-4">
         {reviewableIdeas.map((idea) => (
@@ -144,7 +148,9 @@ export async function IdeaReviewSurface({
               </Link>
 
               {canDecide && (
-                <form action={reviewIdeaAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+                <details className="rounded-lg border bg-secondary/20 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Review idea</summary>
+                <form action={reviewIdeaAction} className="mt-3 grid gap-3">
                   <input type="hidden" name="ideaId" value={idea.id} />
                   <input type="hidden" name="redirectTo" value={routes.reviews.ideas} />
                   <div className="space-y-2">
@@ -166,10 +172,13 @@ export async function IdeaReviewSurface({
                     </Button>
                   </div>
                 </form>
+                </details>
               )}
 
               {!canDecide && canComment && (
-                <form action={addCollaborationCommentAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+                <details className="rounded-lg border bg-secondary/20 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Add feedback</summary>
+                <form action={addCollaborationCommentAction} className="mt-3 grid gap-3">
                   <input type="hidden" name="entityType" value="idea" />
                   <input type="hidden" name="entityId" value={idea.id} />
                   <input type="hidden" name="redirectTo" value={routes.reviews.ideas} />
@@ -182,6 +191,7 @@ export async function IdeaReviewSurface({
                     </Button>
                   </div>
                 </form>
+                </details>
               )}
             </CardContent>
           </Card>

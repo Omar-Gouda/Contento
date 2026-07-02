@@ -20,10 +20,9 @@ import type { NotificationRow } from "@/lib/notifications/queries";
 import type { CurrentWorkHours } from "@/lib/work-hours/queries";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName } from "@/types/roles";
-import { DashboardNavigation } from "./dashboard-navigation";
+import { DashboardMobileBottomNavigation, DashboardNavigation } from "./dashboard-navigation";
 import { NotificationMenu } from "./notification-menu";
 import { OrganizationChatDrawer } from "./organization-chat-drawer";
-import { SiteLogo } from "./site-logo";
 import { ThemeToggle } from "./theme-toggle";
 import { WorkHoursStatusMenu } from "./work-hours-status-menu";
 
@@ -44,6 +43,7 @@ export function DashboardShell({
   workHours?: CurrentWorkHours | null;
   branding?: {
     companyName?: string | null;
+    logoUrl?: string | null;
     primaryColor: string | null;
     secondaryColor: string | null;
     accentColor: string | null;
@@ -61,6 +61,14 @@ export function DashboardShell({
     ...(branding?.secondaryColor ? { "--secondary": branding.secondaryColor, "--sidebar-accent": branding.secondaryColor } : {}),
     ...(branding?.accentColor ? { "--accent": branding.accentColor } : {}),
   } as CSSProperties;
+  const organizationName = branding?.companyName ?? "Workspace";
+  const organizationInitials = organizationName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -79,12 +87,20 @@ export function DashboardShell({
         )}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 px-2">
-          <div className="min-w-0">
-            <SiteLogo showText={!sidebarCollapsed} />
+          <div className={cn("flex min-w-0 items-center gap-2", sidebarCollapsed && "justify-center")}>
+            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 text-sm font-semibold text-primary">
+              {branding?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
+              ) : (
+                organizationInitials || "C"
+              )}
+            </div>
             {!sidebarCollapsed && (
-              <p className="mt-1 truncate pl-10 text-xs text-sidebar-foreground/55">
-                {branding?.companyName ?? "Workspace"}
-              </p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-sidebar-foreground">{organizationName}</p>
+                <p className="truncate text-xs text-sidebar-foreground/55">Contento</p>
+              </div>
             )}
           </div>
           <Button
@@ -132,8 +148,19 @@ export function DashboardShell({
               </SheetTrigger>
               <SheetContent side="left" className="w-[20rem] gap-0 p-0 sm:max-w-[20rem]">
                 <SheetHeader className="border-b px-4 py-4">
-                  <SheetTitle>
-                    <SiteLogo />
+                  <SheetTitle className="flex items-center gap-2">
+                    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 text-sm font-semibold text-primary">
+                      {branding?.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
+                      ) : (
+                        organizationInitials || "C"
+                      )}
+                    </span>
+                    <span className="min-w-0 text-left">
+                      <span className="block truncate text-sm font-semibold">{organizationName}</span>
+                      <span className="block truncate text-xs font-normal text-muted-foreground">Contento</span>
+                    </span>
                   </SheetTitle>
                 </SheetHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
@@ -164,7 +191,7 @@ export function DashboardShell({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-              <div>
+              <div className="hidden sm:block">
                 <ThemeToggle />
               </div>
               <NotificationMenu
@@ -189,16 +216,14 @@ export function DashboardShell({
                   hasActiveBreak={Boolean(workHours?.activeBreakSession)}
                 />
               </div>
-              <Button type="button" variant="outline" size="icon" aria-label="Security status">
-                <ShieldCheck />
-              </Button>
             </div>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">
           {children}
         </main>
       </div>
+      <DashboardMobileBottomNavigation context={context} />
     </div>
   );
 }

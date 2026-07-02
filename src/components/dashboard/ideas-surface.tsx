@@ -16,7 +16,10 @@ import { getClients } from "@/lib/clients/queries";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { FormSheet } from "@/components/dashboard/form-sheet";
 import { IdeaTypeFields } from "@/components/dashboard/idea-type-fields";
+import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -77,78 +80,76 @@ export async function IdeasSurface({
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-primary">Ideas</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-
-      <PageMessage error={searchParams.error} status={searchParams.notice} />
-
-      {canCreate && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Drop your idea before it disappears forever.</CardTitle>
-            <CardDescription>Warning: creativity may occur here. Select a client, then shape the idea by format.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={createIdeaAction} className="grid gap-4 lg:grid-cols-3">
-              <input type="hidden" name="redirectTo" value={basePath} />
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clientId">Client</Label>
-                <select id="clientId" name="clientId" className={selectClass}>
-                  <option value="">No client</option>
-                  {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="assignedTo">Assignee</Label>
-                <select id="assignedTo" name="assignedTo" className={selectClass}>
-                  <option value="">Unassigned</option>
-                  {activeUsers.map((user) => (
-                    <option key={user.id} value={user.id}>{user.displayName}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="teamId">Team</Label>
-                <select id="teamId" name="teamId" className={selectClass}>
-                  <option value="">No team</option>
-                  {activeTeams.map((team) => (
-                    <option key={team.id} value={team.id}>{team.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Input id="description" name="description" />
-              </div>
-              <IdeaTypeFields selectClass={selectClass} />
-              <div className="space-y-2 lg:col-span-3">
-                <Label htmlFor="notes">Notes</Label>
-                <Input id="notes" name="notes" />
-              </div>
-              <div className="lg:col-span-3">
-                <Button type="submit">
-                  <Plus />
-                  Create idea
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Search ideas and narrow by review status.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <PageHeader
+        eyebrow="Ideas"
+        title={title}
+        description={description}
+        actions={
+          <PageActions>
+            {canCreate && (
+              <FormSheet
+                title="Create idea"
+                description="Select a client, choose the format, and shape the idea before it moves into review."
+                triggerLabel="Create idea"
+              >
+                <form action={createIdeaAction} className="grid gap-4 lg:grid-cols-3">
+                  <input type="hidden" name="redirectTo" value={basePath} />
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" name="title" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client</Label>
+                    <select id="clientId" name="clientId" className={selectClass}>
+                      <option value="">No client</option>
+                      {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="assignedTo">Assignee</Label>
+                    <select id="assignedTo" name="assignedTo" className={selectClass}>
+                      <option value="">Unassigned</option>
+                      {activeUsers.map((user) => (
+                        <option key={user.id} value={user.id}>{user.displayName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamId">Team</Label>
+                    <select id="teamId" name="teamId" className={selectClass}>
+                      <option value="">No team</option>
+                      {activeTeams.map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input id="description" name="description" />
+                  </div>
+                  <IdeaTypeFields selectClass={selectClass} />
+                  <div className="space-y-2 lg:col-span-3">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Input id="notes" name="notes" />
+                  </div>
+                  <div className="lg:col-span-3">
+                    <Button type="submit">
+                      <Plus />
+                      Create idea
+                    </Button>
+                  </div>
+                </form>
+              </FormSheet>
+            )}
+            <FilterPanel
+              description="Search ideas and narrow by review status, team, or client."
+              activeFilters={[
+                { label: "Search", value: searchParams.q },
+                { label: "Status", value: searchParams.status },
+                { label: "Team", value: activeTeams.find((team) => team.id === searchParams.team)?.name ?? searchParams.team },
+                { label: "Client", value: activeClients.find((client) => client.id === searchParams.client)?.name ?? searchParams.client },
+              ]}
+            >
           <form action={basePath} className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_auto]">
             <div className="space-y-2">
               <Label htmlFor="q">Search</Label>
@@ -179,11 +180,15 @@ export async function IdeasSurface({
               </select>
             </div>
             <div className="flex items-end">
-              <Button type="submit" className="w-full md:w-auto">Apply</Button>
+              <Button type="submit" className="w-fit">Apply</Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+            </FilterPanel>
+          </PageActions>
+        }
+      />
+
+      <PageMessage error={searchParams.error} status={searchParams.notice} />
 
       <div className="grid gap-4">
         {ideas.map((idea) => (
@@ -255,7 +260,9 @@ export async function IdeasSurface({
               )}
 
               {canUpdate && (
-                <form action={updateIdeaAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3 lg:grid-cols-3">
+                <details className="rounded-lg border bg-secondary/20 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Edit idea details</summary>
+                  <form action={updateIdeaAction} className="mt-3 grid gap-3 lg:grid-cols-3">
                   <input type="hidden" name="ideaId" value={idea.id} />
                   <input type="hidden" name="redirectTo" value={basePath} />
                   <div className="space-y-2">
@@ -340,7 +347,8 @@ export async function IdeasSurface({
                     <Save />
                     Save idea
                   </Button>
-                </form>
+                  </form>
+                </details>
               )}
 
               <div className="flex flex-wrap gap-3">
@@ -348,6 +356,10 @@ export async function IdeasSurface({
                   Open idea detail
                 </Link>
 
+                {(canChangeStatus || canUpdate) && (
+                  <details className="w-full rounded-lg border bg-secondary/20 p-3">
+                    <summary className="cursor-pointer text-sm font-medium text-primary">Manage idea</summary>
+                    <div className="mt-3 flex flex-wrap gap-2">
                 {canChangeStatus && (
                   <form action={updateIdeaStatusAction} className="flex flex-wrap gap-2">
                     <input type="hidden" name="ideaId" value={idea.id} />
@@ -368,6 +380,9 @@ export async function IdeasSurface({
                       Delete
                     </Button>
                   </form>
+                )}
+                    </div>
+                  </details>
                 )}
               </div>
             </CardContent>

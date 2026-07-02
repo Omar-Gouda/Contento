@@ -34,7 +34,7 @@ The production app also seeds additional agency-facing role labels for Graphic D
 | `users.assign_role` | Assign or change user roles. | Full Access | No Access | No Access | No Access |
 | `users.view_activity` | View user activity and profile context. | Full Access | Limited Access | Limited Access | View Only |
 
-Marketing Manager user deletion uses `users.disable` Full Access plus server-only service-role deletion. The UI requires an explicit choice to keep historical work or permanently remove owned work, and users cannot delete themselves.
+Marketing Manager user deletion and Marketing Manager-issued temporary password resets use `users.disable` Full Access plus server-only service-role actions. The UI requires an explicit choice to keep historical work or permanently remove owned work, users cannot delete themselves, and temporary password resets set `must_change_password` without storing the temporary password in Contento tables or logs.
 
 ## Team Management
 
@@ -55,9 +55,11 @@ Marketing Manager user deletion uses `users.disable` Full Access plus server-onl
 | `clients.manage` | Manage client profile details. | Full Access | Limited assigned-client access | No Access | No Access |
 | `clients.assign` | Assign account managers and scoped delivery users to client workspaces. | Full Access | No Access | No Access | No Access |
 | `clients.assign_account_manager` | Assign or self-assign account managers to client workspaces. | Full Access | Limited self-assignment access | No Access | No Access |
-| `clients.delete` | Disable, archive, or delete client profiles. | Full Access | No Access | No Access | No Access |
+| `clients.delete` | Disable, reactivate, archive, or delete client profiles. | Full Access | No Access | No Access | No Access |
 | `content.final_output` | Attach final Drive links for production handoff. | Full Access | Limited Access | Limited Access | Limited Access |
 | `reports.send_to_client` | Mark reports as shared with the client. | Full Access | Limited Access | No Access | No Access |
+
+Client lifecycle rules are enforced inside company scope. Disabled and expired clients block Client-role portal access and new task, idea, or content creation, while internal users with permitted client scope can still view historical records.
 
 ## Task Management
 
@@ -122,7 +124,7 @@ Report visibility is additionally scope-checked. Marketing Manager can see all c
 
 | Permission Key | Capability | Admin | Supervisor | CC Team Lead | Creator |
 | --- | --- | --- | --- | --- | --- |
-| `calendar.view` | View scheduling calendar for task due dates, scheduled content, submitted time off, sick leave, and meetings. | Full Access | Limited Access | Limited Access | Limited Access |
+| `calendar.view` | View scheduling calendar for task due dates, idea/content publishing dates, submitted time off, sick leave, and meetings. | Full Access | Limited Access | Limited Access | Limited Access |
 | `calendar.schedule_content` | Schedule approved content. | Full Access | Limited Access | Limited Access | No Access |
 | `calendar.reschedule_content` | Reschedule content calendar items. | Full Access | Limited Access | Limited Access | No Access |
 | `calendar.filter` | Filter calendar by creator, status, date, or team. | Full Access | Limited Access | Limited Access | Limited Access |
@@ -235,7 +237,7 @@ The current implementation uses this matrix for Teams, Tasks, Ideas, Content, Ca
 * The header notification bell shows recent own notifications, unread count, mark-read controls, and a browser-local sound preference.
 * The header no longer contains a fake search field; `/search` remains the standalone scoped search page.
 * Report CSV export requires `exports.reports`, never accepts a browser-provided `company_id`, and writes `reports.exported` to `activity_logs`.
-* Generated reports insert immutable report history rows from real task, content, work-hours, and time-off data plus an optional user note.
+* Generated reports insert immutable report history rows from real task, idea publishing, content, comment, work-hours, and time-off data plus optional user notes and editable marketing metrics.
 * Notifications, comments, mentions, attachments, saved views, content templates, search, analytics, and dashboard preferences use the final production permissions above.
 * Generic collaboration records are only visible when the user can access the linked entity.
 * Saved views and dashboard preferences are private to the owning user.

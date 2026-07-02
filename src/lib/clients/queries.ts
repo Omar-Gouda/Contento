@@ -6,11 +6,18 @@ import { getRoleDisplayName, normalizeRoleName } from "@/types/roles";
 
 type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 type ClientAssignmentRow = Database["public"]["Tables"]["client_assignments"]["Row"];
+type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 type UserRow = Pick<
   Database["public"]["Tables"]["users"]["Row"],
   "id" | "email" | "first_name" | "last_name" | "role_id" | "status"
 >;
 type RoleRow = Pick<Database["public"]["Tables"]["roles"]["Row"], "id" | "name">;
+type SupabaseQueryError = {
+  message: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+};
 
 export type ClientUser = UserRow & {
   displayName: string;
@@ -19,6 +26,7 @@ export type ClientUser = UserRow & {
 };
 
 export type ClientProfile = ClientRow & {
+  logoSignedUrl: string | null;
   accountManagerName: string | null;
   assignedUsers: Array<ClientUser & { assignmentRole: ClientAssignmentRow["assignment_role"] }>;
 };
@@ -46,6 +54,31 @@ function clientSlug(name: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
     .slice(0, 120);
+}
+
+function logGetClientsError(error: SupabaseQueryError) {
+  console.error("getClients error", {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  });
+}
+
+async function getSignedLogoUrl(supabase: SupabaseServerClient, logoPath: string | null) {
+  if (!logoPath) {
+    return null;
+  }
+
+  if (logoPath.startsWith("http://") || logoPath.startsWith("https://")) {
+    return logoPath;
+  }
+
+  const { data } = await supabase.storage
+    .from("contento-avatars")
+    .createSignedUrl(logoPath, 60 * 60);
+
+  return data?.signedUrl ?? null;
 }
 
 export async function getClientAssignableUsers(context: AuthContext): Promise<ClientUser[]> {
@@ -85,14 +118,19 @@ export async function getClients(
   filters: { search?: string; status?: string } = {}
 ): Promise<ClientProfile[]> {
   const supabase = await createSupabaseServerClient();
+  await supabase.rpc("expire_current_company_clients", {});
   let query = supabase
     .from("clients")
-    .select("id, company_id, name, slug, logo_url, primary_color, secondary_color, accent_color, contact_person, contact_email, contact_phone, notes, brief_drive_link, requirements, assigned_account_manager_id, status, created_by, created_at, updated_at")
+    .select("id, company_id, name, slug, logo_url, primary_color, secondary_color, accent_color, contact_person, contact_email, contact_phone, notes, brief_drive_link, requirements, assigned_account_manager_id, contract_start_date, contract_end_date, disabled_at, disabled_reason, status, created_by, created_at, updated_at")
     .eq("company_id", context.companyId)
     .order("updated_at", { ascending: false });
 
   if (filters.status && filters.status !== "all") {
     query = query.eq("status", filters.status as ClientRow["status"]);
+  }
+
+  if (context.role === "client") {
+    query = query.eq("status", "active");
   }
 
   if (filters.search) {
@@ -105,6 +143,7 @@ export async function getClients(
   ]);
 
   if (error) {
+    logGetClientsError(error);
     throw new Error("Unable to load clients.");
   }
 
@@ -124,8 +163,9 @@ export async function getClients(
   const userById = new Map(users.map((user) => [user.id, user]));
   const assignmentRows = (assignments as ClientAssignmentRow[] | null) ?? [];
 
-  return clientRows.map((client) => ({
+  return Promise.all(clientRows.map(async (client) => ({
     ...client,
+    logoSignedUrl: await getSignedLogoUrl(supabase, client.logo_url),
     accountManagerName: client.assigned_account_manager_id
       ? userById.get(client.assigned_account_manager_id)?.displayName ?? null
       : null,
@@ -136,7 +176,7 @@ export async function getClients(
         return user ? { ...user, assignmentRole: assignment.assignment_role } : null;
       })
       .filter((user): user is ClientUser & { assignmentRole: ClientAssignmentRow["assignment_role"] } => Boolean(user)),
-  }));
+  })));
 }
 
 export async function getClientById(context: AuthContext, clientId: string) {

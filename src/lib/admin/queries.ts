@@ -68,7 +68,7 @@ export async function getCompanyUsers(
   const supabase = await createSupabaseServerClient();
   let query = supabase
     .from("users")
-    .select("id, company_id, email, first_name, last_name, avatar_url, role_id, status, created_at, updated_at")
+    .select("id, company_id, email, first_name, last_name, avatar_url, role_id, status, must_change_password, created_at, updated_at")
     .eq("company_id", context.companyId)
     .order("created_at", { ascending: false });
 

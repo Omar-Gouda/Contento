@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Clock, KeyRound, Save, User } from "lucide-react";
 
 import { PageMessage } from "@/components/admin/page-message";
+import { FormSheet } from "@/components/dashboard/form-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +83,25 @@ export default async function ProfilePage({
             <CardDescription>Your name is used across tasks, reviews, reports, and audit logs.</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 grid gap-3 rounded-lg border bg-secondary/25 p-4 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">First name</span>
+                <span className="font-medium">{profile.first_name}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Last name</span>
+                <span className="font-medium">{profile.last_name}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Email</span>
+                <span className="truncate font-medium">{profile.email}</span>
+              </div>
+            </div>
+            <FormSheet
+              title="Edit profile"
+              description="Update your display name. Role, team, and company assignment stay controlled by workspace permissions."
+              triggerLabel="Edit profile"
+            >
             <form action={updateProfileAction} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First name</Label>
@@ -102,6 +122,7 @@ export default async function ProfilePage({
                 </Button>
               </div>
             </form>
+            </FormSheet>
           </CardContent>
         </Card>
       </div>

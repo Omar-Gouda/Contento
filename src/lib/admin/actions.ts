@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/context";
 import {
   createCompanyUserSchema,
   inviteUserSchema,
+  resetUserPasswordSchema,
   terminateUserSchema,
   updateInvitationStatusSchema,
   updateUserRoleSchema,
@@ -676,6 +677,61 @@ export async function updateUserTeamAction(formData: FormData) {
     team_id: parsed.data.teamId,
   });
   redirectWith("/admin/users", "notice", "updated");
+}
+
+export async function resetUserPasswordAction(formData: FormData) {
+  const context = await requirePermission("users.disable", "full");
+  const parsed = resetUserPasswordSchema.safeParse({
+    userId: getFormString(formData, "userId"),
+    temporaryPassword: getFormString(formData, "temporaryPassword"),
+    confirmTemporaryPassword: getFormString(formData, "confirmTemporaryPassword"),
+  });
+
+  if (!parsed.success) {
+    redirectWith("/admin/users", "error", parsed.error.issues[0]?.message ?? "Invalid password reset.");
+  }
+
+  if (context.role !== "admin") {
+    redirectWith("/admin/users", "error", "Only Marketing Managers can reset company user passwords.");
+  }
+
+  if (parsed.data.userId === context.userId) {
+    redirectWith("/admin/users", "error", "You cannot reset your own password through user management.");
+  }
+
+  if (!hasSupabaseAdminConfig()) {
+    redirectWith("/admin/users", "error", "Supabase service role is required to reset user passwords.");
+  }
+
+  try {
+    await assertUserInCompany(parsed.data.userId, context.companyId);
+  } catch {
+    redirectWith("/admin/users", "error", "User does not belong to your company.");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const { error: authError } = await admin.auth.admin.updateUserById(parsed.data.userId, {
+    password: parsed.data.temporaryPassword,
+  });
+
+  if (authError) {
+    redirectWith("/admin/users", "error", "Supabase Auth could not reset this password.");
+  }
+
+  const { error: profileError } = await admin
+    .from("users")
+    .update({ must_change_password: true })
+    .eq("id", parsed.data.userId)
+    .eq("company_id", context.companyId);
+
+  if (profileError) {
+    redirectWith("/admin/users", "error", "Password was reset, but the required-change flag could not be saved.");
+  }
+
+  await logAdminActivity(context.companyId, context.userId, "users.password_reset", "user", parsed.data.userId, {
+    must_change_password: true,
+  });
+  redirectWith("/admin/users", "notice", "password-reset");
 }
 
 export async function terminateUserAction(formData: FormData) {

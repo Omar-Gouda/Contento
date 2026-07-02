@@ -13,7 +13,7 @@ Primary goals:
 * Protect dashboard routes with middleware and server-side profile resolution.
 * Redirect users to the correct role dashboard.
 * Enforce tenant isolation through application checks and RLS.
-* Support password reset, first-company onboarding, and Marketing Manager-created users.
+* Support password reset, first-company onboarding, Marketing Manager-created users, and Marketing Manager-issued temporary password resets.
 * Force Marketing Manager-created users to change temporary passwords before dashboard access.
 * Track working-hours sign-in and sign-out events without weakening authentication.
 * Support Super Admin organization bootstrap and lifecycle management outside tenant workspaces.
@@ -77,7 +77,7 @@ The Supabase Auth user confirms identity. The Contento `users` row confirms work
 | `/search` | Global search over accessible company data. | Implemented in final production phase. |
 | `/settings` | Admin organization settings and branding. | Implemented in final production phase. |
 | `/profile` | Current user profile and avatar settings. | Implemented in final production phase. |
-| `/content/templates` | Content template management and use. | Implemented in final production phase. |
+| `/content/templates` | Legacy content template route. | Removed from active navigation and routing; existing active templates can still be used during content creation. |
 | `/super-admin` | Platform overview. | Implemented in final production phase. |
 | `/super-admin/organizations/[id]` | Organization detail and lifecycle controls. | Implemented in final production phase. |
 
@@ -223,6 +223,8 @@ Rules:
 * The selected role and team must belong to the Admin company.
 * If profile creation fails, the server action deletes the created Auth user.
 
+Marketing Managers can also reset a company user's password from `/admin/users`. That server action uses the server-only Supabase Admin API to set the temporary password, sets `users.must_change_password = true`, and does not store or log the temporary password.
+
 ## 9. Forced Password Change Flow
 
 ```txt
@@ -256,6 +258,7 @@ Rules:
 * Users who do not need a password change are redirected to their role dashboard.
 * Clearing the flag uses `clear_current_user_must_change_password()` first so broad self-profile updates are not exposed.
 * If the RPC cannot finish after Supabase Auth has already updated the password, the server action attempts the same-user, same-company RLS update before showing a partial-failure message.
+* Normal profile password changes use Supabase Auth session update and stay on `/profile` with a success message. The current implementation does not require the existing password unless a later re-authentication step is added.
 
 ## 10. Invitation Acceptance Flow
 
@@ -561,7 +564,7 @@ RLS does not replace application authorization entirely. The app still checks pe
 * Supabase service-role key must never be exposed to the browser.
 * Public Supabase anon key is allowed in browser code because RLS protects data.
 * Only active users should access dashboards.
-* Password reset responses should not reveal whether an email exists.
+* Password reset responses should not reveal whether an email exists and should include the safe fallback to contact a Marketing Manager when email recovery cannot be received.
 * Auth pages should not load company data.
 * Protected pages should not render until company and role context is resolved.
 * Permission failures should not reveal another company's data.

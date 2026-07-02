@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { clientProfileSchema } from "@/lib/clients/schemas";
@@ -17,6 +18,13 @@ type DatabaseError = {
   details?: string;
   hint?: string;
 };
+
+const imageTypes = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+  ["image/gif", "gif"],
+]);
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -246,6 +254,31 @@ function assignmentRoleForUserRole(roleName: string | null | undefined) {
   return "member";
 }
 
+async function updateClientContactUserStatus(
+  supabase: SupabaseServerClient,
+  companyId: string,
+  clientId: string,
+  status: Database["public"]["Enums"]["user_status"]
+) {
+  const { data: assignments } = await supabase
+    .from("client_assignments")
+    .select("user_id")
+    .eq("client_id", clientId)
+    .eq("assignment_role", "client_contact");
+
+  const userIds = ((assignments as Array<{ user_id: string }> | null) ?? []).map((assignment) => assignment.user_id);
+
+  if (!userIds.length) {
+    return;
+  }
+
+  await supabase
+    .from("users")
+    .update({ status })
+    .eq("company_id", companyId)
+    .in("id", userIds);
+}
+
 export async function saveClientAction(formData: FormData) {
   const context = await requireAuthContext();
   const parsed = clientProfileSchema.safeParse({
@@ -264,6 +297,9 @@ export async function saveClientAction(formData: FormData) {
     requirements: formString(formData, "requirements"),
     assignedAccountManagerId: formString(formData, "assignedAccountManagerId"),
     assignedUserIds: formStringArray(formData, "assignedUserIds"),
+    contractStartDate: formString(formData, "contractStartDate"),
+    contractEndDate: formString(formData, "contractEndDate"),
+    disabledReason: formString(formData, "disabledReason"),
     status: formString(formData, "status") || "active",
   });
 
@@ -358,6 +394,10 @@ export async function saveClientAction(formData: FormData) {
     notes: parsed.data.notes,
     requirements: parsed.data.requirements,
     assigned_account_manager_id: assignedAccountManagerId,
+    contract_start_date: parsed.data.contractStartDate,
+    contract_end_date: parsed.data.contractEndDate,
+    disabled_reason: parsed.data.status === "active" ? null : parsed.data.disabledReason || null,
+    disabled_at: parsed.data.status === "active" ? null : new Date().toISOString(),
     status: parsed.data.status,
   };
 
@@ -416,6 +456,13 @@ export async function saveClientAction(formData: FormData) {
   }
 
   const clientId = result.data.id;
+  await updateClientContactUserStatus(
+    supabase,
+    context.companyId,
+    clientId,
+    parsed.data.status === "active" ? "active" : "disabled"
+  );
+
   if (!shouldUpdateAssignments) {
     await logActivity(context, parsed.data.clientId ? "clients.updated" : "clients.created", clientId, {
       name: parsed.data.name,
@@ -464,4 +511,223 @@ export async function saveClientAction(formData: FormData) {
     assigned_user_count: assignmentRows.length,
   });
   safeRedirect(`/clients/${clientId}`, "notice", parsed.data.clientId ? "Client updated." : "Client created.");
+}
+
+export async function updateClientLifecycleAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const clientId = formString(formData, "clientId");
+  const status = formString(formData, "status");
+  const disabledReason = formString(formData, "disabledReason").trim();
+  const canUpdateClient =
+    hasPermission(context, "clients.update", "limited") ||
+    hasPermission(context, "clients.manage", "limited");
+
+  if (!clientId) {
+    safeRedirect("/clients", "error", "Client profile could not be resolved.");
+  }
+
+  if (!canUpdateClient || context.role !== "admin") {
+    safeRedirect(`/clients/${clientId}`, "error", "Only Marketing Managers can change client lifecycle status.");
+  }
+
+  if (!["active", "disabled", "expired", "archived"].includes(status)) {
+    safeRedirect(`/clients/${clientId}`, "error", "Choose a valid client status.");
+  }
+
+  try {
+    await assertClientInScope(clientId, context.companyId);
+  } catch {
+    safeRedirect("/clients", "error", "Client profile is outside your organization.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const nextStatus = status as Database["public"]["Tables"]["clients"]["Row"]["status"];
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      status: nextStatus,
+      disabled_at: nextStatus === "active" ? null : new Date().toISOString(),
+      disabled_reason: nextStatus === "active" ? null : disabledReason || (nextStatus === "expired" ? "Contract end date has passed." : "Manually disabled."),
+    })
+    .eq("id", clientId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    safeRedirect(`/clients/${clientId}`, "error", "Client lifecycle status could not be updated.");
+  }
+
+  await updateClientContactUserStatus(supabase, context.companyId, clientId, nextStatus === "active" ? "active" : "disabled");
+  await logActivity(context, "clients.lifecycle_updated", clientId, { status: nextStatus });
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${clientId}`);
+  safeRedirect(`/clients/${clientId}`, "notice", nextStatus === "active" ? "Client reactivated." : "Client disabled.");
+}
+
+export async function deleteClientAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const clientId = formString(formData, "clientId");
+
+  if (!clientId) {
+    safeRedirect("/clients", "error", "Client profile could not be resolved.");
+  }
+
+  if (context.role !== "admin" || !hasPermission(context, "clients.manage", "limited")) {
+    safeRedirect(`/clients/${clientId}`, "error", "Only Marketing Managers can delete client profiles.");
+  }
+
+  try {
+    await assertClientInScope(clientId, context.companyId);
+  } catch {
+    safeRedirect("/clients", "error", "Client profile is outside your organization.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  await updateClientContactUserStatus(supabase, context.companyId, clientId, "disabled");
+  const { error } = await supabase
+    .from("clients")
+    .delete()
+    .eq("id", clientId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    safeRedirect(`/clients/${clientId}`, "error", "Client profile could not be deleted.");
+  }
+
+  await logActivity(context, "clients.deleted", clientId, {});
+  revalidatePath("/clients");
+  safeRedirect("/clients", "notice", "Client deleted.");
+}
+
+export async function uploadClientLogoAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const clientId = formString(formData, "clientId");
+  const file = formData.get("logo");
+  const canUpdateClient =
+    hasPermission(context, "clients.update", "limited") ||
+    hasPermission(context, "clients.manage", "limited");
+
+  if (!clientId) {
+    safeRedirect("/clients", "error", "Client profile could not be resolved.");
+  }
+
+  if (!canUpdateClient) {
+    safeRedirect(`/clients/${clientId}`, "error", "You do not have permission to update client profiles.");
+  }
+
+  if (!(file instanceof File) || file.size === 0) {
+    safeRedirect(`/clients/${clientId}`, "error", "Choose a client logo image.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    safeRedirect(`/clients/${clientId}`, "error", "Client logo must be 5 MB or smaller.");
+  }
+
+  const extension = imageTypes.get(file.type);
+
+  if (!extension) {
+    safeRedirect(`/clients/${clientId}`, "error", "Client logo must be a JPG, PNG, WebP, or GIF image.");
+  }
+
+  try {
+    await assertClientInScope(clientId, context.companyId);
+  } catch {
+    safeRedirect("/clients", "error", "Client profile is outside your organization.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: currentClient, error: loadError } = await supabase
+    .from("clients")
+    .select("logo_url")
+    .eq("id", clientId)
+    .eq("company_id", context.companyId)
+    .maybeSingle();
+
+  if (loadError || !currentClient) {
+    safeRedirect("/clients", "error", "Client profile could not be loaded.");
+  }
+
+  const path = `${context.companyId}/clients/${clientId}/logo-${randomUUID()}.${extension}`;
+  const { error: uploadError } = await supabase.storage
+    .from("contento-avatars")
+    .upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    safeRedirect(`/clients/${clientId}`, "error", "Client logo could not be uploaded. Try a smaller image or another file.");
+  }
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ logo_url: path })
+    .eq("id", clientId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    await supabase.storage.from("contento-avatars").remove([path]);
+    safeRedirect(`/clients/${clientId}`, "error", "Client logo could not be saved.");
+  }
+
+  if (currentClient.logo_url && !currentClient.logo_url.startsWith("http")) {
+    await supabase.storage.from("contento-avatars").remove([currentClient.logo_url]);
+  }
+
+  await logActivity(context, "clients.logo_updated", clientId, {});
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${clientId}`);
+  safeRedirect(`/clients/${clientId}`, "notice", "Client logo updated.");
+}
+
+export async function removeClientLogoAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const clientId = formString(formData, "clientId");
+  const canUpdateClient =
+    hasPermission(context, "clients.update", "limited") ||
+    hasPermission(context, "clients.manage", "limited");
+
+  if (!clientId) {
+    safeRedirect("/clients", "error", "Client profile could not be resolved.");
+  }
+
+  if (!canUpdateClient) {
+    safeRedirect(`/clients/${clientId}`, "error", "You do not have permission to update client profiles.");
+  }
+
+  try {
+    await assertClientInScope(clientId, context.companyId);
+  } catch {
+    safeRedirect("/clients", "error", "Client profile is outside your organization.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: currentClient, error: loadError } = await supabase
+    .from("clients")
+    .select("logo_url")
+    .eq("id", clientId)
+    .eq("company_id", context.companyId)
+    .maybeSingle();
+
+  if (loadError || !currentClient) {
+    safeRedirect("/clients", "error", "Client profile could not be loaded.");
+  }
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ logo_url: null })
+    .eq("id", clientId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    safeRedirect(`/clients/${clientId}`, "error", "Client logo could not be removed.");
+  }
+
+  if (currentClient.logo_url && !currentClient.logo_url.startsWith("http")) {
+    await supabase.storage.from("contento-avatars").remove([currentClient.logo_url]);
+  }
+
+  await logActivity(context, "clients.logo_removed", clientId, {});
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${clientId}`);
+  safeRedirect(`/clients/${clientId}`, "notice", "Client logo removed.");
 }

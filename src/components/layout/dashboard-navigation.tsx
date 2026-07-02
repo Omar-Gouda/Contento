@@ -11,7 +11,6 @@ import {
   ClipboardList,
   Clock,
   FileBarChart,
-  FileText,
   LayoutDashboard,
   Lightbulb,
   PanelsTopLeft,
@@ -190,10 +189,6 @@ function getWorkItems(context: AuthContext): NavigationItem[] {
 
   if (hasPermission(context, "content.track_pipeline", "view")) {
     items.push({ label: "Content", href: routes.content.home, icon: PanelsTopLeft });
-  }
-
-  if (hasPermission(context, "content.templates.use", "view")) {
-    items.push({ label: "Templates", href: routes.content.templates, icon: FileText });
   }
 
   if (hasPermission(context, "calendar.view", "view")) {
@@ -453,6 +448,53 @@ export function DashboardNavigation({ context, collapsed = false }: { context: A
           onToggle={toggleGroup}
         />
       ))}
+    </nav>
+  );
+}
+
+export function DashboardMobileBottomNavigation({ context }: { context: AuthContext }) {
+  const pathname = usePathname();
+  const groups = useMemo(() => getNavigationGroups(context), [context]);
+  const items = groups.flatMap((group) => group.items);
+  const preferredHrefs = [
+    dashboardByRole[context.role].href,
+    routes.clients.home,
+    routes.tasks,
+    routes.ideas,
+    routes.calendar,
+    routes.reports,
+    routes.profile.home,
+  ];
+  const mobileItems = preferredHrefs
+    .map((href) => items.find((item) => item.href === href))
+    .filter((item, index, list): item is NavigationItem => item !== undefined && list.findIndex((candidate) => candidate?.href === item.href) === index)
+    .slice(0, 5);
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-2 py-2 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        {mobileItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActivePath(pathname, item);
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-label={item.label}
+              className={cn(
+                "flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition",
+                active
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <Icon className="size-4" />
+              <span className="w-full truncate text-center">{item.label.replace(" dashboard", "")}</span>
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

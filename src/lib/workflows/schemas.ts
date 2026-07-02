@@ -231,10 +231,10 @@ export const contentTemplateSchema = z.object({
   description: z.string().trim().max(1000, "Template description is too long.").default(""),
   body: z.string().trim().max(5000, "Template body is too long.").default(""),
   category: z.string().trim().max(80, "Template category is too long.").default(""),
-  redirectTo: z.string().trim().default("/content/templates"),
+  redirectTo: z.string().trim().default("/content"),
 });
 
 export const contentTemplateArchiveSchema = z.object({
   templateId: z.string().trim().uuid(),
-  redirectTo: z.string().trim().default("/content/templates"),
+  redirectTo: z.string().trim().default("/content"),
 });

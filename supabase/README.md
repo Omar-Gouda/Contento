@@ -21,6 +21,7 @@ This folder contains the database foundation for Contento.
 | `migrations/202606250002_contento_client_report_send_flow.sql` | Hardens report visibility so Client role users only read client-scoped reports after they are explicitly sent to the client workspace. |
 | `migrations/202606300001_contento_client_permission_hotfix.sql` | Adds client create/update/delete/assignment permission hardening and client RLS fixes for Marketing Manager and Account Manager client management. |
 | `migrations/202607010001_contento_ux_permission_chat_hotfix.sql` | Tightens report visibility for Account Manager scope, adds direct organization chat tables, helper functions, indexes, triggers, and chat RLS policies. |
+| `migrations/202607020001_contento_client_contract_password_storage_hotfix.sql` | Adds client contract lifecycle fields, disabled/expired statuses, client expiry normalization, and a company-scoped client expiry RPC. |
 
 ## RLS Policy Model
 
@@ -41,13 +42,14 @@ Policy principles:
 * Task, idea, content, report, time-off, comments, mentions, and attachment visibility use scope helpers so Admins stay company-wide, Supervisors and Team Leads stay team-scoped, and Creators stay own-scope.
 * Client workspace visibility is company-scoped and uses `clients`, `client_assignments`, `is_same_company_client()`, and `can_access_client_scope()` so client users only see assigned client workspaces and internal users remain inside company/team/client boundaries.
 * Client-linked task, idea, content, report, and calendar policies validate that referenced clients belong to the same company before inserts or updates are allowed.
+* Disabled and expired clients block Client-role portal access and new work creation while preserving internal historical visibility inside normal role scope.
 * Client-role report visibility requires `reports.sent_to_client_at`; internal users with report access can prepare reports before sharing them with clients.
 * Account Manager report visibility is scoped to assigned users, assigned teams, and assigned clients; Marketing Manager remains company-wide.
 * Notifications are readable and updateable only by their recipient inside the same company.
 * Chat conversations and messages are company-scoped, participant-scoped, and optionally client-scoped for Client users and assigned Account Managers.
 * Saved views and dashboard preferences are private to the owning user.
 * Content templates are company-scoped; active templates can be used by permitted creators, while management requires template permissions.
-* `contento-attachments` and `contento-avatars` storage buckets use company/user folder policies.
+* `contento-attachments` and `contento-avatars` storage buckets use company/user folder policies. Avatar, organization logo, and client logo removal clears database paths and removes the private storage object when available.
 * Report CSV export is server-side and requires `exports.reports`.
 * Generated reports are stored as new historical rows based on live task, content, work-hours, and time-off data.
 * Service-role access should remain server-only and must never be exposed to the browser.

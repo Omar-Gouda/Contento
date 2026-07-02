@@ -18,6 +18,9 @@ import { getClients } from "@/lib/clients/queries";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { FormSheet } from "@/components/dashboard/form-sheet";
+import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -124,95 +127,91 @@ export async function TaskManagementSurface({
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-primary">Tasks</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal">{title}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-      </div>
-
-      <PageMessage error={searchParams.error} status={searchParams.notice} />
-
-      {canCreate && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{context.role === "supervisor" ? "Assign production work" : "Create task"}</CardTitle>
-            <CardDescription>
-              {context.role === "supervisor"
-                ? "Create client-scoped work and assign it to a Content Creator, Graphic Designer, or Video Editor."
-                : "Create real company-scoped work with an owner, team, priority, and due date."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={createTaskAction} className="grid gap-4 lg:grid-cols-4">
-              <input type="hidden" name="redirectTo" value={basePath} />
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clientId">Client</Label>
-                <select id="clientId" name="clientId" className={selectClass}>
-                  <option value="">No client</option>
-                  {activeClients.map((client) => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="assignedTo">Assignee</Label>
-                <select id="assignedTo" name="assignedTo" className={selectClass}>
-                  <option value="">Unassigned</option>
-                  {assignmentUsers.map((user) => (
-                    <option key={user.id} value={user.id}>{user.displayName}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="teamId">Team</Label>
-                <select id="teamId" name="teamId" className={selectClass}>
-                  <option value="">No team</option>
-                  {activeTeams.map((team) => (
-                    <option key={team.id} value={team.id}>{team.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Input id="description" name="description" />
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="finalDriveLink">Final Drive link</Label>
-                <Input id="finalDriveLink" name="finalDriveLink" type="url" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <select id="priority" name="priority" defaultValue="normal" className={selectClass}>
-                  {priorities.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dueDate">Due date</Label>
-                <Input id="dueDate" name="dueDate" type="date" />
-              </div>
-              <div className="flex items-end lg:col-span-4">
-                <Button type="submit">
-                  <Plus />
-                  Create task
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter by status, team, or title.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <PageHeader
+        eyebrow="Tasks"
+        title={title}
+        description={description}
+        actions={
+          <PageActions>
+            {canCreate && (
+              <FormSheet
+                title={context.role === "supervisor" ? "Assign production work" : "Create task"}
+                description={
+                  context.role === "supervisor"
+                    ? "Create client-scoped work and assign it to a Content Creator, Graphic Designer, or Video Editor."
+                    : "Create real company-scoped work with an owner, team, priority, and due date."
+                }
+                triggerLabel={context.role === "supervisor" ? "Assign work" : "Create task"}
+              >
+                <form action={createTaskAction} className="grid gap-4 lg:grid-cols-4">
+                  <input type="hidden" name="redirectTo" value={basePath} />
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" name="title" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client</Label>
+                    <select id="clientId" name="clientId" className={selectClass}>
+                      <option value="">No client</option>
+                      {activeClients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="assignedTo">Assignee</Label>
+                    <select id="assignedTo" name="assignedTo" className={selectClass}>
+                      <option value="">Unassigned</option>
+                      {assignmentUsers.map((user) => (
+                        <option key={user.id} value={user.id}>{user.displayName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamId">Team</Label>
+                    <select id="teamId" name="teamId" className={selectClass}>
+                      <option value="">No team</option>
+                      {activeTeams.map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input id="description" name="description" />
+                  </div>
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="finalDriveLink">Final Drive link</Label>
+                    <Input id="finalDriveLink" name="finalDriveLink" type="url" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="priority">Priority</Label>
+                    <select id="priority" name="priority" defaultValue="normal" className={selectClass}>
+                      {priorities.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dueDate">Due date</Label>
+                    <Input id="dueDate" name="dueDate" type="date" />
+                  </div>
+                  <div className="flex items-end lg:col-span-4">
+                    <Button type="submit">
+                      <Plus />
+                      Create task
+                    </Button>
+                  </div>
+                </form>
+              </FormSheet>
+            )}
+            <FilterPanel
+              description="Filter by status, team, client, or title."
+              activeFilters={[
+                { label: "Search", value: searchParams.q },
+                { label: "Status", value: searchParams.status },
+                { label: "Team", value: activeTeams.find((team) => team.id === searchParams.team)?.name ?? searchParams.team },
+                { label: "Client", value: activeClients.find((client) => client.id === searchParams.client)?.name ?? searchParams.client },
+              ]}
+            >
           <form action={basePath} className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_auto]">
             <div className="space-y-2">
               <Label htmlFor="q">Search</Label>
@@ -243,11 +242,15 @@ export async function TaskManagementSurface({
               </select>
             </div>
             <div className="flex items-end">
-              <Button type="submit" className="w-full md:w-auto">Apply</Button>
+              <Button type="submit" className="w-fit">Apply</Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+            </FilterPanel>
+          </PageActions>
+        }
+      />
+
+      <PageMessage error={searchParams.error} status={searchParams.notice} />
 
       <div className="grid gap-4">
         {(groupedTasks.length ? groupedTasks : [{ label: "Tasks", description: "Current task records.", tasks }]).map((group) => (
@@ -304,7 +307,9 @@ export async function TaskManagementSurface({
 
                 <div className="grid gap-3 lg:grid-cols-2">
                   {canAssign && (
-                    <form action={assignTaskAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+                    <details className="rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Manage assignment</summary>
+                    <form action={assignTaskAction} className="mt-3 grid gap-3">
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="redirectTo" value={basePath} />
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -332,10 +337,13 @@ export async function TaskManagementSurface({
                       </div>
                       <Button type="submit" variant="outline" size="sm">Save assignment</Button>
                     </form>
+                    </details>
                   )}
 
                   {canUpdateStatus && !productionRole && (
-                    <form action={updateTaskStatusAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+                    <details className="rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Update status</summary>
+                    <form action={updateTaskStatusAction} className="mt-3 grid gap-3">
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="redirectTo" value={basePath} />
                       <Label htmlFor={`status-${task.id}`}>Status</Label>
@@ -344,6 +352,7 @@ export async function TaskManagementSurface({
                       </select>
                       <Button type="submit" variant="outline" size="sm">Update status</Button>
                     </form>
+                    </details>
                   )}
                 </div>
 
@@ -357,7 +366,9 @@ export async function TaskManagementSurface({
                     </Link>
                   )}
                   {canUpdateStatus && productionRole && (
-                    <form action={updateTaskStatusAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+                    <details className="mt-3 rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Submit for review</summary>
+                    <form action={updateTaskStatusAction} className="mt-3 grid gap-3">
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="status" value="under_review" />
                       <input type="hidden" name="redirectTo" value={basePath} />
@@ -366,10 +377,13 @@ export async function TaskManagementSurface({
                       </p>
                       <Button type="submit" variant="outline" size="sm">Submit for Content Creator review</Button>
                     </form>
+                    </details>
                   )}
                 </div>
 
-                <form action={addTaskCommentAction} className="grid gap-3">
+                <details className="rounded-lg border bg-secondary/20 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Add comment</summary>
+                <form action={addTaskCommentAction} className="mt-3 grid gap-3">
                   <input type="hidden" name="taskId" value={task.id} />
                   <input type="hidden" name="redirectTo" value={basePath} />
                   <Label htmlFor={`comment-${task.id}`}>Comment</Label>
@@ -381,6 +395,7 @@ export async function TaskManagementSurface({
                     </Button>
                   </div>
                 </form>
+                </details>
 
                 {taskComments.length > 0 && (
                   <div className="grid gap-2">
@@ -397,7 +412,9 @@ export async function TaskManagementSurface({
                 )}
 
                 {canFinalOutput && (
-                  <form action={submitTaskFinalOutputAction} className="grid gap-3 rounded-lg border bg-secondary/20 p-3">
+                  <details className="rounded-lg border bg-secondary/20 p-3">
+                    <summary className="cursor-pointer text-sm font-medium text-primary">Save final output</summary>
+                  <form action={submitTaskFinalOutputAction} className="mt-3 grid gap-3">
                     <input type="hidden" name="taskId" value={task.id} />
                     <input type="hidden" name="redirectTo" value={basePath} />
                     <Label htmlFor={`final-${task.id}`}>Final Drive link</Label>
@@ -415,6 +432,7 @@ export async function TaskManagementSurface({
                       </Button>
                     </div>
                   </form>
+                  </details>
                 )}
               </CardContent>
             </Card>

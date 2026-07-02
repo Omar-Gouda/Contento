@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Search } from "lucide-react";
 
 import {
+  resetUserPasswordAction,
   updateUserRoleAction,
   updateUserStatusAction,
   updateUserTeamAction,
@@ -14,6 +15,9 @@ import {
 import { requirePermission } from "@/lib/auth/context";
 import { getClients } from "@/lib/clients/queries";
 import { PageMessage } from "@/components/admin/page-message";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { FormSheet } from "@/components/dashboard/form-sheet";
+import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { RoleAwareUserCreateForm } from "@/components/admin/role-aware-user-create-form";
 import { UserTerminationControls } from "@/components/admin/user-termination-controls";
 import { Badge } from "@/components/ui/badge";
@@ -71,34 +75,26 @@ export default async function AdminUsersPage({
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-primary">Admin</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal">User management</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Manage company users, account status, agency role assignment, and team membership.
-          </p>
-        </div>
-      </div>
-
-      <PageMessage error={params.error} status={params.notice} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Create user</CardTitle>
-          <CardDescription>Create a company-scoped account with a Contento role and status.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RoleAwareUserCreateForm roles={roles} teams={teams} clients={clients} accountManagers={accountManagers} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Search by name or email and filter by account status.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <PageHeader
+        eyebrow="Admin"
+        title="User management"
+        description="Manage company users, account status, agency role assignment, and team membership."
+        actions={
+          <PageActions>
+            <FormSheet
+              title="Create user"
+              description="Create a company-scoped account. Client-role users can also create the linked client profile from this flow."
+              triggerLabel="Create user"
+            >
+              <RoleAwareUserCreateForm roles={roles} teams={teams} clients={clients} accountManagers={accountManagers} />
+            </FormSheet>
+            <FilterPanel
+              description="Search by name or email and filter by account status."
+              activeFilters={[
+                { label: "Search", value: params.q },
+                { label: "Status", value: params.status },
+              ]}
+            >
           <form className="grid gap-3 md:grid-cols-[1fr_180px_auto]" action="/admin/users">
             <div className="space-y-2">
               <Label htmlFor="q">Search</Label>
@@ -124,13 +120,17 @@ export default async function AdminUsersPage({
               </select>
             </div>
             <div className="flex items-end">
-              <Button type="submit" className="w-full md:w-auto">
+              <Button type="submit" className="w-fit">
                 Apply
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+            </FilterPanel>
+          </PageActions>
+        }
+      />
+
+      <PageMessage error={params.error} status={params.notice} />
 
       <Card>
         <CardHeader>
@@ -138,7 +138,118 @@ export default async function AdminUsersPage({
           <CardDescription>{users.length} users found in this workspace.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="grid gap-3 lg:hidden">
+            {users.map((user) => (
+              <div key={user.id} className="rounded-xl border bg-secondary/20 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{user.first_name} {user.last_name}</p>
+                    <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                  </div>
+                  <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
+                </div>
+                <details className="mt-4 rounded-lg border bg-background/60 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Manage user</summary>
+                <div className="mt-3 grid gap-3">
+                  <form action={updateUserRoleAction} className="grid gap-2">
+                    <input type="hidden" name="userId" value={user.id} />
+                    <Label htmlFor={`mobile-role-${user.id}`}>Role</Label>
+                    <div className="flex gap-2">
+                      <select
+                        id={`mobile-role-${user.id}`}
+                        name="roleId"
+                        defaultValue={user.role_id ?? ""}
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-sm"
+                      >
+                        {roles.map((role) => (
+                          <option key={role.id} value={role.id}>
+                            {getRoleDisplayName(role.name)}
+                          </option>
+                        ))}
+                      </select>
+                      <Button type="submit" variant="outline" size="sm">Save</Button>
+                    </div>
+                  </form>
+                  <form action={updateUserTeamAction} className="grid gap-2">
+                    <input type="hidden" name="userId" value={user.id} />
+                    <Label htmlFor={`mobile-team-${user.id}`}>Team</Label>
+                    <div className="flex gap-2">
+                      <select
+                        id={`mobile-team-${user.id}`}
+                        name="teamId"
+                        defaultValue={user.teamId ?? ""}
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-sm"
+                      >
+                        <option value="">No team</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Button type="submit" variant="outline" size="sm">Save</Button>
+                    </div>
+                  </form>
+                  <form action={updateUserStatusAction} className="grid gap-2">
+                    <input type="hidden" name="userId" value={user.id} />
+                    <Label htmlFor={`mobile-status-${user.id}`}>Status</Label>
+                    <div className="flex gap-2">
+                      <select
+                        id={`mobile-status-${user.id}`}
+                        name="status"
+                        defaultValue={user.status === "invited" ? "active" : user.status}
+                        className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-sm"
+                      >
+                        {userStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                      <Button type="submit" size="sm">Update</Button>
+                    </div>
+                  </form>
+                  <UserTerminationControls
+                    userId={user.id}
+                    userName={`${user.first_name} ${user.last_name}`.trim() || user.email}
+                    disabled={user.id === context.userId}
+                  />
+                  {context.role === "admin" && (
+                    <FormSheet
+                      title="Reset user password"
+                      description="Set a temporary password. The user must change it on their next sign-in."
+                      triggerLabel="Reset password"
+                    >
+                      <form action={resetUserPasswordAction} className="grid gap-4">
+                        <input type="hidden" name="userId" value={user.id} />
+                        <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+                          Reset password for <span className="font-medium">{user.email}</span>. Share the temporary password securely outside Contento.
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`mobile-temp-${user.id}`}>Temporary password</Label>
+                          <Input id={`mobile-temp-${user.id}`} name="temporaryPassword" type="password" autoComplete="new-password" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`mobile-confirm-temp-${user.id}`}>Confirm temporary password</Label>
+                          <Input id={`mobile-confirm-temp-${user.id}`} name="confirmTemporaryPassword" type="password" autoComplete="new-password" required />
+                        </div>
+                        <Button type="submit" variant="destructive" disabled={user.id === context.userId}>
+                          Reset password
+                        </Button>
+                      </form>
+                    </FormSheet>
+                  )}
+                </div>
+                </details>
+              </div>
+            ))}
+            {!users.length && (
+              <div className="rounded-xl border border-dashed px-3 py-10 text-center text-muted-foreground">
+                No company users match the current filters.
+              </div>
+            )}
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full min-w-[980px] border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground">
@@ -157,45 +268,49 @@ export default async function AdminUsersPage({
                       <div className="text-muted-foreground">{user.email}</div>
                     </td>
                     <td className="border-b px-3 py-4">
-                      <form action={updateUserRoleAction} className="flex gap-2">
-                        <input type="hidden" name="userId" value={user.id} />
-                        <select
-                          name="roleId"
-                          defaultValue={user.role_id ?? ""}
-                          className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
-                        >
-                          {roles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                              {getRoleDisplayName(role.name)}
-                            </option>
-                          ))}
-                        </select>
-                        <Button type="submit" variant="outline" size="sm">Save</Button>
-                      </form>
+                      <span className="font-medium">{getRoleDisplayName(user.roleName)}</span>
                     </td>
                     <td className="border-b px-3 py-4">
-                      <form action={updateUserTeamAction} className="flex gap-2">
-                        <input type="hidden" name="userId" value={user.id} />
-                        <select
-                          name="teamId"
-                          defaultValue={user.teamId ?? ""}
-                          className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
-                        >
-                          <option value="">No team</option>
-                          {teams.map((team) => (
-                            <option key={team.id} value={team.id}>
-                              {team.name}
-                            </option>
-                          ))}
-                        </select>
-                        <Button type="submit" variant="outline" size="sm">Save</Button>
-                      </form>
+                      {user.teamName ?? "No team"}
                     </td>
                     <td className="border-b px-3 py-4">
                       <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
                     </td>
                     <td className="border-b px-3 py-4">
-                      <div className="flex flex-wrap gap-2">
+                      <details className="rounded-lg border bg-secondary/20 p-3">
+                        <summary className="cursor-pointer text-sm font-medium text-primary">Manage user</summary>
+                      <div className="mt-3 grid gap-3">
+                        <form action={updateUserRoleAction} className="flex gap-2">
+                          <input type="hidden" name="userId" value={user.id} />
+                          <select
+                            name="roleId"
+                            defaultValue={user.role_id ?? ""}
+                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                          >
+                            {roles.map((role) => (
+                              <option key={role.id} value={role.id}>
+                                {getRoleDisplayName(role.name)}
+                              </option>
+                            ))}
+                          </select>
+                          <Button type="submit" variant="outline" size="sm">Save role</Button>
+                        </form>
+                        <form action={updateUserTeamAction} className="flex gap-2">
+                          <input type="hidden" name="userId" value={user.id} />
+                          <select
+                            name="teamId"
+                            defaultValue={user.teamId ?? ""}
+                            className="h-8 rounded-lg border border-input bg-background px-2 text-sm"
+                          >
+                            <option value="">No team</option>
+                            {teams.map((team) => (
+                              <option key={team.id} value={team.id}>
+                                {team.name}
+                              </option>
+                            ))}
+                          </select>
+                          <Button type="submit" variant="outline" size="sm">Save team</Button>
+                        </form>
                         <form action={updateUserStatusAction} className="flex gap-2">
                           <input type="hidden" name="userId" value={user.id} />
                           <select
@@ -216,7 +331,33 @@ export default async function AdminUsersPage({
                           userName={`${user.first_name} ${user.last_name}`.trim() || user.email}
                           disabled={user.id === context.userId}
                         />
+                        {context.role === "admin" && (
+                          <FormSheet
+                            title="Reset user password"
+                            description="Set a temporary password. The user must change it on their next sign-in."
+                            triggerLabel="Reset password"
+                          >
+                            <form action={resetUserPasswordAction} className="grid gap-4">
+                              <input type="hidden" name="userId" value={user.id} />
+                              <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+                                Reset password for <span className="font-medium">{user.email}</span>. Share the temporary password securely outside Contento.
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`temp-${user.id}`}>Temporary password</Label>
+                                <Input id={`temp-${user.id}`} name="temporaryPassword" type="password" autoComplete="new-password" required />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`confirm-temp-${user.id}`}>Confirm temporary password</Label>
+                                <Input id={`confirm-temp-${user.id}`} name="confirmTemporaryPassword" type="password" autoComplete="new-password" required />
+                              </div>
+                              <Button type="submit" variant="destructive" disabled={user.id === context.userId}>
+                                Reset password
+                              </Button>
+                            </form>
+                          </FormSheet>
+                        )}
                       </div>
+                      </details>
                     </td>
                   </tr>
                 ))}

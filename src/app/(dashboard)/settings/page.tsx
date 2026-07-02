@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Palette, Save, Settings } from "lucide-react";
 
 import { PageMessage } from "@/components/admin/page-message";
+import { FormSheet } from "@/components/dashboard/form-sheet";
+import { OrganizationLogoUpload } from "@/components/forms/logo-upload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,14 +71,44 @@ export default async function SettingsPage({
           <CardDescription>These settings are company-scoped and applied to the authenticated workspace.</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-5 rounded-xl border bg-secondary/25 p-4">
+            <div className="mb-3">
+              <p className="text-sm font-medium">Organization logo</p>
+              <p className="text-xs text-muted-foreground">
+                Upload a square-friendly logo for the sidebar and workspace identity.
+              </p>
+            </div>
+            <OrganizationLogoUpload
+              initialLogoUrl={data.companyLogoSignedUrl}
+              organizationName={data.company.name}
+            />
+          </div>
+          <div className="mb-4 grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border bg-secondary/25 p-3">
+              <p className="text-xs text-muted-foreground">Organization</p>
+              <p className="mt-1 font-medium">{data.company.name}</p>
+            </div>
+            <div className="rounded-lg border bg-secondary/25 p-3">
+              <p className="text-xs text-muted-foreground">Timezone</p>
+              <p className="mt-1 font-medium">{CONTENTO_TIME_ZONE}</p>
+            </div>
+            <div className="rounded-lg border bg-secondary/25 p-3">
+              <p className="text-xs text-muted-foreground">Break allowance</p>
+              <p className="mt-1 font-medium">
+                {settingNumber(data.settings, "dailyBreakAllowanceMinutes", DAILY_BREAK_ALLOWANCE_MINUTES)} minutes
+              </p>
+            </div>
+          </div>
+          <FormSheet
+            title="Edit workspace settings"
+            description="Update company identity, work-hour rules, and restrained workspace branding."
+            triggerLabel="Edit settings"
+          >
           <form action={updateCompanySettingsAction} className="grid gap-5 lg:grid-cols-3">
+            <input type="hidden" name="logoUrl" value={data.company.logo_url ?? ""} />
             <div className="space-y-2 lg:col-span-2">
               <Label htmlFor="companyName">Organization name</Label>
               <Input id="companyName" name="companyName" defaultValue={data.company.name} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="logoUrl">Logo URL</Label>
-              <Input id="logoUrl" name="logoUrl" defaultValue={data.company.logo_url ?? ""} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="workDayTargetMinutes">Work day target minutes</Label>
@@ -105,15 +137,15 @@ export default async function SettingsPage({
             </div>
             <div className="space-y-2">
               <Label htmlFor="primaryColor">Primary color</Label>
-              <Input id="primaryColor" name="primaryColor" defaultValue={brandingValue(data.settings, "primaryColor", "#1f8a8a")} />
+              <Input id="primaryColor" name="primaryColor" defaultValue={brandingValue(data.settings, "primaryColor", "#7c3aed")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="secondaryColor">Secondary color</Label>
-              <Input id="secondaryColor" name="secondaryColor" defaultValue={brandingValue(data.settings, "secondaryColor", "#e9eef2")} />
+              <Input id="secondaryColor" name="secondaryColor" defaultValue={brandingValue(data.settings, "secondaryColor", "#ede9fe")} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="accentColor">Accent color</Label>
-              <Input id="accentColor" name="accentColor" defaultValue={brandingValue(data.settings, "accentColor", "#d4a72c")} />
+              <Input id="accentColor" name="accentColor" defaultValue={brandingValue(data.settings, "accentColor", "#4f46e5")} />
             </div>
             <div className="flex items-end lg:col-span-3">
               <Button type="submit">
@@ -122,6 +154,7 @@ export default async function SettingsPage({
               </Button>
             </div>
           </form>
+          </FormSheet>
         </CardContent>
       </Card>
 
@@ -139,7 +172,7 @@ export default async function SettingsPage({
               <div key={key} className="rounded-lg border bg-secondary/30 p-3">
                 <div
                   className="mb-3 h-10 rounded-md border"
-                  style={{ backgroundColor: brandingValue(data.settings, key, "#1f8a8a") }}
+                  style={{ backgroundColor: brandingValue(data.settings, key, key === "accentColor" ? "#4f46e5" : key === "secondaryColor" ? "#ede9fe" : "#7c3aed") }}
                 />
                 <p className="text-sm font-medium">{key}</p>
               </div>

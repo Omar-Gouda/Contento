@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { RoleDashboardFoundation } from "@/components/dashboard/role-dashboard-foundation";
 import { roleDashboards } from "@/config/site";
@@ -16,6 +17,10 @@ export default async function ClientDashboardPage() {
     getDashboardCharts(context),
     getDashboardSections(context),
   ]);
+
+  if (!sections.clients.length) {
+    redirect("/account-inactive?error=client-expired");
+  }
 
   return (
     <RoleDashboardFoundation

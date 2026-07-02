@@ -132,10 +132,16 @@ Company-scoped client workspace records for agency deliverables and client-facin
 | `brief_drive_link` | Link to the client brief or source folder. |
 | `requirements` | Client requirements and operating notes. |
 | `assigned_account_manager_id` | Account manager owner inside the company. |
-| `status` | Client lifecycle state: active, paused, or archived. |
+| `contract_start_date` | Optional client contract start date. |
+| `contract_end_date` | Optional client contract end date. Past end dates move active clients to expired status. |
+| `disabled_at` | Timestamp for manual disablement, expiry disablement, or archive/delete-style lifecycle blocking. |
+| `disabled_reason` | Optional reason shown to internal operators when a client is disabled or expired. |
+| `status` | Client lifecycle state: active, disabled, expired, or archived. Legacy paused values are migrated to disabled. |
 | `created_by` | User who created the client workspace. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
+
+Disabled and expired client profiles block Client-role portal access and prevent new task, idea, or content creation for that client. Historical internal work remains readable inside the normal company and role scope.
 
 ### `client_assignments`
 
@@ -302,7 +308,7 @@ Company-scoped report table for daily, weekly, creator, team, and company report
 
 ### `calendar_events`
 
-Company-scoped scheduling table for content calendar items and optional general scheduling events. The product calendar intentionally shows scheduling records only, not reports, ideas, work sessions, analytics, or activity logs.
+Company-scoped scheduling table for content calendar items and optional general scheduling events. The product calendar shows scheduling records, task due dates, idea/content publishing dates, day off, and sick leave only; it does not show reports, work sessions, analytics, or activity logs.
 
 | Field | Purpose |
 | --- | --- |
@@ -902,3 +908,11 @@ Migration `202606240004_contento_final_production_saas_readiness.sql` adds final
 * Content review scoring fields.
 * Additional permissions for notifications, attachments, comments, mentions, search, saved views, analytics, templates, and dashboard customization.
 * RLS policies and indexes for the final production tables and helper functions.
+
+Migration `202607020001_contento_client_contract_password_storage_hotfix.sql` adds client lifecycle hardening:
+
+* Client contract dates: `clients.contract_start_date` and `clients.contract_end_date`.
+* Client disabled metadata: `clients.disabled_at` and `clients.disabled_reason`.
+* Client lifecycle states: active, disabled, expired, and archived.
+* Automatic expiry normalization for active clients whose contract end date has passed in `Africa/Cairo`.
+* Company-scoped `expire_current_company_clients()` RPC that also disables assigned Client-role users for expired client workspaces.
