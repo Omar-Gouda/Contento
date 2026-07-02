@@ -57,7 +57,7 @@ export function ForgotPasswordForm() {
       <CardHeader>
         <CardTitle>Reset your password</CardTitle>
         <CardDescription>
-          Enter your account email and we will send a secure reset link.
+          Enter your account email and we will send a secure reset link. If that inbox cannot receive recovery links, contact your Marketing Manager.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

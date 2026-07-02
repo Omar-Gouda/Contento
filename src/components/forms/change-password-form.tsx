@@ -56,7 +56,7 @@ export function ChangePasswordForm() {
           Change password
         </CardTitle>
         <CardDescription>
-          Update your temporary password before accessing your workspace.
+          Choose a new secure password for your Contento account.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

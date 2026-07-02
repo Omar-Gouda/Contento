@@ -65,7 +65,7 @@ export default async function AdminWorkHoursPage({
                 <Input id="date" name="date" type="date" defaultValue={selectedDate} className="pl-9" />
               </div>
             </div>
-            <Button type="submit">Apply</Button>
+            <Button type="submit" className="w-fit">Apply</Button>
           </form>
         </CardContent>
       </Card>

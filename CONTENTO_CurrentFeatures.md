@@ -99,6 +99,10 @@ Features:
 * Create and edit client workspaces
 * Assign account managers and scoped production users
 * Track client briefs, branding, contacts, notes, and requirements
+* Track client contract start/end dates and lifecycle state: active, disabled, expired, or archived
+* Expired or disabled clients are blocked from client-portal access while internal users retain historical visibility
+* New tasks, ideas, and content cannot be created for disabled or expired clients until the client is reactivated
+* Marketing Managers can disable, reactivate, archive/delete, and manage lifecycle reason text for client profiles
 * Link tasks, ideas, content, reports, and calendar items to clients
 * View client-specific workspace pages and delivery history
 * Preserve structured report metrics and require an explicit internal send action before Client role users can read client-scoped reports
@@ -120,6 +124,7 @@ Features:
 * Force Marketing Manager-created users to change their password on first login
 * Manage client assignments where permitted
 * Marketing Manager can delete users through a confirmation modal with keep-content or remove-content options
+* Marketing Manager can issue a temporary password reset for company users; the user is forced through `/change-password` on next sign-in
 
 ## 5.1 User Invitations
 
@@ -206,11 +211,13 @@ Features:
 * Schedule content
 * View task due dates
 * View scheduled content
+* View idea/content publishing dates in a compact scheduling grid
 * Submit day off and sick leave requests
 * Review scoped pending time-off requests when the role has approval permission
-* View optional general scheduling events
+* Click a calendar date to open a day-details drawer
+* Click event chips to open the linked task, idea, content item, or time-off review target
 * `Africa/Cairo` timezone respected in display
-* Calendar intentionally excludes ideas, reports, work sessions, analytics events, and activity logs
+* Calendar intentionally excludes reports, work sessions, analytics events, and activity logs
 
 ## 9. Reports
 
@@ -225,7 +232,8 @@ Features:
 * Company reports
 * Client-scoped report history
 * Export reports as CSV
-* Report body is generated from live task, content, work-hours, and time-off data with optional user notes
+* Report body is generated from live task, idea publishing, content, comment, work-hours, and time-off data with optional user notes
+* Report builder opens in a sheet and separates auto-generated operational sections from editable marketing metrics
 * Marketing Manager can view company reports
 * Account Manager report visibility is limited to assigned users, assigned teams, and assigned clients
 * Client users only see reports explicitly sent to their assigned client workspace
@@ -299,15 +307,23 @@ Features:
 * Modern SaaS design
 * Responsive layout
 * Sidebar navigation
-* Mobile navigation
+* Mobile drawer navigation plus compact bottom navigation for core routes
 * Loading states
 * Empty states
 * Error states
 * Smooth animations
+* Purple/violet primary theme with semantic status colors
+* Large create/edit forms open in sheets or collapsible sections on core operational pages
+* Record-level edit controls are hidden behind explicit manage/review/add sections so pages are view-only by default
+* List filters are collapsed by default and show active filter chips
+* Filters open from compact sheet buttons on Clients, Tasks, Ideas, Content, Reports, Users, and Reviews
+* Dashboard task and idea previews use sticky-note style cards backed by real dashboard data
 * Dark mode with light, dark, and system preferences
 * Theme toggle and sign out controls live in the header
 * `/` redirects to sign in after landing page removal
 * Smoother sign-in lock-screen reveal with lower drag threshold and velocity-based unlock
+* Organization and client logos upload to company-scoped storage paths, preview with automatic square object-fit cropping, and render through signed URLs after refresh
+* Profile avatars, organization logos, and client logos can be removed; the database path is cleared and the storage object is deleted when available
 
 ## 14. Exporting
 
@@ -408,6 +424,7 @@ Created in the current implementation:
 * Two-step content review flow: Content Creator draft -> Team Lead review -> Account Manager review -> approved/rejected/changes requested
 * Content rating support through `content_ratings` and `content.rate`
 * Content calendar at `/calendar` with month, week, and day views for task due dates, idea publishing dates, scheduled content, day off, and sick leave
+* Calendar controls render outside the grid, event chips stay inside day cells, overflowing month cells show a `+N more` day link, and each date opens a day-detail sheet
 * Reports page at `/reports`
 * Report detail page at `/reports/[id]`
 * CSV report export route at `/reports/export`
@@ -433,9 +450,12 @@ Created in the final production phase:
 * Global search at `/search`
 * Saved views and advanced filter persistence for operational list pages
 * Organization settings and branding at `/settings`
+* Organization logo upload in settings and client logo upload in client profile edit mode
 * User profile management at `/profile`
+* Profile password changes update Supabase Auth without redirecting active users away; forced password changes still clear `must_change_password` and redirect by role
+* Forgot/reset password recovery uses safe generic messaging, Marketing Manager contact fallback guidance, and session-aware post-reset routing
 * Review scoring fields on content reviews
-* Content templates at `/content/templates`
+* Standalone content templates page removed from navigation; existing active templates can still be used during content creation when present
 * Dashboard widget customization with user preferences under `/settings/preferences`
 * Expanded audit logging for user management and workflow actions
 * GitHub and Vercel readiness documentation, safe `.env.example`, and temporary file cleanup

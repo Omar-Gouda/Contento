@@ -6,6 +6,7 @@ import { getRoleDisplayName } from "@/types/roles";
 export type CompanySettingsData = {
   company: Database["public"]["Tables"]["companies"]["Row"];
   settings: Json;
+  companyLogoSignedUrl: string | null;
 };
 
 export type ProfileData = Database["public"]["Tables"]["users"]["Row"] & {
@@ -33,9 +34,24 @@ export async function getCompanySettings(context: AuthContext): Promise<CompanyS
     throw new Error("Unable to load organization settings.");
   }
 
+  let companyLogoSignedUrl: string | null = null;
+
+  if (company.logo_url) {
+    if (company.logo_url.startsWith("http://") || company.logo_url.startsWith("https://")) {
+      companyLogoSignedUrl = company.logo_url;
+    } else {
+      const { data: signedLogo } = await supabase.storage
+        .from("contento-avatars")
+        .createSignedUrl(company.logo_url, 60 * 60);
+
+      companyLogoSignedUrl = signedLogo?.signedUrl ?? null;
+    }
+  }
+
   return {
     company: company as Database["public"]["Tables"]["companies"]["Row"],
     settings: settings?.settings_json ?? {},
+    companyLogoSignedUrl,
   };
 }
 
@@ -86,19 +102,27 @@ export async function getCompanyBranding(context: AuthContext) {
   try {
     const data = await getCompanySettings(context);
     const settings = data.settings;
+    const fallback = {
+      companyName: data.company.name,
+      logoUrl: data.companyLogoSignedUrl,
+      primaryColor: null,
+      secondaryColor: null,
+      accentColor: null,
+    };
 
     if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
-      return null;
+      return fallback;
     }
 
     const branding = settings.branding;
 
     if (!branding || typeof branding !== "object" || Array.isArray(branding)) {
-      return null;
+      return fallback;
     }
 
     return {
       companyName: data.company.name,
+      logoUrl: data.companyLogoSignedUrl,
       primaryColor: typeof branding.primaryColor === "string" ? branding.primaryColor : null,
       secondaryColor: typeof branding.secondaryColor === "string" ? branding.secondaryColor : null,
       accentColor: typeof branding.accentColor === "string" ? branding.accentColor : null,

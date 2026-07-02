@@ -253,8 +253,10 @@ Platform role for organization lifecycle only. Super Admin can create organizati
 1. Marketing Manager creates a client workspace inside the company by creating a Client role user.
 2. Users can be assigned to the client workspace based on role and responsibility.
 3. Tasks, ideas, content, reports, and calendar events can be linked to that client.
-4. Client users see only their assigned client workspace and shared delivery information.
-5. Internal users retain company, role, team, and client-scope boundaries.
+4. Contract start/end dates and lifecycle state control whether the client is active, disabled, expired, or archived.
+5. Disabled and expired clients cannot access the client portal and cannot receive new tasks, ideas, or content until reactivated.
+6. Client users see only their assigned active client workspace and shared delivery information.
+7. Internal users retain company, role, team, and client-scope boundaries for historical work.
 
 ### Review Workflow
 
@@ -331,13 +333,16 @@ The system should store:
 Implemented production foundations now include:
 
 * Authentication, onboarding, platform Super Admin organization bootstrap, organization lifecycle management, protected routes, RBAC, and RLS.
-* Admin user management, shared team workspace, task management with detail pages, ideas with detail pages, content pipeline with detail pages, content reviews and scoring, calendar month/week/list views, reports with detail pages, CSV report export with activity logging, working hours, scoped dashboard summaries, dark mode, and modern dashboard shell.
-* Notifications with header dropdown, global search as a standalone page, comments, mentions, attachments, saved views, content templates, organization settings and branding, profile management, dashboard customization under `/settings/preferences`, and Supabase Storage buckets.
+* Admin user management, Marketing Manager temporary password resets, shared team workspace, task management with detail pages, ideas with detail pages, content pipeline with detail pages, content reviews and scoring, calendar month/week/day views, reports with detail pages, CSV report export with activity logging, working hours, scoped dashboard summaries, dark mode, and modern dashboard shell.
+* Notifications with header dropdown, global search as a standalone page, comments, mentions, attachments, saved views, retained content-template storage/use support, organization settings and branding, profile management, avatar/logo removal, dashboard customization under `/settings/preferences`, and Supabase Storage buckets.
 * Role dashboards are private productivity spaces for the signed-in user's own work. Team/company review queues live in scoped operational pages.
-* Calendar is scheduling-only: task due dates, scheduled content, submitted day off/sick leave requests, and optional meetings. It does not show ideas, reports, work sessions, analytics events, or activity logs.
-* Reports are generated from real task, content, work-hours, and time-off data, with optional user notes and preserved history.
+* Calendar is scheduling-only: task due dates, idea/content publishing dates, scheduled content, submitted day off/sick leave requests, and optional meetings. It uses a separated weekday header and month/week/day grids, and it does not show reports, work sessions, analytics events, or activity logs.
+* Reports are generated from real task, idea publishing, content, comment, work-hours, and time-off data, with optional user notes, editable marketing metrics, and preserved history.
+* Large create/edit forms on core operational pages open in sheets or collapsible sections so lists, records, and calendars stay visible first.
+* Operational pages are view-only by default, with active filter chips and collapsed filter panels to preserve a focused mobile and desktop reading experience.
+* The default UI theme uses purple/violet as the primary brand color while keeping status colors semantic and dark-mode safe.
 * New operational workflow routes are server-rendered, permission-checked, company-scoped, team-boundary-aware, and backed by Supabase tables.
-* Client workspace management is implemented with company-scoped clients, client assignments, client-linked tasks/ideas/content/reports/calendar entries, final Drive handoff links, and client-facing dashboards.
+* Client workspace management is implemented with company-scoped clients, client assignments, contract lifecycle controls, disabled/expired portal blocking, client-linked tasks/ideas/content/reports/calendar entries, final Drive handoff links, and client-facing dashboards.
 
 Still deferred:
 

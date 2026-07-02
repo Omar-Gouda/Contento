@@ -14,12 +14,38 @@ const optionalUrlSchema = z
   .transform((value) => (value ? value : null))
   .pipe(z.string().url("Enter a valid URL.").nullable());
 
+const optionalLogoValueSchema = z
+  .string()
+  .trim()
+  .max(500, "Logo value is too long.")
+  .optional()
+  .transform((value) => (value ? value : null))
+  .pipe(
+    z
+      .string()
+      .refine((value) => {
+        if (/^https?:\/\//i.test(value)) {
+          return z.string().url().safeParse(value).success;
+        }
+
+        return /^[a-zA-Z0-9/_./-]+$/.test(value);
+      }, "Logo must be a valid URL or stored workspace logo path.")
+      .nullable()
+  );
+
 const colorSchema = z
   .string()
   .trim()
   .optional()
   .transform((value) => (value ? value : null))
   .pipe(z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #2563eb.").nullable());
+
+const optionalDateSchema = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => (value ? value : null))
+  .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date.").nullable());
 
 export const clientProfileSchema = z.object({
   clientId: optionalUuidSchema,
@@ -30,7 +56,7 @@ export const clientProfileSchema = z.object({
     .max(160, "Slug is too long.")
     .optional()
     .default(""),
-  logoUrl: optionalUrlSchema,
+  logoUrl: optionalLogoValueSchema,
   primaryColor: colorSchema,
   secondaryColor: colorSchema,
   accentColor: colorSchema,
@@ -47,7 +73,19 @@ export const clientProfileSchema = z.object({
   requirements: z.string().trim().max(5000, "Brief details are too long.").default(""),
   assignedAccountManagerId: optionalUuidSchema,
   assignedUserIds: z.array(z.string().trim().uuid()).default([]),
-  status: z.enum(["active", "paused", "archived"]),
+  contractStartDate: optionalDateSchema,
+  contractEndDate: optionalDateSchema,
+  disabledReason: z.string().trim().max(500, "Disabled reason is too long.").default(""),
+  status: z.enum(["active", "disabled", "expired", "archived"]),
+}).refine((value) => {
+  if (!value.contractStartDate || !value.contractEndDate) {
+    return true;
+  }
+
+  return value.contractEndDate >= value.contractStartDate;
+}, {
+  message: "Contract end date must be on or after the start date.",
+  path: ["contractEndDate"],
 });
 
 export const archiveClientSchema = z.object({

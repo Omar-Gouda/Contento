@@ -14,6 +14,9 @@ import { AuthorizationError, hasPermission } from "@/lib/auth/permissions";
 import { canOpenReports } from "@/lib/workflows/scope";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { FormSheet } from "@/components/dashboard/form-sheet";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -34,6 +37,31 @@ const reportTypes = ["daily", "weekly", "creator", "team", "company"] as const;
 const generatedReportTypes = ["daily", "weekly"] as const;
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+const generatedSections = [
+  ["Completed tasks", "tasks.status + updated_at"],
+  ["Pending tasks", "tasks.status"],
+  ["Submitted content", "content_items.submitted_at"],
+  ["Approved / declined content", "content_items.status"],
+  ["Revision count", "content_items change-request statuses"],
+  ["Client comments", "task and entity comments"],
+  ["Work-hours summary", "work_days totals"],
+  ["Missing hours", "work_days.total_missing_minutes"],
+] as const;
+const manualMetrics = [
+  ["reachGrowth", "Reach growth %"],
+  ["engagementRate", "Engagement rate %"],
+  ["followerGrowth", "Follower growth"],
+  ["totalAdSpend", "Total ad spend"],
+  ["reach", "Reach"],
+  ["impressions", "Impressions"],
+  ["clicks", "Clicks"],
+  ["ctr", "CTR"],
+  ["cpc", "CPC"],
+  ["cpm", "CPM"],
+  ["leadsGenerated", "Leads generated"],
+  ["conversions", "Conversions"],
+  ["roas", "ROAS"],
+] as const;
 
 export default async function ReportsPage({
   searchParams,
@@ -62,36 +90,27 @@ export default async function ReportsPage({
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-primary">Reports</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal">Reports</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Submit and review daily, weekly, user, team, and company reports with company-scoped access.
-          </p>
-        </div>
-        {canExport && (
-          <a
-            href={`/reports/export?type=${encodeURIComponent(params.type ?? "all")}&team=${encodeURIComponent(params.team ?? "all")}&client=${encodeURIComponent(params.client ?? "all")}`}
-            className={buttonVariants({ variant: "outline" })}
+      <PageHeader
+        eyebrow="Reports"
+        title="Reports"
+        description="Submit and review daily, weekly, user, team, and company reports with company-scoped access."
+        actions={
+          <PageActions>
+            {canExport && (
+              <a
+                href={`/reports/export?type=${encodeURIComponent(params.type ?? "all")}&team=${encodeURIComponent(params.team ?? "all")}&client=${encodeURIComponent(params.client ?? "all")}`}
+                className={buttonVariants({ variant: "outline", size: "lg" })}
+              >
+                <Download />
+                Export CSV
+              </a>
+            )}
+            {canSubmit && (
+          <FormSheet
+            title="Generated report builder"
+            description="Contento generates the operational report from live records. Add optional notes and editable marketing metrics before saving."
+            triggerLabel="Generate report"
           >
-            <Download />
-            Export CSV
-          </a>
-        )}
-      </div>
-
-      <PageMessage error={params.error} status={params.notice} />
-
-      {canSubmit && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Generated draft builder</CardTitle>
-            <CardDescription>
-              Generate a structured draft from workspace activity, then add client-ready metrics for Account Manager and Marketing Manager review.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
             <form action={generateReportAction} className="grid gap-4 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="reportType">Type</Label>
@@ -126,25 +145,24 @@ export default async function ReportsPage({
                   {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
                 </select>
               </div>
+              <div className="grid gap-3 lg:col-span-4 md:grid-cols-2">
+                {generatedSections.map(([label, source]) => (
+                  <div key={label} className="rounded-lg border bg-secondary/25 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Source: {source}</p>
+                      </div>
+                      <Badge variant="secondary">Auto</Badge>
+                    </div>
+                    <p className="mt-3 rounded-md bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+                      Generated from the selected report range when saved.
+                    </p>
+                  </div>
+                ))}
+              </div>
               <div className="grid gap-4 lg:col-span-4 lg:grid-cols-3">
-                {[
-                  ["postsPublished", "Total posts published"],
-                  ["storiesPublished", "Total stories published"],
-                  ["reelsPublished", "Total reels/videos published"],
-                  ["reachGrowth", "Reach growth %"],
-                  ["engagementRate", "Engagement rate %"],
-                  ["followerGrowth", "Follower growth"],
-                  ["totalAdSpend", "Total ad spend"],
-                  ["reach", "Reach"],
-                  ["impressions", "Impressions"],
-                  ["clicks", "Clicks"],
-                  ["ctr", "CTR"],
-                  ["cpc", "CPC"],
-                  ["cpm", "CPM"],
-                  ["leadsGenerated", "Leads generated"],
-                  ["conversions", "Conversions"],
-                  ["roas", "ROAS"],
-                ].map(([name, label]) => (
+                {manualMetrics.map(([name, label]) => (
                   <div key={name} className="space-y-2">
                     <Label htmlFor={name}>{label}</Label>
                     <input id={name} name={name} className={selectClass} />
@@ -201,16 +219,16 @@ export default async function ReportsPage({
                 </p>
               </div>
             </form>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Review reports by type, team, or client.</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </FormSheet>
+            )}
+            <FilterPanel
+              description="Review reports by type, team, or client."
+              activeFilters={[
+                { label: "Type", value: params.type },
+                { label: "Team", value: activeTeams.find((team) => team.id === params.team)?.name ?? params.team },
+                { label: "Client", value: activeClients.find((client) => client.id === params.client)?.name ?? params.client },
+              ]}
+            >
           <form action="/reports" className="grid gap-3 md:grid-cols-[180px_180px_180px_auto]">
             <div className="space-y-2">
               <Label htmlFor="type">Type</Label>
@@ -234,11 +252,15 @@ export default async function ReportsPage({
               </select>
             </div>
             <div className="flex items-end">
-              <Button type="submit">Apply</Button>
+              <Button type="submit" className="w-fit">Apply</Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+            </FilterPanel>
+          </PageActions>
+        }
+      />
+
+      <PageMessage error={params.error} status={params.notice} />
 
       <Card>
         <CardHeader>
@@ -246,7 +268,32 @@ export default async function ReportsPage({
           <CardDescription>{reports.length} report records found.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="grid gap-3 md:hidden">
+            {reports.map((report) => (
+              <Link key={report.id} href={`/reports/${report.id}`} className="rounded-xl border bg-secondary/20 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{report.title || "Untitled report"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatCairoDateTime(report.created_at)}</p>
+                  </div>
+                  <Badge variant="secondary">{report.report_type}</Badge>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
+                  <span>User: {report.userName ?? "Company"}</span>
+                  <span>Team: {report.teamName ?? "No team"}</span>
+                  <span>Client: {report.clientName ?? "No client"}</span>
+                </div>
+                <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{report.body}</p>
+              </Link>
+            ))}
+            {!reports.length && (
+              <div className="rounded-xl border border-dashed px-3 py-10 text-center text-muted-foreground">
+                <FileDown className="mx-auto mb-3 size-8 text-primary" />
+                No reports match this filter.
+              </div>
+            )}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[920px] border-separate border-spacing-0 text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground">

@@ -71,6 +71,20 @@ export const updateUserTeamSchema = z.object({
   teamId: optionalUuidSchema,
 });
 
+export const resetUserPasswordSchema = z.object({
+  userId: z.string().trim().uuid(),
+  temporaryPassword: z
+    .string()
+    .min(8, "Temporary password must be at least 8 characters.")
+    .regex(/[A-Z]/, "Temporary password must include an uppercase letter.")
+    .regex(/[a-z]/, "Temporary password must include a lowercase letter.")
+    .regex(/[0-9]/, "Temporary password must include a number."),
+  confirmTemporaryPassword: z.string(),
+}).refine((value) => value.temporaryPassword === value.confirmTemporaryPassword, {
+  message: "Temporary passwords do not match.",
+  path: ["confirmTemporaryPassword"],
+});
+
 export const terminateUserSchema = z.object({
   userId: z.string().trim().uuid(),
   mode: z.enum(["keep_content", "remove_content"]),

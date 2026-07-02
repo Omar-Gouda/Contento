@@ -194,6 +194,30 @@ async function assertClientInCompany(clientId: string | null, companyId: string)
   }
 }
 
+async function assertClientAcceptsNewWork(clientId: string | null, companyId: string) {
+  if (!clientId) {
+    return;
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, status, contract_end_date")
+    .eq("id", clientId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("Client does not belong to this company.");
+  }
+
+  const today = getCairoDate();
+
+  if (data.status !== "active" || (data.contract_end_date && data.contract_end_date < today)) {
+    throw new Error("Client is not active.");
+  }
+}
+
 async function assertClientScopeForReport(context: AuthContext, clientId: string | null) {
   if (!clientId || context.role === "admin") {
     return;
@@ -503,7 +527,7 @@ export async function createTaskAction(formData: FormData) {
   try {
     await assertUserInCompany(parsed.data.assignedTo, context.companyId);
     await assertTeamInCompany(parsed.data.teamId, context.companyId);
-    await assertClientInCompany(parsed.data.clientId, context.companyId);
+    await assertClientAcceptsNewWork(parsed.data.clientId, context.companyId);
     await assertAssignmentScope(context, parsed.data.teamId, parsed.data.assignedTo);
   } catch {
     safeRedirect(parsed.data.redirectTo, "error", "Choose valid assignee, team, and client values inside your role scope.");
@@ -739,7 +763,7 @@ export async function createIdeaAction(formData: FormData) {
   try {
     await assertUserInCompany(parsed.data.assignedTo, context.companyId);
     await assertTeamInCompany(parsed.data.teamId, context.companyId);
-    await assertClientInCompany(parsed.data.clientId, context.companyId);
+    await assertClientAcceptsNewWork(parsed.data.clientId, context.companyId);
     await assertAssignmentScope(context, parsed.data.teamId, parsed.data.assignedTo);
   } catch {
     safeRedirect(parsed.data.redirectTo, "error", "Choose valid company idea links.");
@@ -1047,7 +1071,7 @@ export async function createContentAction(formData: FormData) {
     await assertTaskInCompany(parsed.data.taskId, context.companyId);
     await assertIdeaInCompany(parsed.data.ideaId, context.companyId);
     await assertTeamInCompany(parsed.data.teamId, context.companyId);
-    await assertClientInCompany(parsed.data.clientId, context.companyId);
+    await assertClientAcceptsNewWork(parsed.data.clientId, context.companyId);
     await assertAssignmentScope(context, parsed.data.teamId, creatorId);
   } catch {
     safeRedirect(parsed.data.redirectTo, "error", "Choose valid content links inside your role scope.");
@@ -1560,6 +1584,20 @@ export async function generateReportAction(formData: FormData) {
     .in("status", ["approved", "rejected", "changes_requested_by_team_lead", "changes_requested_by_supervisor"])
     .gte("updated_at", range.startIso)
     .lte("updated_at", range.endIso);
+  let scheduledContentQuery = supabase
+    .from("content_items")
+    .select("id, title, status, scheduled_at, creator_id, team_id, client_id")
+    .eq("company_id", context.companyId)
+    .not("scheduled_at", "is", null)
+    .gte("scheduled_at", range.startIso)
+    .lte("scheduled_at", range.endIso);
+  let publishingIdeasQuery = supabase
+    .from("ideas")
+    .select("id, idea_type, status, publishing_at, assigned_to, created_by, team_id, client_id")
+    .eq("company_id", context.companyId)
+    .not("publishing_at", "is", null)
+    .gte("publishing_at", range.startIso)
+    .lte("publishing_at", range.endIso);
   let workDaysQuery = supabase
     .from("work_days")
     .select("total_worked_minutes, total_break_minutes, total_missing_minutes, status")
@@ -1578,6 +1616,8 @@ export async function generateReportAction(formData: FormData) {
     updatedTasksQuery = updatedTasksQuery.eq("team_id", teamId);
     submittedContentQuery = submittedContentQuery.eq("team_id", teamId);
     reviewedContentQuery = reviewedContentQuery.eq("team_id", teamId);
+    scheduledContentQuery = scheduledContentQuery.eq("team_id", teamId);
+    publishingIdeasQuery = publishingIdeasQuery.eq("team_id", teamId);
   }
 
   if (clientId) {
@@ -1585,6 +1625,8 @@ export async function generateReportAction(formData: FormData) {
     updatedTasksQuery = updatedTasksQuery.eq("client_id", clientId);
     submittedContentQuery = submittedContentQuery.eq("client_id", clientId);
     reviewedContentQuery = reviewedContentQuery.eq("client_id", clientId);
+    scheduledContentQuery = scheduledContentQuery.eq("client_id", clientId);
+    publishingIdeasQuery = publishingIdeasQuery.eq("client_id", clientId);
   }
 
   if (reportUserId) {
@@ -1592,6 +1634,8 @@ export async function generateReportAction(formData: FormData) {
     updatedTasksQuery = updatedTasksQuery.eq("assigned_to", reportUserId);
     submittedContentQuery = submittedContentQuery.eq("creator_id", reportUserId);
     reviewedContentQuery = reviewedContentQuery.eq("creator_id", reportUserId);
+    scheduledContentQuery = scheduledContentQuery.eq("creator_id", reportUserId);
+    publishingIdeasQuery = publishingIdeasQuery.or(`assigned_to.eq.${reportUserId},created_by.eq.${reportUserId}`);
     workDaysQuery = workDaysQuery.eq("user_id", reportUserId);
     timeOffQuery = timeOffQuery.eq("user_id", reportUserId);
   }
@@ -1601,6 +1645,8 @@ export async function generateReportAction(formData: FormData) {
     { data: updatedTasks, error: updatedTasksError },
     { data: submittedContent, error: submittedContentError },
     { data: reviewedContent, error: reviewedContentError },
+    { data: scheduledContent, error: scheduledContentError },
+    { data: publishingIdeas, error: publishingIdeasError },
     { data: workDays, error: workDaysError },
     { data: timeOff, error: timeOffError },
   ] = await Promise.all([
@@ -1608,6 +1654,8 @@ export async function generateReportAction(formData: FormData) {
     updatedTasksQuery,
     submittedContentQuery,
     reviewedContentQuery,
+    scheduledContentQuery,
+    publishingIdeasQuery,
     workDaysQuery,
     timeOffQuery,
   ]);
@@ -1617,6 +1665,8 @@ export async function generateReportAction(formData: FormData) {
     updatedTasksError ||
     submittedContentError ||
     reviewedContentError ||
+    scheduledContentError ||
+    publishingIdeasError ||
     workDaysError ||
     timeOffError
   ) {
@@ -1639,12 +1689,44 @@ export async function generateReportAction(formData: FormData) {
   const updatedTaskRows = updatedTasks ?? [];
   const submittedContentRows = submittedContent ?? [];
   const reviewedContentRows = reviewedContent ?? [];
+  const scheduledContentRows = scheduledContent ?? [];
+  const publishingIdeaRows = publishingIdeas ?? [];
   const timeOffRows = timeOff ?? [];
+  const pendingTaskRows = updatedTaskRows.filter((task) => !["completed", "closed"].includes(task.status));
+  const approvedContentRows = reviewedContentRows.filter((item) => ["approved", "scheduled", "published"].includes(item.status));
+  const declinedContentRows = reviewedContentRows.filter((item) => item.status === "rejected");
+  const revisionRows = reviewedContentRows.filter((item) => String(item.status).includes("changes_requested"));
+  const contentFormatCounts = {
+    posts: publishingIdeaRows.filter((idea) => idea.idea_type === "post").length,
+    stories: publishingIdeaRows.filter((idea) => idea.idea_type === "story").length,
+    reels: publishingIdeaRows.filter((idea) => idea.idea_type === "reel").length,
+  };
+  const taskIdsForComments = updatedTaskRows.map((task) => task.id);
+  const { count: clientCommentCount, error: commentCountError } = taskIdsForComments.length
+    ? await supabase
+      .from("task_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", context.companyId)
+      .in("task_id", taskIdsForComments)
+      .gte("created_at", range.startIso)
+      .lte("created_at", range.endIso)
+    : { count: 0, error: null };
+
+  if (commentCountError) {
+    safeRedirect("/reports", "error", "Report comment data could not be generated.");
+  }
+
   const note = parsed.data.note.trim();
   const builderMetrics = {
-    postsPublished: parsed.data.postsPublished,
-    storiesPublished: parsed.data.storiesPublished,
-    reelsPublished: parsed.data.reelsPublished,
+    postsPublished: contentFormatCounts.posts,
+    storiesPublished: contentFormatCounts.stories,
+    reelsPublished: contentFormatCounts.reels,
+    scheduledContent: scheduledContentRows.length,
+    approvedContent: approvedContentRows.length,
+    declinedContent: declinedContentRows.length,
+    revisionCount: revisionRows.length,
+    pendingTasks: pendingTaskRows.length,
+    clientComments: clientCommentCount ?? 0,
     reachGrowth: parsed.data.reachGrowth,
     engagementRate: parsed.data.engagementRate,
     followerGrowth: parsed.data.followerGrowth,
@@ -1682,10 +1764,19 @@ export async function generateReportAction(formData: FormData) {
   const bodyLines = [
     `${title}`,
     `Scope: ${scopeLabel}.`,
+    `Total posts published: ${contentFormatCounts.posts}.`,
+    `Total stories published: ${contentFormatCounts.stories}.`,
+    `Total reels/videos published: ${contentFormatCounts.reels}.`,
     `Completed tasks: ${completedTaskRows.length}.`,
+    `Pending tasks: ${pendingTaskRows.length}.`,
     `Updated tasks: ${updatedTaskRows.length}.`,
     `Submitted content: ${submittedContentRows.length}.`,
+    `Content scheduled: ${scheduledContentRows.length}.`,
+    `Content approved: ${approvedContentRows.length}.`,
+    `Content declined: ${declinedContentRows.length}.`,
+    `Revision count: ${revisionRows.length}.`,
     `Reviewed/decisioned content: ${reviewedContentRows.length}.`,
+    `Client comments: ${clientCommentCount ?? 0}.`,
     `Worked time: ${minutesLabel(workSummary.worked)}.`,
     `Break time: ${minutesLabel(workSummary.break)}.`,
     `Missing time: ${minutesLabel(workSummary.missing)}.`,

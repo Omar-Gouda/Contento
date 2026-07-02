@@ -28,7 +28,6 @@ export const routes = {
   content: {
     home: "/content",
     reviews: "/content/reviews",
-    templates: "/content/templates",
   },
   reviews: {
     ideas: "/reviews/ideas",

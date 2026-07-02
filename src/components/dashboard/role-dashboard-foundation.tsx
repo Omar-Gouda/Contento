@@ -3,6 +3,7 @@ import {
   BarChart3,
   Building2,
   ClipboardList,
+  Pin,
   type LucideIcon,
 } from "lucide-react";
 
@@ -158,8 +159,11 @@ function ClientSection({ sections }: { sections: DashboardSections }) {
         />
       </CardHeader>
       <CardContent>
-        <div className="grid gap-3 md:grid-cols-2">
-          {sections.clients.slice(0, 4).map((client) => (
+        {sections.clientsError ? (
+          <EmptyState label={sections.clientsError} href="/clients" action="Open clients" />
+        ) : sections.clients.length ? (
+          <div className="grid gap-3 md:grid-cols-2">
+            {sections.clients.slice(0, 4).map((client) => (
             <Link
               key={client.id}
               href={client.href}
@@ -201,8 +205,11 @@ function ClientSection({ sections }: { sections: DashboardSections }) {
                 </div>
               </div>
             </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState label="No client spaces are available for your role yet." href="/clients" action="Open clients" />
+        )}
       </CardContent>
     </Card>
   );
@@ -213,6 +220,14 @@ function WorkItemList({
 }: {
   items: DashboardWorkItem[];
 }) {
+  const stickyColors = [
+    "border-amber-200 bg-amber-100/90 text-amber-950 shadow-amber-950/10 dark:border-amber-300/20 dark:bg-amber-300/15 dark:text-amber-50",
+    "border-violet-200 bg-violet-100/90 text-violet-950 shadow-violet-950/10 dark:border-violet-300/20 dark:bg-violet-300/15 dark:text-violet-50",
+    "border-emerald-200 bg-emerald-100/90 text-emerald-950 shadow-emerald-950/10 dark:border-emerald-300/20 dark:bg-emerald-300/15 dark:text-emerald-50",
+    "border-sky-200 bg-sky-100/90 text-sky-950 shadow-sky-950/10 dark:border-sky-300/20 dark:bg-sky-300/15 dark:text-sky-50",
+  ];
+  const rotations = ["rotate-[-1.4deg]", "rotate-[1deg]", "rotate-[-0.6deg]", "rotate-[1.3deg]"];
+
   return (
     <Card>
       <CardHeader>
@@ -222,31 +237,52 @@ function WorkItemList({
           icon={ClipboardList}
         />
       </CardHeader>
-      <CardContent className="grid gap-3">
+      <CardContent className="grid gap-4 sm:grid-cols-2">
         {items.length ? (
-          items.map((item) => (
+          items.map((item, index) => {
+            const isIdea = item.href.startsWith("/ideas");
+            const isTask = item.href.startsWith("/tasks");
+
+            return (
             <Link
               key={`${item.href}-${item.id}`}
               href={item.href}
-              className="rounded-lg border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-primary/5"
+              className={cn(
+                "group relative min-h-36 rounded-lg border p-4 shadow-md transition duration-200 hover:-translate-y-1 hover:rotate-0 hover:shadow-lg",
+                stickyColors[index % stickyColors.length],
+                rotations[index % rotations.length]
+              )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {[item.clientName, item.actionLabel].filter(Boolean).join(" / ") || item.label}
+              <span className="absolute left-1/2 top-2 flex size-5 -translate-x-1/2 items-center justify-center rounded-full bg-background/70 text-primary shadow-sm">
+                <Pin className="size-3" />
+              </span>
+              <div className="mt-4 flex min-h-24 flex-col justify-between gap-4">
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                      {isIdea ? "Idea" : isTask ? "Task" : item.label}
+                    </span>
+                    <Badge variant="outline" className={cn("shrink-0 bg-background/45 capitalize", statusTone(item.status))}>
+                      {item.status.replaceAll("_", " ")}
+                    </Badge>
+                  </div>
+                  <p className="line-clamp-2 text-sm font-semibold">{item.title}</p>
+                  <p className="mt-2 line-clamp-1 text-xs opacity-75">
+                    {item.clientName ?? "No client"}
                   </p>
                 </div>
-                <Badge variant="outline" className={cn("shrink-0 capitalize", statusTone(item.status))}>
-                  {item.status.replaceAll("_", " ")}
-                </Badge>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span className="capitalize">{item.label.replaceAll("_", " ")}</span>
-                <span>{formatDashboardDate(item.date)}</span>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span className="rounded-md bg-background/45 px-2 py-1">
+                    {isIdea ? "Type" : "Priority"}: {item.label.replaceAll("_", " ")}
+                  </span>
+                  <span className="rounded-md bg-background/45 px-2 py-1">
+                    {isIdea ? "Publish" : "Due"}: {formatDashboardDate(item.date)}
+                  </span>
+                </div>
               </div>
             </Link>
-          ))
+            );
+          })
         ) : (
           <EmptyState label="No active work needs your attention right now." href="/tasks" action="Open task queue" />
         )}
@@ -286,8 +322,14 @@ export function RoleDashboardFoundation({
       </div>
 
       <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {visibleSummary.map((metric) => (
-          <Card key={metric.label}>
+        {visibleSummary.map((metric, index) => (
+          <Card
+            key={metric.label}
+            className={cn(
+              "overflow-hidden border-primary/10 shadow-sm",
+              index % 2 === 0 ? "bg-gradient-to-br from-card to-primary/5" : "bg-gradient-to-br from-card to-violet-500/5"
+            )}
+          >
             <CardHeader>
               <CardTitle>{metric.value}</CardTitle>
               <CardDescription>{metric.label}</CardDescription>

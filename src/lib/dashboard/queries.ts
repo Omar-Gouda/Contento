@@ -57,6 +57,7 @@ export type DashboardWorkItem = {
 
 export type DashboardSections = {
   clients: DashboardClientCard[];
+  clientsError: string | null;
   workItems: DashboardWorkItem[];
   reviewItems: DashboardWorkItem[];
   reports: DashboardWorkItem[];
@@ -566,8 +567,21 @@ export async function getDashboardCharts(context: AuthContext): Promise<Dashboar
 }
 
 export async function getDashboardSections(context: AuthContext): Promise<DashboardSections> {
-  const [clients, tasks, ideas, content, reports, notifications] = await Promise.all([
-    getClients(context),
+  const clientsPromise = getClients(context)
+    .then((clients) => ({ clients, clientsError: null as string | null }))
+    .catch((error: unknown) => {
+      console.error("dashboard clients section error", {
+        message: error instanceof Error ? error.message : "Unable to load clients.",
+      });
+
+      return {
+        clients: [],
+        clientsError: "Client data could not be loaded. Open Clients to retry after the workspace schema is updated.",
+      };
+    });
+
+  const [{ clients, clientsError }, tasks, ideas, content, reports, notifications] = await Promise.all([
+    clientsPromise,
     getWorkflowTasks(context, { status: "all" }),
     getWorkflowIdeas(context, { status: "all" }),
     getWorkflowContent(context, { status: "all" }),
@@ -587,7 +601,7 @@ export async function getDashboardSections(context: AuthContext): Promise<Dashbo
     return {
       id: client.id,
       name: client.name,
-      logoUrl: client.logo_url,
+      logoUrl: client.logoSignedUrl,
       status: client.status,
       accountManagerName: client.accountManagerName,
       briefDriveLink: client.brief_drive_link,
@@ -656,6 +670,7 @@ export async function getDashboardSections(context: AuthContext): Promise<Dashbo
   if (context.role === "client") {
     return {
       clients: clientCards,
+      clientsError,
       workItems: itemLimit([
         ...content
           .filter((item) => item.status !== "archived")
@@ -680,6 +695,7 @@ export async function getDashboardSections(context: AuthContext): Promise<Dashbo
   if (context.role === "admin" || context.role === "supervisor") {
     return {
       clients: itemLimit(clientCards, context.role === "admin" ? 8 : 6),
+      clientsError,
       workItems: itemLimit(assignedTasks, 6),
       reviewItems: itemLimit(contentReviews, 6),
       reports: itemLimit(reportItems, 5),
@@ -689,6 +705,7 @@ export async function getDashboardSections(context: AuthContext): Promise<Dashbo
 
   return {
     clients: itemLimit(clientCards, 6),
+    clientsError,
     workItems: itemLimit([...assignedTasks, ...assignedIdeas], 6),
     reviewItems: itemLimit(contentReviews.filter((item) => context.role !== "creator" || item.status !== "sent_to_supervisor"), 5),
     reports: itemLimit(reportItems, 4),

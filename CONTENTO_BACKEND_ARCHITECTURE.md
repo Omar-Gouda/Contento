@@ -193,6 +193,7 @@ Implemented responsibilities:
 * Sign in.
 * Forgot password.
 * Reset password.
+* Marketing Manager-issued temporary password reset through trusted server-only Supabase Admin API.
 * Sign out.
 * Protected routes.
 * Role-based redirect.
@@ -219,6 +220,7 @@ Implemented responsibilities:
 * Role permissions.
 * Admin user listing, filtering, status changes, role assignment, and team assignment.
 * Admin invitations.
+* Admin temporary password reset with `must_change_password` enforcement.
 * Client assignments and client workspace ownership metadata.
 
 ### Working Hours
@@ -239,11 +241,11 @@ Implemented responsibilities:
 Implemented responsibilities:
 
 * Admin team creation, updates, archive state, lead assignment, member assignment, and team statistics.
-* Client workspace creation, editing, assignments, and client-linked delivery visibility.
+* Client workspace creation, editing, assignments, contract lifecycle status, expiry blocking, and client-linked delivery visibility.
 * Task creation, assignment, reassignment, status updates, priority, due dates, comments, and activity logs.
 * Idea creation, editing, deletion, assignment, notes, status tracking, and activity logs.
 * Content item creation, client/task/idea linking, creator assignment, submission, resubmission, review feedback, approval, rejection, change requests, final Drive handoff, and scheduling.
-* Calendar month, week, and day views for scheduling only: task due dates, scheduled content, submitted day off/sick leave requests, and optional general meetings using `Africa/Cairo` display rules.
+* Calendar month, week, and day grid views for scheduling only: task due dates, scheduled content, submitted day off/sick leave requests, and optional general meetings using `Africa/Cairo` display rules.
 * Time-off request submission and scoped Admin/Supervisor approval with reviewer metadata.
 * Generated daily and weekly reports from real tasks, content decisions, client scope, work hours, and time-off records, plus CSV export with permission checks.
 
@@ -267,7 +269,7 @@ Implemented responsibilities:
 * Notification records with entity links, unread counts, header dropdown, read/unread filters, mark-read actions, and browser-local sound preference.
 * Generic comments, mentions, and attachments for tasks, ideas, content, and reports.
 * Mention notifications for same-company accessible users.
-* Supabase Storage buckets for attachments and avatars.
+* Supabase Storage buckets for attachments and avatars, with profile avatar and organization/client logo removal clearing database paths and deleting storage objects when available.
 * Standalone global search across accessible company records. The app shell does not show a fake header search field.
 * Saved views for advanced filters.
 * Content templates for reusable content creation.

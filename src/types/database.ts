@@ -83,7 +83,11 @@ export type Database = {
         brief_drive_link: string | null;
         requirements: string;
         assigned_account_manager_id: string | null;
-        status: "active" | "paused" | "archived";
+        contract_start_date: string | null;
+        contract_end_date: string | null;
+        disabled_at: string | null;
+        disabled_reason: string | null;
+        status: "active" | "disabled" | "expired" | "archived";
         created_by: string | null;
         created_at: string;
         updated_at: string;
@@ -560,6 +564,10 @@ export type Database = {
           target_client_id: string | null;
         };
         Returns: boolean;
+      };
+      expire_current_company_clients: {
+        Args: Record<string, never>;
+        Returns: number;
       };
     };
     Enums: {

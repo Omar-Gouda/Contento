@@ -23,7 +23,7 @@ function colorOrNull(value: string) {
   return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed : null;
 }
 
-const avatarTypes = new Map([
+const imageTypes = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
   ["image/webp", "webp"],
@@ -66,7 +66,7 @@ export async function uploadAvatarAction(formData: FormData) {
     safeRedirect("/profile", "error", "Avatar image must be 5 MB or smaller.");
   }
 
-  const extension = avatarTypes.get(file.type);
+  const extension = imageTypes.get(file.type);
 
   if (!extension) {
     safeRedirect("/profile", "error", "Avatar must be a JPG, PNG, WebP, or GIF image.");
@@ -109,6 +109,125 @@ export async function uploadAvatarAction(formData: FormData) {
 
   revalidatePath("/profile");
   safeRedirect("/profile", "notice", "Avatar updated.");
+}
+
+export async function removeAvatarAction() {
+  const context = await requireAuthContext();
+  const supabase = await createSupabaseServerClient();
+  const { data: currentProfile, error: loadError } = await supabase
+    .from("users")
+    .select("avatar_url")
+    .eq("id", context.userId)
+    .eq("company_id", context.companyId)
+    .maybeSingle();
+
+  if (loadError || !currentProfile) {
+    safeRedirect("/profile", "error", "Avatar could not be loaded.");
+  }
+
+  const { error } = await supabase
+    .from("users")
+    .update({ avatar_url: null })
+    .eq("id", context.userId)
+    .eq("company_id", context.companyId);
+
+  if (error) {
+    safeRedirect("/profile", "error", "Avatar could not be removed.");
+  }
+
+  if (currentProfile.avatar_url && !currentProfile.avatar_url.startsWith("http")) {
+    await supabase.storage.from("contento-avatars").remove([currentProfile.avatar_url]);
+  }
+
+  revalidatePath("/profile");
+  safeRedirect("/profile", "notice", "Avatar removed.");
+}
+
+export async function uploadOrganizationLogoAction(formData: FormData) {
+  const context = await requirePermission("settings.company", "limited");
+  const file = formData.get("logo");
+
+  if (!(file instanceof File) || file.size === 0) {
+    safeRedirect("/settings", "error", "Choose an organization logo image.");
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    safeRedirect("/settings", "error", "Organization logo must be 5 MB or smaller.");
+  }
+
+  const extension = imageTypes.get(file.type);
+
+  if (!extension) {
+    safeRedirect("/settings", "error", "Organization logo must be a JPG, PNG, WebP, or GIF image.");
+  }
+
+  const path = `${context.companyId}/organization/logo-${randomUUID()}.${extension}`;
+  const supabase = await createSupabaseServerClient();
+  const { data: currentCompany } = await supabase
+    .from("companies")
+    .select("logo_url")
+    .eq("id", context.companyId)
+    .maybeSingle();
+
+  const { error: uploadError } = await supabase.storage
+    .from("contento-avatars")
+    .upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (uploadError) {
+    safeRedirect("/settings", "error", "Organization logo could not be uploaded. Try a smaller image or another file.");
+  }
+
+  const { error } = await supabase
+    .from("companies")
+    .update({ logo_url: path })
+    .eq("id", context.companyId);
+
+  if (error) {
+    await supabase.storage.from("contento-avatars").remove([path]);
+    safeRedirect("/settings", "error", "Organization logo could not be saved.");
+  }
+
+  if (currentCompany?.logo_url && !currentCompany.logo_url.startsWith("http")) {
+    await supabase.storage.from("contento-avatars").remove([currentCompany.logo_url]);
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/", "layout");
+  safeRedirect("/settings", "notice", "Organization logo updated.");
+}
+
+export async function removeOrganizationLogoAction() {
+  const context = await requirePermission("settings.company", "limited");
+  const supabase = await createSupabaseServerClient();
+  const { data: currentCompany, error: loadError } = await supabase
+    .from("companies")
+    .select("logo_url")
+    .eq("id", context.companyId)
+    .maybeSingle();
+
+  if (loadError || !currentCompany) {
+    safeRedirect("/settings", "error", "Organization logo could not be loaded.");
+  }
+
+  const { error } = await supabase
+    .from("companies")
+    .update({ logo_url: null })
+    .eq("id", context.companyId);
+
+  if (error) {
+    safeRedirect("/settings", "error", "Organization logo could not be removed.");
+  }
+
+  if (currentCompany.logo_url && !currentCompany.logo_url.startsWith("http")) {
+    await supabase.storage.from("contento-avatars").remove([currentCompany.logo_url]);
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/", "layout");
+  safeRedirect("/settings", "notice", "Organization logo removed.");
 }
 
 export async function updateCompanySettingsAction(formData: FormData) {

@@ -25,7 +25,6 @@ type IdeaRow = Database["public"]["Tables"]["ideas"]["Row"];
 type ContentRow = Database["public"]["Tables"]["content_items"]["Row"];
 type ContentReviewRow = Database["public"]["Tables"]["content_reviews"]["Row"];
 type ContentRatingRow = Database["public"]["Tables"]["content_ratings"]["Row"];
-type CalendarEventRow = Database["public"]["Tables"]["calendar_events"]["Row"];
 type DayOffRow = Database["public"]["Tables"]["day_off_requests"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type ClientRow = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name">;
@@ -105,14 +104,6 @@ export type WorkflowReport = ReportRow & {
   body: string;
 };
 
-function calendarEventType(type: CalendarEventRow["event_type"]): CalendarItem["type"] {
-  if (type === "content") {
-    return "content";
-  }
-
-  return "day_off";
-}
-
 function fullName(user: Pick<UserRow, "first_name" | "last_name" | "email"> | null | undefined) {
   if (!user) {
     return null;
@@ -159,6 +150,14 @@ async function loadUsersAndRoles(context: AuthContext) {
       displayName: fullName(user) ?? user.email,
       roleName: user.role_id ? getRoleDisplayName(roleById.get(user.role_id)) : "Unassigned",
     }));
+}
+
+function dateOnly(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 export async function getWorkflowUsers(context: AuthContext) {
@@ -651,45 +650,19 @@ export async function getCalendarItems(
   const range = getCalendarRange(options.view, options.date);
   const startIso = range.start.toISOString();
   const endIso = range.end.toISOString();
-  const startDate = range.start.toISOString().slice(0, 10);
-  const endDate = range.end.toISOString().slice(0, 10);
+  const startDate = dateOnly(range.start);
+  const endDate = dateOnly(range.end);
   const [
-    { data: events },
-    { data: tasks },
-    { data: ideas },
-    { data: content },
+    tasks,
+    ideas,
+    content,
     { data: dayOff },
     users,
+    visibleUserIds,
   ] = await Promise.all([
-    supabase
-      .from("calendar_events")
-      .select("id, company_id, client_id, title, description, event_type, content_id, user_id, team_id, start_date, end_date, created_by, updated_at")
-      .eq("company_id", context.companyId)
-      .in("event_type", ["content", "day_off"])
-      .lte("start_date", endIso)
-      .gte("end_date", startIso)
-      .order("start_date", { ascending: true }),
-    supabase
-      .from("tasks")
-      .select("id, title, assigned_to, status, due_date, client_id")
-      .eq("company_id", context.companyId)
-      .not("due_date", "is", null)
-      .gte("due_date", startDate)
-      .lte("due_date", endDate),
-    supabase
-      .from("ideas")
-      .select("id, title, assigned_to, created_by, status, publishing_at, client_id")
-      .eq("company_id", context.companyId)
-      .not("publishing_at", "is", null)
-      .gte("publishing_at", startIso)
-      .lte("publishing_at", endIso),
-    supabase
-      .from("content_items")
-      .select("id, title, creator_id, status, scheduled_at, submitted_at, client_id")
-      .eq("company_id", context.companyId)
-      .not("scheduled_at", "is", null)
-      .gte("scheduled_at", startIso)
-      .lte("scheduled_at", endIso),
+    getWorkflowTasks(context, { status: "all" }),
+    getWorkflowIdeas(context, { status: "all" }),
+    getWorkflowContent(context, { status: "all" }),
     supabase
       .from("day_off_requests")
       .select("id, user_id, request_type, start_date, end_date, status")
@@ -697,30 +670,14 @@ export async function getCalendarItems(
       .lte("start_date", endDate)
       .gte("end_date", startDate),
     loadUsersAndRoles(context),
+    getVisibleUserIds(context),
   ]);
 
   const userById = new Map(users.map((user) => [user.id, user.displayName]));
-  const { data: clients } = await supabase.from("clients").select("id, name").eq("company_id", context.companyId);
-  const clientById = new Map(((clients as ClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
-  const eventContentIds = new Set(
-    ((events as CalendarEventRow[] | null) ?? [])
-      .map((event) => event.content_id)
-      .filter((contentId): contentId is string => Boolean(contentId))
-  );
+  const visibleUserSet = visibleUserIds ? new Set(visibleUserIds) : null;
   const items: CalendarItem[] = [
-    ...(((events as CalendarEventRow[] | null) ?? []).map((event) => ({
-      id: event.id,
-      type: calendarEventType(event.event_type),
-      title: event.title,
-      startsAt: event.start_date,
-      endsAt: event.end_date,
-      status: event.event_type,
-      owner: event.user_id ? userById.get(event.user_id) ?? null : null,
-      clientName: event.client_id ? clientById.get(event.client_id) ?? null : null,
-      href: event.content_id ? `${routes.content.home}/${event.content_id}` : null,
-    }))),
-    ...(((tasks as Array<Pick<TaskRow, "id" | "title" | "assigned_to" | "status" | "due_date" | "client_id">> | null) ?? [])
-      .filter((task) => task.due_date)
+    ...tasks
+      .filter((task) => task.due_date && task.due_date >= startDate && task.due_date <= endDate)
       .map((task) => ({
         id: task.id,
         type: "task" as const,
@@ -728,12 +685,12 @@ export async function getCalendarItems(
         startsAt: `${task.due_date}T09:00:00`,
         endsAt: `${task.due_date}T10:00:00`,
         status: task.status,
-        owner: task.assigned_to ? userById.get(task.assigned_to) ?? null : null,
-        clientName: task.client_id ? clientById.get(task.client_id) ?? null : null,
+        owner: task.assigneeName,
+        clientName: task.clientName,
         href: `${routes.tasks}/${task.id}`,
-      }))),
-    ...(((ideas as Array<Pick<IdeaRow, "id" | "title" | "assigned_to" | "created_by" | "status" | "publishing_at" | "client_id">> | null) ?? [])
-      .filter((idea) => idea.publishing_at)
+      })),
+    ...ideas
+      .filter((idea) => idea.publishing_at && idea.publishing_at >= startIso && idea.publishing_at <= endIso)
       .map((idea) => ({
         id: idea.id,
         type: "idea" as const,
@@ -741,19 +698,12 @@ export async function getCalendarItems(
         startsAt: idea.publishing_at as string,
         endsAt: idea.publishing_at as string,
         status: idea.status,
-        owner: idea.assigned_to
-          ? userById.get(idea.assigned_to) ?? null
-          : idea.created_by
-            ? userById.get(idea.created_by) ?? null
-            : null,
-        clientName: idea.client_id ? clientById.get(idea.client_id) ?? null : null,
+        owner: idea.assigneeName ?? idea.creatorName,
+        clientName: idea.clientName,
         href: `${routes.ideas}/${idea.id}`,
-      }))),
-    ...(((content as Array<Pick<ContentRow, "id" | "title" | "creator_id" | "status" | "scheduled_at" | "submitted_at" | "client_id">> | null) ?? [])
-      .filter((item) => {
-        const eventDate = item.scheduled_at;
-        return Boolean(eventDate && eventDate >= startIso && eventDate <= endIso && !eventContentIds.has(item.id));
-      })
+      })),
+    ...content
+      .filter((item) => item.scheduled_at && item.scheduled_at >= startIso && item.scheduled_at <= endIso)
       .map((item) => ({
         id: item.id,
         type: "content" as const,
@@ -761,12 +711,12 @@ export async function getCalendarItems(
         startsAt: item.scheduled_at as string,
         endsAt: item.scheduled_at as string,
         status: item.status,
-        owner: item.creator_id ? userById.get(item.creator_id) ?? null : null,
-        clientName: item.client_id ? clientById.get(item.client_id) ?? null : null,
+        owner: item.creatorName,
+        clientName: item.clientName,
         href: `${routes.content.home}/${item.id}`,
-      }))),
+      })),
     ...(((dayOff as Array<Pick<DayOffRow, "id" | "user_id" | "request_type" | "start_date" | "end_date" | "status">> | null) ?? [])
-      .filter((request) => request.user_id === context.userId || userById.has(request.user_id))
+      .filter((request) => request.user_id === context.userId || !visibleUserSet || visibleUserSet.has(request.user_id))
       .map((request) => ({
         id: request.id,
         type: request.request_type,

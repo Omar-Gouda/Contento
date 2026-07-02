@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { Camera } from "lucide-react";
+import { Camera, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-import { uploadAvatarAction } from "@/lib/settings/actions";
+import { removeAvatarAction, uploadAvatarAction } from "@/lib/settings/actions";
 
 function AvatarSubmitButton() {
   const { pending } = useFormStatus();
@@ -58,10 +58,7 @@ export function AvatarUpload({
   }
 
   return (
-    <form
-      action={uploadAvatarAction}
-      className="grid gap-4 md:grid-cols-[96px_1fr] md:items-center"
-    >
+    <div className="grid gap-4 md:grid-cols-[96px_1fr] md:items-center">
       <div className="flex size-24 items-center justify-center overflow-hidden rounded-2xl border bg-secondary text-xl font-semibold text-primary">
         {previewUrl ? (
           // Private Supabase Storage paths are rendered through short-lived signed URLs.
@@ -78,46 +75,53 @@ export function AvatarUpload({
       </div>
 
       <div className="grid gap-3">
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-          <label className="sr-only" htmlFor={inputId}>
-            Avatar image
-          </label>
-          <input
-            id={inputId}
-            name="avatar"
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const next = e.target.files?.[0] ?? null;
-              setClientError(null);
+        <form action={uploadAvatarAction} className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <label className="sr-only" htmlFor={inputId}>Avatar image</label>
+          <input id={inputId} name="avatar" type="file" accept="image/*" onChange={(e) => {
+            const next = e.target.files?.[0] ?? null;
+            setClientError(null);
 
-              if (next && !next.type.startsWith("image/")) {
-                updatePreview(null);
-                setClientError("Choose a JPG, PNG, WebP, or GIF image.");
-                e.currentTarget.value = "";
-                return;
-              }
+            if (next && !next.type.startsWith("image/")) {
+              updatePreview(null);
+              setClientError("Choose a JPG, PNG, WebP, or GIF image.");
+              e.currentTarget.value = "";
+              return;
+            }
 
-              if (next && next.size > 5 * 1024 * 1024) {
-                updatePreview(null);
-                setClientError("Avatar image must be 5 MB or smaller.");
-                e.currentTarget.value = "";
-                return;
-              }
+            if (next && next.size > 5 * 1024 * 1024) {
+              updatePreview(null);
+              setClientError("Avatar image must be 5 MB or smaller.");
+              e.currentTarget.value = "";
+              return;
+            }
 
-              updatePreview(next);
-            }}
-            className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
-          />
-
+            updatePreview(next);
+          }} className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50" />
           <AvatarSubmitButton />
-        </div>
+        </form>
+        {initialAvatarUrl && (
+          <form action={removeAvatarAction}>
+            <Button
+              type="submit"
+              variant="destructive"
+              size="sm"
+              onClick={(event) => {
+                if (!window.confirm("Remove your current avatar?")) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              <Trash2 />
+              Remove avatar
+            </Button>
+          </form>
+        )}
         <p className="text-xs text-muted-foreground">
           JPG, PNG, WebP, or GIF. Maximum file size is 5 MB.
         </p>
         {clientError && <p className="text-sm text-destructive">{clientError}</p>}
       </div>
-    </form>
+    </div>
   );
 }
 

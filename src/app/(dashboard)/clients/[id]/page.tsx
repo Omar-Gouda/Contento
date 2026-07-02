@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 
 import { PageMessage } from "@/components/admin/page-message";
+import { FormSheet } from "@/components/dashboard/form-sheet";
 import { IdeaTypeFields } from "@/components/dashboard/idea-type-fields";
+import { ClientLogoUpload } from "@/components/forms/logo-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -30,7 +32,7 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
-import { saveClientAction } from "@/lib/clients/actions";
+import { deleteClientAction, saveClientAction, updateClientLifecycleAction } from "@/lib/clients/actions";
 import { getClientAssignableUsers, getClientWorkspace } from "@/lib/clients/queries";
 import {
   addTaskCommentAction,
@@ -66,11 +68,35 @@ function statusTone(status: string) {
     return "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200";
   }
 
+  if (["disabled", "expired"].includes(status)) {
+    return "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200";
+  }
+
   if (["scheduled", "in_progress"].includes(status)) {
     return "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-200";
   }
 
   return "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-200";
+}
+
+function contractWarning(endDate: string | null) {
+  if (!endDate) {
+    return null;
+  }
+
+  const today = new Date();
+  const end = new Date(`${endDate}T12:00:00`);
+  const days = Math.ceil((end.getTime() - today.getTime()) / 86_400_000);
+
+  if (days < 0) {
+    return "Contract expired";
+  }
+
+  if (days <= 14) {
+    return `Contract ends in ${days} day${days === 1 ? "" : "s"}`;
+  }
+
+  return null;
 }
 
 function SectionCard({
@@ -127,8 +153,9 @@ export default async function ClientDetailPage({
     hasPermission(context, "clients.update", "limited") ||
     hasPermission(context, "clients.manage", "limited")
   ) && context.role !== "client";
-  const canCreateIdea = hasPermission(context, "ideas.create", "limited") && context.role !== "client";
-  const canCreateTask = hasPermission(context, "tasks.create", "limited") && context.role !== "client";
+  const clientAcceptsNewWork = client.status === "active";
+  const canCreateIdea = hasPermission(context, "ideas.create", "limited") && context.role !== "client" && clientAcceptsNewWork;
+  const canCreateTask = hasPermission(context, "tasks.create", "limited") && context.role !== "client" && clientAcceptsNewWork;
   const canComment = hasPermission(context, "tasks.view", "view") && context.role !== "client";
   const canFinalOutput = hasPermission(context, "content.final_output", "limited");
   const productionRole = isProductionRole(context.role);
@@ -141,10 +168,12 @@ export default async function ClientDetailPage({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
-  const logoStyle = client.logo_url
-    ? ({ backgroundImage: `url("${client.logo_url.replaceAll("\"", "%22")}")` } satisfies CSSProperties)
+  const displayLogoUrl = client.logoSignedUrl;
+  const logoStyle = displayLogoUrl
+    ? ({ backgroundImage: `url("${displayLogoUrl.replaceAll("\"", "%22")}")` } satisfies CSSProperties)
     : undefined;
   const recentComments = taskComments.slice(0, 8);
+  const contractNotice = contractWarning(client.contract_end_date);
   const productionTasks = productionRole
     ? client.tasks.filter((task) => task.assigned_to === context.userId)
     : client.tasks;
@@ -178,7 +207,7 @@ export default async function ClientDetailPage({
               className="flex size-16 shrink-0 items-center justify-center rounded-xl border bg-secondary bg-cover bg-center text-lg font-semibold text-primary"
               style={logoStyle}
             >
-              {!client.logo_url && initials}
+              {!displayLogoUrl && initials}
             </div>
             <div>
               <p className="text-sm font-medium text-primary">Client command center</p>
@@ -190,6 +219,7 @@ export default async function ClientDetailPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className={cn("capitalize", statusTone(client.status))}>{client.status}</Badge>
+            {contractNotice && <Badge variant="outline">{contractNotice}</Badge>}
             {client.contact_email && (
               <a href={`mailto:${client.contact_email}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 <Send />
@@ -230,6 +260,9 @@ export default async function ClientDetailPage({
               <div className="grid gap-3 text-sm">
                 <div><p className="text-muted-foreground">Contact person</p><p className="font-medium">{client.contact_person || "Not set"}</p></div>
                 <div><p className="text-muted-foreground">Contact email</p><p className="font-medium">{client.contact_email || "Not set"}</p></div>
+                <div><p className="text-muted-foreground">Contract start</p><p className="font-medium">{client.contract_start_date || "Not set"}</p></div>
+                <div><p className="text-muted-foreground">Contract end</p><p className="font-medium">{client.contract_end_date || "Not set"}</p></div>
+                <div><p className="text-muted-foreground">Disabled reason</p><p className="font-medium">{client.disabled_reason || "None"}</p></div>
                 <div>
                   <p className="text-muted-foreground">Brief link</p>
                   {client.brief_drive_link ? (
@@ -244,44 +277,105 @@ export default async function ClientDetailPage({
               </div>
 
               {canManageClient && (
-                <form action={saveClientAction} className="grid gap-3">
-                  <input type="hidden" name="clientId" value={client.id} />
-                  <input type="hidden" name="slug" value={client.slug ?? ""} />
-                  <input type="hidden" name="logoUrl" value={client.logo_url ?? ""} />
-                  <input type="hidden" name="primaryColor" value={client.primary_color ?? ""} />
-                  <input type="hidden" name="secondaryColor" value={client.secondary_color ?? ""} />
-                  <input type="hidden" name="accentColor" value={client.accent_color ?? ""} />
-                  <input type="hidden" name="notes" value={client.notes} />
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Client name</Label>
-                    <Input id="name" name="name" defaultValue={client.name} />
+                <FormSheet
+                  title="Edit client profile"
+                  description="Update client identity, contact details, brief links, and logo."
+                  triggerLabel="Edit client"
+                >
+                  <div className="grid gap-5">
+                    <ClientLogoUpload
+                      clientId={client.id}
+                      clientName={client.name}
+                      initialLogoUrl={displayLogoUrl}
+                    />
+                    <form action={saveClientAction} className="grid gap-3">
+                      <input type="hidden" name="clientId" value={client.id} />
+                      <input type="hidden" name="slug" value={client.slug ?? ""} />
+                      <input type="hidden" name="logoUrl" value={client.logo_url ?? ""} />
+                      <input type="hidden" name="primaryColor" value={client.primary_color ?? ""} />
+                      <input type="hidden" name="secondaryColor" value={client.secondary_color ?? ""} />
+                      <input type="hidden" name="accentColor" value={client.accent_color ?? ""} />
+                      <input type="hidden" name="notes" value={client.notes} />
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Client name</Label>
+                        <Input id="name" name="name" defaultValue={client.name} />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="contactPerson">Contact person</Label>
+                          <Input id="contactPerson" name="contactPerson" defaultValue={client.contact_person ?? ""} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="contactEmail">Contact email</Label>
+                          <Input id="contactEmail" name="contactEmail" type="email" defaultValue={client.contact_email ?? ""} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="briefDriveLink">Brief Drive link</Label>
+                        <Input id="briefDriveLink" name="briefDriveLink" type="url" defaultValue={client.brief_drive_link ?? ""} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="requirements">Requirements</Label>
+                        <textarea id="requirements" name="requirements" defaultValue={client.requirements} className="min-h-28 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="contractStartDate">Contract start date</Label>
+                          <Input id="contractStartDate" name="contractStartDate" type="date" defaultValue={client.contract_start_date ?? ""} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="contractEndDate">Contract end date</Label>
+                          <Input id="contractEndDate" name="contractEndDate" type="date" defaultValue={client.contract_end_date ?? ""} />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-[180px_1fr]">
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Status</Label>
+                          <select id="status" name="status" defaultValue={client.status} className={selectClass}>
+                            <option value="active">active</option>
+                            <option value="disabled">disabled</option>
+                            <option value="expired">expired</option>
+                            <option value="archived">archived</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="disabledReason">Disabled reason</Label>
+                          <Input id="disabledReason" name="disabledReason" defaultValue={client.disabled_reason ?? ""} />
+                        </div>
+                      </div>
+                      <input type="hidden" name="contactPhone" value={client.contact_phone ?? ""} />
+                      <input type="hidden" name="assignedAccountManagerId" value={client.assigned_account_manager_id ?? ""} />
+                      {client.assignedUsers.map((user) => (
+                        <input key={user.id} type="hidden" name="assignedUserIds" value={user.id} />
+                      ))}
+                      <Button type="submit">Save client</Button>
+                    </form>
+                    {context.role === "admin" && (
+                      <div className="rounded-xl border bg-secondary/20 p-4">
+                        <p className="text-sm font-semibold">Lifecycle controls</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Disabled or expired clients keep historical records visible to internal users, but assigned Client logins are disabled.
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <form action={updateClientLifecycleAction}>
+                            <input type="hidden" name="clientId" value={client.id} />
+                            <input type="hidden" name="status" value={client.status === "active" ? "disabled" : "active"} />
+                            <input type="hidden" name="disabledReason" value="Manually disabled by Marketing Manager." />
+                            <Button type="submit" variant={client.status === "active" ? "destructive" : "outline"} size="sm">
+                              {client.status === "active" ? "Disable client" : "Reactivate client"}
+                            </Button>
+                          </form>
+                          <form action={deleteClientAction}>
+                            <input type="hidden" name="clientId" value={client.id} />
+                            <Button type="submit" variant="destructive" size="sm">
+                              Delete client
+                            </Button>
+                          </form>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="contactPerson">Contact person</Label>
-                      <Input id="contactPerson" name="contactPerson" defaultValue={client.contact_person ?? ""} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="contactEmail">Contact email</Label>
-                      <Input id="contactEmail" name="contactEmail" type="email" defaultValue={client.contact_email ?? ""} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="briefDriveLink">Brief Drive link</Label>
-                    <Input id="briefDriveLink" name="briefDriveLink" type="url" defaultValue={client.brief_drive_link ?? ""} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="requirements">Requirements</Label>
-                    <textarea id="requirements" name="requirements" defaultValue={client.requirements} className="min-h-28 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-                  </div>
-                  <input type="hidden" name="status" value={client.status} />
-                  <input type="hidden" name="contactPhone" value={client.contact_phone ?? ""} />
-                  <input type="hidden" name="assignedAccountManagerId" value={client.assigned_account_manager_id ?? ""} />
-                  {client.assignedUsers.map((user) => (
-                    <input key={user.id} type="hidden" name="assignedUserIds" value={user.id} />
-                  ))}
-                  <Button type="submit">Save brief</Button>
-                </form>
+                </FormSheet>
               )}
             </div>
           </SectionCard>
@@ -291,7 +385,12 @@ export default async function ClientDetailPage({
       <SectionCard id="ideas" title="Ideas" description="Client-specific ideas, formats, scheduling, and creative direction." icon={MessageSquare}>
         <div className="grid gap-4">
           {canCreateIdea && (
-            <form action={createIdeaAction} className="grid gap-4 rounded-xl border bg-secondary/20 p-4 lg:grid-cols-3">
+            <FormSheet
+              title="Create client idea"
+              description={`Create a new idea already scoped to ${client.name}.`}
+              triggerLabel="Add idea"
+            >
+            <form action={createIdeaAction} className="grid gap-4 lg:grid-cols-3">
               <input type="hidden" name="clientId" value={client.id} />
               <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
               <div className="space-y-2 lg:col-span-2">
@@ -314,6 +413,7 @@ export default async function ClientDetailPage({
                 <Button type="submit"><Plus /> Submit idea</Button>
               </div>
             </form>
+            </FormSheet>
           )}
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -345,7 +445,12 @@ export default async function ClientDetailPage({
         <SectionCard id="tasks" title="Tasks" description="Client-scoped assignment and production delivery." icon={ClipboardList}>
           <div className="grid gap-4">
             {canCreateTask && !productionRole && (
-              <form action={createTaskAction} className="grid gap-4 rounded-xl border bg-secondary/20 p-4 lg:grid-cols-4">
+              <FormSheet
+                title="Create client task"
+                description={`Create production work already scoped to ${client.name}.`}
+                triggerLabel="Create task"
+              >
+              <form action={createTaskAction} className="grid gap-4 lg:grid-cols-4">
                 <input type="hidden" name="clientId" value={client.id} />
                 <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
                 <div className="space-y-2 lg:col-span-2">
@@ -377,6 +482,7 @@ export default async function ClientDetailPage({
                   <Button type="submit"><Plus /> Create task</Button>
                 </div>
               </form>
+              </FormSheet>
             )}
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -400,7 +506,9 @@ export default async function ClientDetailPage({
                     {task.final_drive_link && <a href={task.final_drive_link} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline", size: "sm" })}>Final link</a>}
                   </div>
                   {canFinalOutput && task.assigned_to === context.userId && (
-                    <form action={submitTaskFinalOutputAction} className="mt-4 grid gap-2">
+                    <details className="mt-4 rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Save final output</summary>
+                    <form action={submitTaskFinalOutputAction} className="mt-3 grid gap-2">
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
                       <Label htmlFor={`final-${task.id}`}>Final Drive link</Label>
@@ -409,14 +517,18 @@ export default async function ClientDetailPage({
                         <Button type="submit" variant="outline">Save final</Button>
                       </div>
                     </form>
+                    </details>
                   )}
                   {productionRole && task.assigned_to === context.userId && (
+                    <details className="mt-3 rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Submit for review</summary>
                     <form action={updateTaskStatusAction} className="mt-3">
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="status" value="under_review" />
                       <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
                       <Button type="submit" variant="outline" size="sm">Submit for Content Creator review</Button>
                     </form>
+                    </details>
                   )}
                 </div>
               ))}
@@ -483,7 +595,9 @@ export default async function ClientDetailPage({
           <SectionCard id="chat" title="Chat" description="Recent client-scoped task comments." icon={MessageSquare}>
             <div className="grid gap-3">
               {canComment && client.tasks.length > 0 && (
-                <form action={addTaskCommentAction} className="grid gap-3 rounded-xl border bg-secondary/20 p-4">
+                <details className="rounded-xl border bg-secondary/20 p-4">
+                  <summary className="cursor-pointer text-sm font-medium text-primary">Add client comment</summary>
+                <form action={addTaskCommentAction} className="mt-3 grid gap-3">
                   <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
                   <Label htmlFor="chat-task">Add comment</Label>
                   <select id="chat-task" name="taskId" className={selectClass}>
@@ -492,6 +606,7 @@ export default async function ClientDetailPage({
                   <Input name="body" placeholder="Add a client-specific update or handoff note" required />
                   <Button type="submit" variant="outline">Add comment</Button>
                 </form>
+                </details>
               )}
               {recentComments.map((comment) => (
                 <div key={comment.id} className="rounded-xl border bg-card p-4 text-sm">

@@ -191,15 +191,17 @@ export async function forgotPasswordAction(input: ForgotPasswordInput): Promise<
   });
 
   if (error) {
+    console.warn("Contento password reset email failed", error.message);
+
     return {
-      success: false,
-      message: "We could not start a password reset right now. Please try again.",
+      success: true,
+      message: "If an account exists, recovery instructions have been sent. If your email cannot receive recovery links, contact your Marketing Manager.",
     };
   }
 
   return {
     success: true,
-    message: "If that email belongs to a Contento account, a reset link has been sent.",
+    message: "If an account exists, recovery instructions have been sent. If your email cannot receive recovery links, contact your Marketing Manager.",
   };
 }
 
@@ -223,6 +225,58 @@ export async function resetPasswordAction(input: ResetPasswordInput): Promise<Au
     return {
       success: false,
       message: "Your reset link is invalid or expired. Request a new password reset link.",
+    };
+  }
+
+  const resolution = await loadAuthProfile(supabase);
+
+  if (resolution.state === "superior_admin") {
+    return {
+      success: true,
+      message: "Your password was updated.",
+      redirectTo: "/super-admin",
+    };
+  }
+
+  if (resolution.state === "active") {
+    return {
+      success: true,
+      message: "Your password was updated.",
+      redirectTo: resolution.context.mustChangePassword
+        ? "/change-password"
+        : getDefaultDashboardPath(resolution.context.role),
+    };
+  }
+
+  if (resolution.state === "inactive" || resolution.state === "incomplete_profile") {
+    return {
+      success: true,
+      message: "Your password was updated.",
+      redirectTo: "/account-inactive",
+    };
+  }
+
+  if (resolution.state === "organization_disabled") {
+    return {
+      success: true,
+      message: "Your password was updated.",
+      redirectTo: "/organization-disabled",
+    };
+  }
+
+  if (resolution.state === "organization_unavailable") {
+    return {
+      success: true,
+      message: "Your password was updated.",
+      redirectTo: "/organization-unavailable",
+    };
+  }
+
+  if (resolution.state === "missing_profile") {
+    return {
+      success: true,
+      message: "Your password was updated.",
+      redirectTo: "/onboarding",
     };
   }
 
@@ -257,13 +311,7 @@ export async function changePasswordAction(input: ResetPasswordInput): Promise<A
     };
   }
 
-  if (!initialResolution.context.mustChangePassword) {
-    return {
-      success: true,
-      message: "Your password is already up to date.",
-      redirectTo: getDefaultDashboardPath(initialResolution.context.role),
-    };
-  }
+  const forcedPasswordChange = initialResolution.context.mustChangePassword;
 
   const { error: updateError } = await supabase.auth.updateUser({
     password: parsed.data.password,
@@ -273,6 +321,13 @@ export async function changePasswordAction(input: ResetPasswordInput): Promise<A
     return {
       success: false,
       message: "We could not update your password right now. Please try again.",
+    };
+  }
+
+  if (!forcedPasswordChange) {
+    return {
+      success: true,
+      message: "Password updated.",
     };
   }
 

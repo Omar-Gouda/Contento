@@ -24,6 +24,9 @@ import { routes } from "@/constants/routes";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { FormSheet } from "@/components/dashboard/form-sheet";
+import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -160,113 +163,109 @@ export async function ContentSurface({
 
   return (
     <section className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-primary">Content pipeline</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal">
-          {mode === "reviews" ? "Content reviews" : "Content"}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          {mode === "reviews"
+      <PageHeader
+        eyebrow="Content pipeline"
+        title={mode === "reviews" ? "Content reviews" : "Content"}
+        description={
+          mode === "reviews"
             ? "Review submitted content through the Team Lead and Account Manager handoff flow."
-            : "Create drafts, submit work to team lead review, and schedule approved content."}
-        </p>
-      </div>
-
-      <PageMessage error={searchParams.error} status={searchParams.notice} />
-
-      {mode === "pipeline" && canCreate && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Create content item</CardTitle>
-            <CardDescription>Start a draft, assign a Content Creator, and optionally link it to an active task.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={createContentAction} className="grid gap-4 lg:grid-cols-4">
-              <input type="hidden" name="redirectTo" value="/content" />
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="creatorId">Content Creator</Label>
-                <select id="creatorId" name="creatorId" className={selectClass} defaultValue={context.userId}>
-                  {activeUsers.map((user) => (
-                    <option key={user.id} value={user.id}>{user.displayName}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clientId">Client</Label>
-                <select id="clientId" name="clientId" className={selectClass}>
-                  <option value="">No client</option>
-                  {activeClients.map((client) => (
-                    <option key={client.id} value={client.id}>{client.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="description">Description</Label>
-                <Input id="description" name="description" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="templateId">Template</Label>
-                <select id="templateId" name="templateId" className={selectClass}>
-                  <option value="">No template</option>
-                  {activeTemplates.map((template) => (
-                    <option key={template.id} value={template.id}>{template.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="taskId">Linked task</Label>
-                <select id="taskId" name="taskId" className={selectClass}>
-                  <option value="">No task</option>
-                  {openTasks.map((task) => (
-                    <option key={task.id} value={task.id}>{task.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ideaId">Linked idea</Label>
-                <select id="ideaId" name="ideaId" className={selectClass}>
-                  <option value="">No idea</option>
-                  {activeIdeas.map((idea) => (
-                    <option key={idea.id} value={idea.id}>{idea.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="teamId">Team</Label>
-                <select id="teamId" name="teamId" className={selectClass}>
-                  <option value="">No team</option>
-                  {activeTeams.map((team) => (
-                    <option key={team.id} value={team.id}>{team.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="finalDriveLink">Final Drive link</Label>
-                <Input id="finalDriveLink" name="finalDriveLink" type="url" placeholder="https://drive.google.com/..." />
-              </div>
-              <div className="lg:col-span-4">
-                <Button type="submit">
-                  <Plus />
-                  Create content
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {mode === "pipeline" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Filter content by status or title.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action="/content" className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_auto]">
+            : "Create drafts, submit work to team lead review, and schedule approved content."
+        }
+        actions={
+          <PageActions>
+            {mode === "pipeline" && canCreate && (
+              <FormSheet
+                title="Create content item"
+                description="Start a draft, assign a Content Creator, and optionally link it to an active task or idea."
+                triggerLabel="Create content"
+              >
+                <form action={createContentAction} className="grid gap-4 lg:grid-cols-4">
+                  <input type="hidden" name="redirectTo" value="/content" />
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" name="title" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="creatorId">Content Creator</Label>
+                    <select id="creatorId" name="creatorId" className={selectClass} defaultValue={context.userId}>
+                      {activeUsers.map((user) => (
+                        <option key={user.id} value={user.id}>{user.displayName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientId">Client</Label>
+                    <select id="clientId" name="clientId" className={selectClass}>
+                      <option value="">No client</option>
+                      {activeClients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input id="description" name="description" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="templateId">Template</Label>
+                    <select id="templateId" name="templateId" className={selectClass}>
+                      <option value="">No template</option>
+                      {activeTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>{template.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="taskId">Linked task</Label>
+                    <select id="taskId" name="taskId" className={selectClass}>
+                      <option value="">No task</option>
+                      {openTasks.map((task) => (
+                        <option key={task.id} value={task.id}>{task.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ideaId">Linked idea</Label>
+                    <select id="ideaId" name="ideaId" className={selectClass}>
+                      <option value="">No idea</option>
+                      {activeIdeas.map((idea) => (
+                        <option key={idea.id} value={idea.id}>{idea.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamId">Team</Label>
+                    <select id="teamId" name="teamId" className={selectClass}>
+                      <option value="">No team</option>
+                      {activeTeams.map((team) => (
+                        <option key={team.id} value={team.id}>{team.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 lg:col-span-2">
+                    <Label htmlFor="finalDriveLink">Final Drive link</Label>
+                    <Input id="finalDriveLink" name="finalDriveLink" type="url" placeholder="https://drive.google.com/..." />
+                  </div>
+                  <div className="lg:col-span-4">
+                    <Button type="submit">
+                      <Plus />
+                      Create content
+                    </Button>
+                  </div>
+                </form>
+              </FormSheet>
+            )}
+            <FilterPanel
+              title={mode === "reviews" ? "Review filters" : "Filters"}
+              description={mode === "reviews" ? "Filter submitted content by status, team, client, or title." : "Filter content by status, team, client, or title."}
+              activeFilters={[
+                { label: "Search", value: searchParams.q },
+                { label: "Status", value: searchParams.status },
+                { label: "Team", value: activeTeams.find((team) => team.id === searchParams.team)?.name ?? searchParams.team },
+                { label: "Client", value: activeClients.find((client) => client.id === searchParams.client)?.name ?? searchParams.client },
+              ]}
+            >
+            <form action={basePath} className="grid gap-3 md:grid-cols-[1fr_180px_180px_180px_auto]">
               <div className="space-y-2">
                 <Label htmlFor="q">Search</Label>
                 <Input id="q" name="q" defaultValue={searchParams.q ?? ""} />
@@ -293,12 +292,15 @@ export async function ContentSurface({
                 </select>
               </div>
               <div className="flex items-end">
-                <Button type="submit" className="w-full md:w-auto">Apply</Button>
+                <Button type="submit" className="w-fit">Apply</Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
-      )}
+            </FilterPanel>
+          </PageActions>
+        }
+      />
+
+      <PageMessage error={searchParams.error} status={searchParams.notice} />
 
       <div className="grid gap-4">
         {reviewableContent.map((item) => {
@@ -383,7 +385,9 @@ export async function ContentSurface({
                   )}
 
                   {mode === "pipeline" && canSchedule && item.status === "approved" && (
-                    <form action={scheduleContentAction} className="flex flex-wrap gap-2">
+                    <details className="rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Schedule content</summary>
+                    <form action={scheduleContentAction} className="mt-3 flex flex-wrap gap-2">
                       <input type="hidden" name="contentId" value={item.id} />
                       <input type="hidden" name="redirectTo" value={basePath} />
                       <Input name="scheduledAt" type="datetime-local" className="w-56" required />
@@ -392,10 +396,13 @@ export async function ContentSurface({
                         Schedule
                       </Button>
                     </form>
+                    </details>
                   )}
 
                   {canFinalOutput && (
-                    <form action={submitContentFinalOutputAction} className="flex flex-col gap-2 rounded-lg border bg-secondary/20 p-3">
+                    <details className="rounded-lg border bg-secondary/20 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-primary">Save final output</summary>
+                    <form action={submitContentFinalOutputAction} className="mt-3 flex flex-col gap-2">
                       <input type="hidden" name="contentId" value={item.id} />
                       <input type="hidden" name="redirectTo" value={basePath} />
                       <Label htmlFor={`final-${item.id}`}>Final Drive link</Label>
@@ -411,11 +418,14 @@ export async function ContentSurface({
                         <Button type="submit" variant="outline" size="sm">Save final</Button>
                       </div>
                     </form>
+                    </details>
                   )}
                 </div>
 
                 {canReviewItem && (
-                  <form action={reviewContentAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+                  <details className="rounded-lg border bg-secondary/20 p-3">
+                    <summary className="cursor-pointer text-sm font-medium text-primary">Review content</summary>
+                  <form action={reviewContentAction} className="mt-3 grid gap-3">
                     <input type="hidden" name="contentId" value={item.id} />
                     <input type="hidden" name="redirectTo" value={routes.reviews.content} />
                     <div className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
@@ -469,10 +479,13 @@ export async function ContentSurface({
                       </div>
                     </div>
                   </form>
+                  </details>
                 )}
 
                 {canRateItem && (
-                  <form action={rateContentAction} className="grid gap-3 rounded-lg border bg-background p-3">
+                  <details className="rounded-lg border bg-background p-3">
+                    <summary className="cursor-pointer text-sm font-medium text-primary">Rate content</summary>
+                  <form action={rateContentAction} className="mt-3 grid gap-3">
                     <input type="hidden" name="contentId" value={item.id} />
                     <input type="hidden" name="redirectTo" value={routes.reviews.content} />
                     <div className="grid gap-3 md:grid-cols-[140px_1fr_auto]">
@@ -496,6 +509,7 @@ export async function ContentSurface({
                       </div>
                     </div>
                   </form>
+                  </details>
                 )}
 
                 {itemReviews.length > 0 && (
