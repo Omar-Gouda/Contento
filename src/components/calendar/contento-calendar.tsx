@@ -178,16 +178,17 @@ function itemTime(item: CalendarItem) {
   return formatCairoTime(item.startsAt);
 }
 
-function EventChip({ item, today, compact = false }: { item: CalendarItem; today: string; compact?: boolean }) {
+function EventChip({ item, today, compact = false, tiny = false }: { item: CalendarItem; today: string; compact?: boolean; tiny?: boolean }) {
   const content = (
     <span
       className={cn(
         "block min-w-0 rounded-lg border px-2 py-1.5 text-left text-[11px] leading-4 shadow-sm transition hover:ring-2 hover:ring-primary/20",
+        tiny && "rounded-md px-1 py-0.5 text-[9px] leading-3",
         eventTone(item, today)
       )}
     >
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className="size-1.5 shrink-0 rounded-full bg-current" />
+      <span className={cn("flex min-w-0 items-center gap-1.5", tiny && "gap-1")}>
+        <span className={cn("size-1.5 shrink-0 rounded-full bg-current", tiny && "size-1")} />
         <span className="truncate font-semibold">{item.title}</span>
       </span>
       {!compact && (
@@ -293,20 +294,46 @@ function DayAgenda({
   );
 }
 
-function DaySheet({ day, items, today, canReviewTimeOff }: { day: string; items: CalendarItem[]; today: string; canReviewTimeOff: boolean }) {
+function DaySheet({
+  day,
+  items,
+  today,
+  canReviewTimeOff,
+  compactOnMobile = false,
+}: {
+  day: string;
+  items: CalendarItem[];
+  today: string;
+  canReviewTimeOff: boolean;
+  compactOnMobile?: boolean;
+}) {
+  const fullLabel = formatDate(day, { weekday: "short", month: "short", day: "numeric" });
+  const mobileLabel = formatDate(day, { day: "numeric" });
+
   return (
     <Sheet>
       <SheetTrigger
         render={
           <button
             type="button"
-            className="inline-flex min-h-9 items-center rounded-full px-2 text-left text-xs font-semibold transition hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+              "inline-flex min-h-9 items-center rounded-full px-2 text-left text-xs font-semibold transition hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring",
+              compactOnMobile && "min-h-6 px-1 text-[11px] sm:min-h-9 sm:px-2 sm:text-xs"
+            )}
           />
         }
       >
-        {formatDate(day, { weekday: "short", month: "short", day: "numeric" })}
+        {compactOnMobile ? (
+          <>
+            <span className="sm:hidden">{mobileLabel}</span>
+            <span className="hidden sm:inline">{fullLabel}</span>
+          </>
+        ) : fullLabel}
       </SheetTrigger>
-      <SheetContent side="right" className="inset-0 h-full w-full overflow-y-auto p-0 sm:inset-y-0 sm:left-auto sm:w-[min(40rem,94vw)] sm:max-w-none">
+      <SheetContent
+        side="bottom"
+        className="max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl p-0 sm:inset-y-0 sm:left-auto sm:right-0 sm:h-full sm:max-h-none sm:w-[min(40rem,94vw)] sm:max-w-none sm:rounded-none sm:border-l sm:border-t-0"
+      >
         <SheetHeader className="border-b px-5 py-5">
           <SheetTitle>{formatDate(day, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</SheetTitle>
           <SheetDescription>
@@ -321,7 +348,19 @@ function DaySheet({ day, items, today, canReviewTimeOff }: { day: string; items:
   );
 }
 
-function CalendarToolbar({ view, anchorDate, today, range }: { view: CalendarView; anchorDate: string; today: string; range: CalendarRange }) {
+function CalendarToolbar({
+  view,
+  anchorDate,
+  today,
+  range,
+  canRequestTimeOff,
+}: {
+  view: CalendarView;
+  anchorDate: string;
+  today: string;
+  range: CalendarRange;
+  canRequestTimeOff: boolean;
+}) {
   const previousDate = shiftAnchor(anchorDate, view, -1);
   const nextDate = shiftAnchor(anchorDate, view, 1);
 
@@ -371,6 +410,7 @@ function CalendarToolbar({ view, anchorDate, today, range }: { view: CalendarVie
             <ChevronRight />
             <span className="sr-only">Next</span>
           </Link>
+          {canRequestTimeOff && <RequestTimeOffButton anchorDate={anchorDate} redirectTo={calendarHref(view, anchorDate)} />}
         </div>
       </div>
     </div>
@@ -383,7 +423,6 @@ function RequestTimeOffButton({ anchorDate, redirectTo }: { anchorDate: string; 
       title="Request time off"
       description="Submit a day off or sick leave request for the selected Cairo calendar date."
       triggerLabel="Request time off"
-      triggerClassName="fixed bottom-5 right-5 z-20 shadow-lg sm:static sm:shadow-none"
     >
       <form action={createTimeOffRequestAction} className="grid gap-4 lg:grid-cols-2">
         <input type="hidden" name="redirectTo" value={redirectTo} />
@@ -439,17 +478,19 @@ function MonthView({
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="hidden h-11 grid-cols-7 border-b bg-secondary/30 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sm:grid">
+      <div className="grid h-8 grid-cols-7 border-b bg-secondary/30 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:h-11 sm:text-[11px] sm:tracking-[0.14em]">
         {weekdays.map((day) => (
-          <div key={day} className="flex items-center justify-center px-2">
-            {day}
+          <div key={day} className="flex items-center justify-center px-1 sm:px-2">
+            <span className="sm:hidden">{day[0]}</span>
+            <span className="hidden sm:inline">{day}</span>
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-7">
+      <div className="grid grid-cols-7">
         {days.map((date) => {
           const day = dateKey(date);
           const records = itemsForDay(items, day);
+          const mobileRecord = records[0] ?? null;
           const visibleRecords = records.slice(0, 3);
           const outsideMonth = date.getMonth() !== activeMonth;
           const isToday = day === today;
@@ -459,19 +500,31 @@ function MonthView({
             <div
               key={day}
               className={cn(
-                "min-h-36 overflow-hidden border-b p-3 transition-colors sm:border-r sm:p-2",
+                "min-h-16 overflow-hidden border-b border-r p-1 transition-colors sm:min-h-36 sm:p-2",
                 outsideMonth && "bg-secondary/20 text-muted-foreground",
                 isSelected && "bg-primary/5",
                 isToday && "ring-1 ring-inset ring-primary/40"
               )}
             >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <DaySheet day={day} items={records} today={today} canReviewTimeOff={canReviewTimeOff} />
-                <Badge variant={records.length ? "secondary" : "outline"} className="h-5 px-1.5 text-[10px]">
-                  {records.length}
-                </Badge>
+              <div className="mb-1 flex min-w-0 items-center justify-between gap-0.5 sm:mb-2 sm:gap-2">
+                <DaySheet day={day} items={records} today={today} canReviewTimeOff={canReviewTimeOff} compactOnMobile />
+                {records.length ? (
+                  <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[9px] sm:h-5 sm:px-1.5 sm:text-[10px]">
+                    {records.length}
+                  </Badge>
+                ) : (
+                  <span className="size-4 shrink-0" aria-hidden="true" />
+                )}
               </div>
-              <div className="grid gap-1.5">
+              <div className="grid gap-1 sm:hidden">
+                {mobileRecord && <EventChip item={mobileRecord} today={today} compact tiny />}
+                {records.length > 1 && (
+                  <Link href={calendarHref("day", day)} className="truncate rounded px-1 text-[9px] font-semibold leading-3 text-primary hover:bg-primary/10">
+                    +{records.length - 1}
+                  </Link>
+                )}
+              </div>
+              <div className="hidden gap-1.5 sm:grid">
                 {visibleRecords.map((item) => (
                   <EventChip key={`${item.type}-${item.id}-${day}`} item={item} today={today} compact />
                 ))}
@@ -573,7 +626,6 @@ export function ContentoCalendar({
               Plan task due dates, publishing moments, scheduled content, and availability in {CONTENTO_TIME_ZONE}.
             </p>
           </div>
-          {canRequestTimeOff && <RequestTimeOffButton anchorDate={anchorDate} redirectTo={calendarHref(view, anchorDate)} />}
         </div>
         <div className="grid gap-2 border-t bg-secondary/20 p-4 sm:grid-cols-3">
           <div className="flex items-center gap-2 rounded-xl border bg-background p-3">
@@ -600,7 +652,7 @@ export function ContentoCalendar({
         </div>
       </div>
 
-      <CalendarToolbar view={view} anchorDate={anchorDate} today={today} range={range} />
+      <CalendarToolbar view={view} anchorDate={anchorDate} today={today} range={range} canRequestTimeOff={canRequestTimeOff} />
 
       {view === "month" && (
         <MonthView
