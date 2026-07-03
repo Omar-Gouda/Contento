@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Download, FileDown, Sparkles } from "lucide-react";
 
 import { generateReportAction } from "@/lib/workflows/actions";
@@ -10,7 +11,7 @@ import {
   getWorkflowUsers,
 } from "@/lib/workflows/queries";
 import { requireAuthContext } from "@/lib/auth/context";
-import { AuthorizationError, hasPermission } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/auth/permissions";
 import { canOpenReports } from "@/lib/workflows/scope";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
+import { getDefaultDashboardPath } from "@/types/roles";
 
 export const metadata: Metadata = {
   title: "Reports",
@@ -72,7 +74,7 @@ export default async function ReportsPage({
   const context = await requireAuthContext();
 
   if (!canOpenReports(context)) {
-    throw new AuthorizationError();
+    redirect(`${getDefaultDashboardPath(context.role)}?error=permission-denied`);
   }
 
   const [reports, users, teams, clients] = await Promise.all([

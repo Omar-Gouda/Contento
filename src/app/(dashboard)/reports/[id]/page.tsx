@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { requireAuthContext } from "@/lib/auth/context";
-import { AuthorizationError, hasPermission } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/auth/permissions";
 import { canOpenReports } from "@/lib/workflows/scope";
 import { sendReportToClientAction } from "@/lib/workflows/actions";
 import { getWorkflowReportById } from "@/lib/workflows/queries";
 import { formatCairoDateTime } from "@/lib/time";
 import { routes } from "@/constants/routes";
+import { getDefaultDashboardPath } from "@/types/roles";
 import { CollaborationPanel } from "@/components/dashboard/collaboration-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ export default async function ReportDetailPage({
   const context = await requireAuthContext();
 
   if (!canOpenReports(context)) {
-    throw new AuthorizationError();
+    redirect(`${getDefaultDashboardPath(context.role)}?error=permission-denied`);
   }
 
   const report = await getWorkflowReportById(context, id);

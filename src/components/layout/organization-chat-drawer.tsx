@@ -53,7 +53,7 @@ export function OrganizationChatDrawer({
 }) {
   const [chatData, setChatData] = useState(data);
   const [selectedConversationId, setSelectedConversationId] = useState(data.conversations[0]?.id ?? "");
-  const [mobileMessageOpen, setMobileMessageOpen] = useState(Boolean(data.conversations[0]?.id));
+  const [mobileMessageOpen, setMobileMessageOpen] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [typingConversationId, setTypingConversationId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -284,6 +284,7 @@ export function OrganizationChatDrawer({
       };
     });
     setSelectedConversationId(result.conversationId);
+    setMobileMessageOpen(true);
   }
 
   function submitMessage(event: FormEvent<HTMLFormElement>, mode: "new" | "reply") {
@@ -358,14 +359,14 @@ export function OrganizationChatDrawer({
       >
         <MessageCircle />
       </SheetTrigger>
-      <SheetContent side="right" className="h-[100dvh] w-screen gap-0 p-0 sm:w-[min(100vw,34rem)] sm:max-w-[34rem]">
+      <SheetContent side="right" className="h-[100dvh] max-h-[100dvh] w-screen gap-0 overflow-hidden p-0 md:w-[min(100vw,34rem)] md:max-w-[34rem]">
         <SheetHeader className="border-b px-4 py-4">
           <SheetTitle>Organization chat</SheetTitle>
           <SheetDescription>Direct messages inside your workspace and assigned client scope.</SheetDescription>
         </SheetHeader>
 
         <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] overflow-hidden">
-          <div className={cn("border-b p-4", mobileMessageOpen && "hidden sm:block")}>
+          <div className={cn("border-b p-4", mobileMessageOpen && "hidden md:block")}>
             <form ref={newChatFormRef} onSubmit={(event) => submitMessage(event, "new")} className="grid gap-3">
               <div className="grid gap-2">
                 <Label htmlFor="chat-recipient">Start a chat</Label>
@@ -373,7 +374,7 @@ export function OrganizationChatDrawer({
                   id="chat-recipient"
                   name="recipientId"
                   required
-                  className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="h-10 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-8 md:px-2.5"
                   disabled={!chatData.recipients.length || isPending}
                 >
                   <option value="">Choose recipient</option>
@@ -403,8 +404,8 @@ export function OrganizationChatDrawer({
             </form>
           </div>
 
-          <div className="grid min-h-0 overflow-hidden sm:grid-cols-[11rem_1fr]">
-            <div className={cn("border-r bg-secondary/20 p-2", mobileMessageOpen && "hidden sm:block")}>
+          <div className="grid min-h-0 overflow-hidden md:grid-cols-[11rem_1fr]">
+            <div className={cn("border-r bg-secondary/20 p-2", mobileMessageOpen && "hidden md:block")}>
               <div className="grid max-h-full gap-1 overflow-y-auto pr-1">
                 {chatData.conversations.map((conversation) => (
                   <button
@@ -419,7 +420,7 @@ export function OrganizationChatDrawer({
                       }));
                     }}
                     className={cn(
-                      "min-h-14 rounded-lg p-2 text-left text-xs transition-colors",
+                      "min-h-16 rounded-lg p-3 text-left text-xs transition-colors md:min-h-14 md:p-2",
                       selectedConversation?.id === conversation.id
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-background"
@@ -444,11 +445,11 @@ export function OrganizationChatDrawer({
               </div>
             </div>
 
-            <div className={cn("min-h-0 overflow-y-auto p-4", !mobileMessageOpen && "hidden sm:block")}>
+            <div className={cn("min-h-0 overflow-y-auto p-4", !mobileMessageOpen && "hidden md:block")}>
               {selectedConversation ? (
                 <div className="grid gap-4">
                   <div className="flex items-center gap-3 rounded-lg border bg-secondary/25 p-3">
-                    <Button type="button" variant="ghost" size="icon-sm" className="sm:hidden" onClick={() => setMobileMessageOpen(false)} aria-label="Back to conversations">
+                    <Button type="button" variant="ghost" size="icon-sm" className="md:hidden" onClick={() => setMobileMessageOpen(false)} aria-label="Back to conversations">
                       <ArrowLeft />
                     </Button>
                     <Avatar name={selectedConversation.otherUserName} url={selectedConversation.otherUserAvatarUrl} />
@@ -471,6 +472,7 @@ export function OrganizationChatDrawer({
                         >
                           {!ownMessage && <Avatar name={message.senderName} url={message.senderAvatarUrl} />}
                           <div className={cn("max-w-[85%] rounded-xl border px-3 py-2", ownMessage ? "bg-primary text-primary-foreground" : "bg-card")}>
+                            {!ownMessage && <p className="mb-1 text-xs font-medium text-muted-foreground">{message.senderName}</p>}
                             <p className="whitespace-pre-wrap text-sm leading-6">{message.body}</p>
                             <p className={cn("mt-1 text-[11px]", ownMessage ? "text-primary-foreground/75" : "text-muted-foreground")}>
                               {formatCairoDateTime(message.createdAt)}
@@ -497,7 +499,7 @@ export function OrganizationChatDrawer({
             </div>
           </div>
 
-          <div className={cn("border-t p-4", !mobileMessageOpen && "hidden sm:block")}>
+          <div className={cn("border-t bg-popover p-4", !mobileMessageOpen && "hidden md:block")}>
             {status && (
               <p className="mb-2 text-xs text-muted-foreground" role="status">
                 {status}
