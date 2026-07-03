@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Clock, Coffee, LogOut, TimerReset } from "lucide-react";
 
 import {
@@ -8,7 +9,7 @@ import {
   startBreakAndRefreshAction,
 } from "@/lib/work-hours/actions";
 import { getCurrentUserWorkHours } from "@/lib/work-hours/queries";
-import { requirePermission } from "@/lib/auth/context";
+import { requireAuthContext } from "@/lib/auth/context";
 import {
   CONTENTO_TIME_ZONE,
   formatCairoTime,
@@ -25,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SignOutButton } from "@/components/forms/sign-out-button";
+import { getDefaultDashboardPath, isInternalUserRole } from "@/types/roles";
 
 export const metadata: Metadata = {
   title: "Work hours",
@@ -36,7 +38,12 @@ export default async function ProfileWorkHoursPage({
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const params = await searchParams;
-  const context = await requirePermission("work_hours.view_own", "view");
+  const context = await requireAuthContext();
+
+  if (!isInternalUserRole(context.role)) {
+    redirect(`${getDefaultDashboardPath(context.role)}?error=permission-denied`);
+  }
+
   const workHours = await getCurrentUserWorkHours(context);
   const activeBreak = Boolean(workHours.activeBreakSession);
   const activeWork = Boolean(workHours.activeWorkSession);

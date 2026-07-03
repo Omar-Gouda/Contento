@@ -29,6 +29,7 @@ import { requirePermission } from "@/lib/auth/context";
 import { removeRecoveryEmailAction, updateProfileAction, updateRecoveryEmailAction } from "@/lib/settings/actions";
 import { getProfileData } from "@/lib/settings/queries";
 import { formatCairoDateTime } from "@/lib/time";
+import { isInternalUserRole } from "@/types/roles";
 
 export const metadata: Metadata = {
   title: "Profile",
@@ -261,35 +262,37 @@ export default async function ProfilePage({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarClock className="size-4 text-primary" />
-              Work hours
-            </CardTitle>
-            <CardDescription>Today&apos;s work summary.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Status</span>
-              <Badge variant={profile.workHours?.activeWorkSession ? "default" : "secondary"}>
-                {profile.workHours?.activeBreakSession ? "On break" : profile.workHours?.activeWorkSession ? "Working" : "Not clocked in"}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Worked</span>
-              <span className="font-medium">{minutesLabel(profile.workHours?.workedMinutes ?? 0)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground">Break used</span>
-              <span className="font-medium">{minutesLabel(profile.workHours?.breakMinutes ?? 0)}</span>
-            </div>
-            <Link href={routes.profile.workHours} className={buttonVariants({ variant: "outline" })}>
-              <Clock />
-              Open work hours
-            </Link>
-          </CardContent>
-        </Card>
+        {isInternalUserRole(context.role) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarClock className="size-4 text-primary" />
+                Work hours
+              </CardTitle>
+              <CardDescription>Today&apos;s work summary.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant={profile.workHours?.activeWorkSession ? "default" : "secondary"}>
+                  {profile.workHours?.activeBreakSession ? "On break" : profile.workHours?.activeWorkSession ? "Working" : "Not clocked in"}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Worked</span>
+                <span className="font-medium">{minutesLabel(profile.workHours?.workedMinutes ?? 0)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Break used</span>
+                <span className="font-medium">{minutesLabel(profile.workHours?.breakMinutes ?? 0)}</span>
+              </div>
+              <Link href={routes.profile.workHours} className={buttonVariants({ variant: "outline" })}>
+                <Clock />
+                Open work hours
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

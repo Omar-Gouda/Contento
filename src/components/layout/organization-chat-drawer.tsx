@@ -30,11 +30,14 @@ function initials(name: string) {
 }
 
 function Avatar({ name, url }: { name: string; url: string | null }) {
+  const [failed, setFailed] = useState(false);
+  const safeUrl = url && !failed ? url : null;
+
   return (
     <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-secondary text-xs font-semibold">
-      {url ? (
+      {safeUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="size-full object-cover" />
+        <img src={safeUrl} alt="" className="size-full object-cover" onError={() => setFailed(true)} />
       ) : (
         initials(name)
       )}
@@ -359,13 +362,13 @@ export function OrganizationChatDrawer({
       >
         <MessageCircle />
       </SheetTrigger>
-      <SheetContent side="right" className="h-[100dvh] max-h-[100dvh] w-screen gap-0 overflow-hidden p-0 md:w-[min(100vw,34rem)] md:max-w-[34rem]">
-        <SheetHeader className="border-b px-4 py-4">
+      <SheetContent side="right" className="h-[100dvh] max-h-[100dvh] w-screen max-w-none gap-0 overflow-hidden p-0 md:w-[min(100vw,34rem)] md:max-w-[34rem]">
+        <SheetHeader className="shrink-0 border-b px-4 py-4">
           <SheetTitle>Organization chat</SheetTitle>
           <SheetDescription>Direct messages inside your workspace and assigned client scope.</SheetDescription>
         </SheetHeader>
 
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] overflow-hidden">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden">
           <div className={cn("border-b p-4", mobileMessageOpen && "hidden md:block")}>
             <form ref={newChatFormRef} onSubmit={(event) => submitMessage(event, "new")} className="grid gap-3">
               <div className="grid gap-2">
@@ -404,8 +407,8 @@ export function OrganizationChatDrawer({
             </form>
           </div>
 
-          <div className="grid min-h-0 overflow-hidden md:grid-cols-[11rem_1fr]">
-            <div className={cn("border-r bg-secondary/20 p-2", mobileMessageOpen && "hidden md:block")}>
+          <div className="grid min-h-0 min-w-0 overflow-hidden md:grid-cols-[11rem_minmax(0,1fr)]">
+            <div className={cn("min-w-0 border-r bg-secondary/20 p-2", mobileMessageOpen && "hidden md:block")}>
               <div className="grid max-h-full gap-1 overflow-y-auto pr-1">
                 {chatData.conversations.map((conversation) => (
                   <button
@@ -445,10 +448,10 @@ export function OrganizationChatDrawer({
               </div>
             </div>
 
-            <div className={cn("min-h-0 overflow-y-auto p-4", !mobileMessageOpen && "hidden md:block")}>
+            <div className={cn("min-h-0 min-w-0 overflow-y-auto p-3 sm:p-4", !mobileMessageOpen && "hidden md:block")}>
               {selectedConversation ? (
-                <div className="grid gap-4">
-                  <div className="flex items-center gap-3 rounded-lg border bg-secondary/25 p-3">
+                <div className="grid min-w-0 gap-4">
+                  <div className="flex min-w-0 items-center gap-3 rounded-lg border bg-secondary/25 p-3">
                     <Button type="button" variant="ghost" size="icon-sm" className="md:hidden" onClick={() => setMobileMessageOpen(false)} aria-label="Back to conversations">
                       <ArrowLeft />
                     </Button>
@@ -461,19 +464,19 @@ export function OrganizationChatDrawer({
                     </div>
                   </div>
 
-                  <div className="grid gap-3">
+                  <div className="grid min-w-0 gap-3">
                     {selectedConversation.messages.map((message) => {
                       const ownMessage = message.senderId === currentUserId;
 
                       return (
                         <div
                           key={message.id}
-                          className={cn("flex gap-2", ownMessage && "justify-end")}
+                          className={cn("flex min-w-0 gap-2", ownMessage && "justify-end")}
                         >
                           {!ownMessage && <Avatar name={message.senderName} url={message.senderAvatarUrl} />}
-                          <div className={cn("max-w-[85%] rounded-xl border px-3 py-2", ownMessage ? "bg-primary text-primary-foreground" : "bg-card")}>
+                          <div className={cn("min-w-0 max-w-[85%] rounded-xl border px-3 py-2", ownMessage ? "bg-primary text-primary-foreground" : "bg-card")}>
                             {!ownMessage && <p className="mb-1 text-xs font-medium text-muted-foreground">{message.senderName}</p>}
-                            <p className="whitespace-pre-wrap text-sm leading-6">{message.body}</p>
+                            <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
                             <p className={cn("mt-1 text-[11px]", ownMessage ? "text-primary-foreground/75" : "text-muted-foreground")}>
                               {formatCairoDateTime(message.createdAt)}
                             </p>
@@ -499,20 +502,20 @@ export function OrganizationChatDrawer({
             </div>
           </div>
 
-          <div className={cn("border-t bg-popover p-4", !mobileMessageOpen && "hidden md:block")}>
+          <div className={cn("shrink-0 border-t bg-popover p-3 sm:p-4", !mobileMessageOpen && "hidden md:block")}>
             {status && (
               <p className="mb-2 text-xs text-muted-foreground" role="status">
                 {status}
               </p>
             )}
-            <form onSubmit={(event) => submitMessage(event, "reply")} className="flex gap-2">
+            <form onSubmit={(event) => submitMessage(event, "reply")} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-end gap-2">
               <input type="hidden" name="conversationId" value={selectedConversation?.id ?? ""} />
               <textarea
                 name="body"
                 required
                 maxLength={2000}
                 placeholder={selectedConversation ? "Reply..." : "Select a chat first"}
-                className="min-h-10 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="min-h-11 min-w-0 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 disabled={!selectedConversation || isPending}
                 onChange={(event) => setTypingConversationId(event.currentTarget.value.trim() ? selectedConversation?.id ?? null : null)}
               />

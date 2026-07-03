@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   Lightbulb,
   PanelsTopLeft,
-  Search,
   Settings,
   ShieldCheck,
   User,
@@ -26,7 +25,7 @@ import {
 import { routes } from "@/constants/routes";
 import { hasPermission, type AuthContext } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
-import { getRoleDisplayName, type UserRole } from "@/types/roles";
+import { getRoleDisplayName, isInternalUserRole, type UserRole } from "@/types/roles";
 
 type NavigationItem = {
   label: string;
@@ -243,10 +242,12 @@ function getTeamItems(context: AuthContext): NavigationItem[] {
 
 function getAccountItems(context: AuthContext): NavigationItem[] {
   const items: NavigationItem[] = [
-    { label: "Search", href: routes.search, icon: Search },
     { label: "Profile", href: routes.profile.home, icon: User },
-    { label: "My work hours", href: routes.profile.workHours, icon: ShieldCheck },
   ];
+
+  if (isInternalUserRole(context.role)) {
+    items.push({ label: "My work hours", href: routes.profile.workHours, icon: ShieldCheck });
+  }
 
   if (hasPermission(context, "settings.company", "limited")) {
     items.push({ label: "Organization settings", href: routes.settings, icon: Settings, exact: true });

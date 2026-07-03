@@ -40,9 +40,10 @@ import {
   getVisibleClientIds,
 } from "@/lib/workflows/scope";
 import { getWorkflowReportById } from "@/lib/workflows/queries";
-import { getCairoDate, minutesLabel } from "@/lib/time";
+import { CONTENTO_TIME_ZONE, getCairoDate, minutesLabel } from "@/lib/time";
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { Database, Json } from "@/types/database";
+import { getRoleDisplayName, isInternalUserRole, type UserRole } from "@/types/roles";
 
 type ContentActionRow = Pick<
   Database["public"]["Tables"]["content_items"]["Row"],
@@ -79,9 +80,45 @@ function addDaysToDateKey(dateKey: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function reportRange(reportType: "daily" | "weekly") {
+type GeneratedReportType = "daily" | "weekly" | "monthly";
+
+const generatedReportSections: Record<UserRole, string[]> = {
+  admin: ["Company overview", "Client activity summary", "Reports reviewed/finalized", "Users and teams activity", "Content approval overview", "Key decisions"],
+  supervisor: ["Assigned clients summary", "Tasks assigned/reviewed", "Client communication/actions", "Reports reviewed", "Blockers"],
+  "team-lead": ["Team progress", "Tasks reviewed", "Content review handoff", "Blockers"],
+  creator: ["Ideas created", "Content submitted", "Tasks completed or in progress", "Client feedback handled", "Blockers"],
+  "graphic-designer": ["Assigned production tasks", "Final Drive links submitted", "Revisions handled", "Pending work", "Blockers"],
+  "video-editor": ["Assigned video/reel tasks", "Final Drive links submitted", "Revisions handled", "Pending work", "Blockers"],
+  client: ["Sent client reports"],
+};
+
+function reportTypeLabel(reportType: GeneratedReportType) {
+  return reportType.charAt(0).toUpperCase() + reportType.slice(1);
+}
+
+function generatedReportAvailabilityError(reportType: GeneratedReportType) {
+  const today = getCairoDate();
+  const dayOfMonth = Number(today.slice(-2));
+  const dayOfWeek = new Date(`${today}T00:00:00.000Z`).getUTCDay();
+
+  if (reportType === "weekly" && dayOfWeek !== 5) {
+    return "Weekly reports are available only on Friday.";
+  }
+
+  if (reportType === "monthly" && dayOfMonth !== 27) {
+    return "Monthly reports are available only on day 27 of the month.";
+  }
+
+  return null;
+}
+
+function reportRange(reportType: GeneratedReportType) {
   const endDate = getCairoDate();
-  const startDate = reportType === "weekly" ? addDaysToDateKey(endDate, -6) : endDate;
+  const startDate = reportType === "weekly"
+    ? addDaysToDateKey(endDate, -6)
+    : reportType === "monthly"
+      ? `${endDate.slice(0, 8)}01`
+      : endDate;
 
   return {
     startDate,
@@ -1502,6 +1539,11 @@ export async function reviewTimeOffRequestAction(formData: FormData) {
 
 export async function generateReportAction(formData: FormData) {
   const context = await requirePermission("reports.submit", "limited");
+
+  if (!isInternalUserRole(context.role)) {
+    safeRedirect("/reports", "error", "Client users cannot generate internal reports.");
+  }
+
   const parsed = generatedReportSchema.safeParse({
     clientId: formString(formData, "clientId"),
     reportType: formString(formData, "reportType"),
@@ -1534,6 +1576,12 @@ export async function generateReportAction(formData: FormData) {
     safeRedirect("/reports", "error", parsed.error.issues[0]?.message ?? "Invalid report request.");
   }
 
+  const availabilityError = generatedReportAvailabilityError(parsed.data.reportType);
+
+  if (availabilityError) {
+    safeRedirect("/reports", "error", availabilityError);
+  }
+
   const teamId = parsed.data.teamId;
   const clientId = parsed.data.clientId;
   const reportUserId = parsed.data.userId ?? (teamId ? null : context.userId);
@@ -1562,20 +1610,20 @@ export async function generateReportAction(formData: FormData) {
 
   let completedTasksQuery = supabase
     .from("tasks")
-    .select("id, title, status, updated_at")
+    .select("id, title, status, final_drive_link, updated_at")
     .eq("company_id", context.companyId)
     .in("status", ["completed", "closed"])
     .gte("updated_at", range.startIso)
     .lte("updated_at", range.endIso);
   let updatedTasksQuery = supabase
     .from("tasks")
-    .select("id, title, status, updated_at")
+    .select("id, title, status, final_drive_link, updated_at")
     .eq("company_id", context.companyId)
     .gte("updated_at", range.startIso)
     .lte("updated_at", range.endIso);
   let submittedContentQuery = supabase
     .from("content_items")
-    .select("id, title, status, submitted_at, updated_at")
+    .select("id, title, status, final_drive_link, submitted_at, updated_at")
     .eq("company_id", context.companyId)
     .not("submitted_at", "is", null)
     .gte("submitted_at", range.startIso)
@@ -1589,7 +1637,7 @@ export async function generateReportAction(formData: FormData) {
     .lte("updated_at", range.endIso);
   let scheduledContentQuery = supabase
     .from("content_items")
-    .select("id, title, status, scheduled_at, creator_id, team_id, client_id")
+    .select("id, title, status, final_drive_link, scheduled_at, creator_id, team_id, client_id")
     .eq("company_id", context.companyId)
     .not("scheduled_at", "is", null)
     .gte("scheduled_at", range.startIso)
@@ -1613,6 +1661,12 @@ export async function generateReportAction(formData: FormData) {
     .eq("company_id", context.companyId)
     .lte("start_date", range.endDate)
     .gte("end_date", range.startDate);
+  let activityLogsQuery = supabase
+    .from("activity_logs")
+    .select("id, action, entity_type, created_at")
+    .eq("company_id", context.companyId)
+    .gte("created_at", range.startIso)
+    .lte("created_at", range.endIso);
 
   if (teamId) {
     completedTasksQuery = completedTasksQuery.eq("team_id", teamId);
@@ -1641,6 +1695,7 @@ export async function generateReportAction(formData: FormData) {
     publishingIdeasQuery = publishingIdeasQuery.or(`assigned_to.eq.${reportUserId},created_by.eq.${reportUserId}`);
     workDaysQuery = workDaysQuery.eq("user_id", reportUserId);
     timeOffQuery = timeOffQuery.eq("user_id", reportUserId);
+    activityLogsQuery = activityLogsQuery.eq("user_id", reportUserId);
   }
 
   const [
@@ -1652,6 +1707,7 @@ export async function generateReportAction(formData: FormData) {
     { data: publishingIdeas, error: publishingIdeasError },
     { data: workDays, error: workDaysError },
     { data: timeOff, error: timeOffError },
+    { data: activityLogs, error: activityLogsError },
   ] = await Promise.all([
     completedTasksQuery,
     updatedTasksQuery,
@@ -1661,6 +1717,7 @@ export async function generateReportAction(formData: FormData) {
     publishingIdeasQuery,
     workDaysQuery,
     timeOffQuery,
+    activityLogsQuery,
   ]);
 
   if (
@@ -1671,7 +1728,8 @@ export async function generateReportAction(formData: FormData) {
     scheduledContentError ||
     publishingIdeasError ||
     workDaysError ||
-    timeOffError
+    timeOffError ||
+    activityLogsError
   ) {
     safeRedirect("/reports", "error", "Report data could not be generated.");
   }
@@ -1695,10 +1753,13 @@ export async function generateReportAction(formData: FormData) {
   const scheduledContentRows = scheduledContent ?? [];
   const publishingIdeaRows = publishingIdeas ?? [];
   const timeOffRows = timeOff ?? [];
+  const activityLogRows = activityLogs ?? [];
   const pendingTaskRows = updatedTaskRows.filter((task) => !["completed", "closed"].includes(task.status));
   const approvedContentRows = reviewedContentRows.filter((item) => ["approved", "scheduled", "published"].includes(item.status));
   const declinedContentRows = reviewedContentRows.filter((item) => item.status === "rejected");
   const revisionRows = reviewedContentRows.filter((item) => String(item.status).includes("changes_requested"));
+  const taskFinalLinkRows = updatedTaskRows.filter((task) => Boolean(task.final_drive_link));
+  const contentFinalLinkRows = [...submittedContentRows, ...scheduledContentRows].filter((item) => Boolean(item.final_drive_link));
   const contentFormatCounts = {
     posts: publishingIdeaRows.filter((idea) => idea.idea_type === "post").length,
     stories: publishingIdeaRows.filter((idea) => idea.idea_type === "story").length,
@@ -1730,43 +1791,16 @@ export async function generateReportAction(formData: FormData) {
     revisionCount: revisionRows.length,
     pendingTasks: pendingTaskRows.length,
     clientComments: clientCommentCount ?? 0,
-    reachGrowth: parsed.data.reachGrowth,
-    engagementRate: parsed.data.engagementRate,
-    followerGrowth: parsed.data.followerGrowth,
-    totalAdSpend: parsed.data.totalAdSpend,
-    reach: parsed.data.reach,
-    impressions: parsed.data.impressions,
-    clicks: parsed.data.clicks,
-    ctr: parsed.data.ctr,
-    cpc: parsed.data.cpc,
-    cpm: parsed.data.cpm,
-    leadsGenerated: parsed.data.leadsGenerated,
-    conversions: parsed.data.conversions,
-    roas: parsed.data.roas,
+    activityRecords: activityLogRows.length,
+    finalDriveLinks: taskFinalLinkRows.length + contentFinalLinkRows.length,
   };
-  const builderLines = [
-    ["Total posts published", parsed.data.postsPublished],
-    ["Total stories published", parsed.data.storiesPublished],
-    ["Total reels/videos published", parsed.data.reelsPublished],
-    ["Reach growth", parsed.data.reachGrowth],
-    ["Engagement rate", parsed.data.engagementRate],
-    ["Follower growth", parsed.data.followerGrowth],
-    ["Total ad spend", parsed.data.totalAdSpend],
-    ["Reach", parsed.data.reach],
-    ["Impressions", parsed.data.impressions],
-    ["Clicks", parsed.data.clicks],
-    ["CTR", parsed.data.ctr],
-    ["CPC", parsed.data.cpc],
-    ["CPM", parsed.data.cpm],
-    ["Leads generated", parsed.data.leadsGenerated],
-    ["Conversions", parsed.data.conversions],
-    ["ROAS", parsed.data.roas],
-  ].filter(([, value]) => value);
   const scopeLabel = teamId ? "team scope" : reportUserId === context.userId ? "my scope" : "selected user scope";
-  const title = `${parsed.data.reportType === "daily" ? "Daily" : "Weekly"} generated report - ${range.startDate} to ${range.endDate}`;
+  const title = `${reportTypeLabel(parsed.data.reportType)} ${getRoleDisplayName(context.role)} generated report - ${range.startDate} to ${range.endDate}`;
+  const roleSections = generatedReportSections[context.role].join(", ");
   const bodyLines = [
     `${title}`,
-    `Scope: ${scopeLabel}.`,
+    `Scope: ${scopeLabel}. Timezone: ${CONTENTO_TIME_ZONE}.`,
+    `Generated layout: ${roleSections}.`,
     `Total posts published: ${contentFormatCounts.posts}.`,
     `Total stories published: ${contentFormatCounts.stories}.`,
     `Total reels/videos published: ${contentFormatCounts.reels}.`,
@@ -1784,6 +1818,8 @@ export async function generateReportAction(formData: FormData) {
     `Break time: ${minutesLabel(workSummary.break)}.`,
     `Missing time: ${minutesLabel(workSummary.missing)}.`,
     `Time-off and sick-leave records: ${timeOffRows.length}.`,
+    `Recorded activity entries: ${activityLogRows.length}.`,
+    `Final Drive links submitted: ${taskFinalLinkRows.length + contentFinalLinkRows.length}.`,
   ];
 
   if (completedTaskRows.length) {
@@ -1794,25 +1830,8 @@ export async function generateReportAction(formData: FormData) {
     bodyLines.push(`Submitted content titles: ${submittedContentRows.slice(0, 8).map((item) => item.title).join(", ")}.`);
   }
 
-  if (builderLines.length) {
-    bodyLines.push("", "Client-ready metrics:");
-    builderLines.forEach(([label, value]) => bodyLines.push(`${label}: ${value}`));
-  }
-
-  if (parsed.data.keyAchievements) {
-    bodyLines.push("", `Key achievements: ${parsed.data.keyAchievements}`);
-  }
-
-  if (parsed.data.mainChallenges) {
-    bodyLines.push(`Main challenges: ${parsed.data.mainChallenges}`);
-  }
-
-  if (parsed.data.nextMonthFocus) {
-    bodyLines.push(`Next month's focus: ${parsed.data.nextMonthFocus}`);
-  }
-
-  if (parsed.data.customSection) {
-    bodyLines.push(`Custom section: ${parsed.data.customSection}`);
+  if (activityLogRows.length) {
+    bodyLines.push(`Recent actions: ${activityLogRows.slice(0, 12).map((activity) => activity.action).join(", ")}.`);
   }
 
   if (note) {

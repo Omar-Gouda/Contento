@@ -107,6 +107,10 @@ export function isProductionRole(role: UserRole | null | undefined) {
   return role === "creator" || role === "graphic-designer" || role === "video-editor";
 }
 
+export function isInternalUserRole(role: UserRole | null | undefined) {
+  return Boolean(role && role !== "client");
+}
+
 export function getDefaultDashboardPath(role: UserRole | null) {
   return role ? roleDashboardPaths[role] : "/sign-in";
 }

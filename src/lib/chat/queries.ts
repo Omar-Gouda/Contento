@@ -52,6 +52,29 @@ function displayName(user: Pick<ChatUserRow, "first_name" | "last_name" | "email
   return [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.email;
 }
 
+function isAbsoluteUrl(value: string) {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+async function resolveAvatarUrl(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  avatarPath: string | null
+) {
+  if (!avatarPath) {
+    return null;
+  }
+
+  if (isAbsoluteUrl(avatarPath)) {
+    return avatarPath;
+  }
+
+  const { data, error } = await supabase.storage
+    .from("contento-avatars")
+    .createSignedUrl(avatarPath, 60 * 60);
+
+  return error ? null : data.signedUrl;
+}
+
 export async function getOrganizationChatData(context: AuthContext): Promise<OrganizationChatData> {
   const supabase = await createSupabaseServerClient();
   const [
@@ -124,6 +147,10 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
     ...((participantUsers as ChatUserRow[] | null) ?? []),
   ];
   const userById = new Map(userRows.map((user) => [user.id, user]));
+  const avatarUrlEntries = await Promise.all(
+    Array.from(userById.values()).map(async (user) => [user.id, await resolveAvatarUrl(supabase, user.avatar_url)] as const)
+  );
+  const avatarUrlByUserId = new Map(avatarUrlEntries);
   const clientById = new Map(((clients as ChatClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
   const messagesByConversation = new Map<string, OrganizationChatMessage[]>();
 
@@ -136,7 +163,7 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
       conversationId: message.conversation_id,
       senderId: message.sender_id,
       senderName: displayName(sender),
-      senderAvatarUrl: sender?.avatar_url ?? null,
+      senderAvatarUrl: avatarUrlByUserId.get(message.sender_id) ?? null,
       body: message.body,
       createdAt: message.created_at,
     });
@@ -165,7 +192,7 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
         id: conversation.id,
         otherUserName: displayName(otherUser),
         otherUserEmail: otherUser?.email ?? "",
-        otherUserAvatarUrl: otherUser?.avatar_url ?? null,
+        otherUserAvatarUrl: avatarUrlByUserId.get(otherUserId) ?? null,
         clientName: conversation.client_id ? clientById.get(conversation.client_id) ?? null : null,
         updatedAt: conversation.updated_at,
         messages: conversationMessages,
@@ -178,7 +205,7 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
         id: user.id,
         name: displayName(user),
         email: user.email,
-        avatarUrl: user.avatar_url,
+        avatarUrl: avatarUrlByUserId.get(user.id) ?? null,
       })),
   };
 }
