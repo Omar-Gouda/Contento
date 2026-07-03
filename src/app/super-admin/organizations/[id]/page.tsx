@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { Activity, Building2, Power, ShieldOff, Trash2, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, Building2, Power, ShieldOff, Trash2, UsersRound } from "lucide-react";
 
 import { PageMessage } from "@/components/admin/page-message";
+import { FormSheet } from "@/components/dashboard/form-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { hardDeleteOrganizationAction } from "@/lib/super-admin/actions";
 import { updateOrganizationLifecycleAction } from "@/lib/super-admin/lifecycle";
 import { getPlatformOrganizationDetail } from "@/lib/super-admin/queries";
 import { formatCairoDateTime } from "@/lib/time";
@@ -37,6 +41,84 @@ function LifecycleButton({
         {label}
       </Button>
     </form>
+  );
+}
+
+function DangerZone({
+  organization,
+}: {
+  organization: Awaited<ReturnType<typeof getPlatformOrganizationDetail>>;
+}) {
+  const counts = organization.hardDeletePreview;
+  const countRows = [
+    ["Users", counts.users],
+    ["Clients", counts.clients],
+    ["Teams", counts.teams],
+    ["Tasks", counts.tasks],
+    ["Ideas", counts.ideas],
+    ["Content", counts.content],
+    ["Reports", counts.reports],
+    ["Calendar/time off", counts.calendarItems],
+    ["Notifications", counts.notifications],
+    ["Chat messages", counts.chatMessages],
+    ["Tracked files", counts.files],
+  ];
+
+  return (
+    <Card className="border-destructive/30 bg-destructive/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="size-4" />
+          Danger zone
+        </CardTitle>
+        <CardDescription>
+          Permanent deletion is only available to active platform Super Admins.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <p className="text-sm leading-6 text-muted-foreground">
+          This permanently deletes the organization, users, clients, tasks, ideas, content, reports, chat, notifications, files, and related data.
+          This cannot be undone.
+        </p>
+        <FormSheet
+          title="Delete organization permanently"
+          description={`Type ${organization.slug} or the exact organization name to confirm permanent deletion.`}
+          triggerLabel="Delete organization permanently"
+          triggerIcon={<Trash2 />}
+          triggerClassName="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20"
+        >
+          <form action={hardDeleteOrganizationAction} className="grid gap-5">
+            <input type="hidden" name="organizationId" value={organization.id} />
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm leading-6 text-destructive">
+              This permanently deletes the organization, users, clients, tasks, ideas, content, reports, chat, notifications, files, and related data.
+              This cannot be undone.
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {countRows.map(([label, value]) => (
+                <div key={label} className="rounded-lg border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-lg font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="organization-delete-confirmation">Confirm slug or name</Label>
+              <Input
+                id="organization-delete-confirmation"
+                name="confirmation"
+                placeholder={organization.slug}
+                autoComplete="off"
+                required
+              />
+            </div>
+            <Button type="submit" variant="destructive">
+              <Trash2 />
+              Delete organization permanently
+            </Button>
+          </form>
+        </FormSheet>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -81,7 +163,7 @@ export default async function SuperAdminOrganizationDetailPage({
 
       <PageMessage
         error={query.error}
-        status={query.notice === "updated" ? "Organization lifecycle updated." : undefined}
+        status={query.notice === "updated" ? "Organization lifecycle updated." : query.notice}
       />
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -159,6 +241,8 @@ export default async function SuperAdminOrganizationDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <DangerZone organization={organization} />
     </section>
   );
 }

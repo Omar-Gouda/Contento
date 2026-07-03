@@ -71,7 +71,7 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 ## Implemented Features
 
 - Supabase authentication with sign in, reset password, sign out, protected routes, role redirects, onboarding, account-state pages, and forced password changes.
-- Platform Super Admin route family with organization listing, details, analytics, lifecycle controls, platform audit logs, and first Org Admin creation.
+- Platform Super Admin route family with organization listing, details, analytics, lifecycle controls, platform audit logs, first Org Admin creation, and confirmation-gated permanent organization deletion.
 - Organization lifecycle states: active, disabled, and deleted. Disabled and deleted organizations are blocked from tenant dashboards.
 - Company-scoped RBAC with Marketing Manager, Account Manager, CC Team Lead, Content Creator, Graphic Designer, Video Editor, and Client role labels backed by tenant role keys.
 - Admin user creation, status changes, role assignment, team/client assignment, Client-user plus client-profile creation, Marketing Manager user deletion with keep/remove content choices, and audit logging.
@@ -79,8 +79,8 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Working-hours tracking with explicit Clock In / Clock Out controls, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, header status menu, and Admin company view.
 - Teams, client workspaces, tasks, ideas, dedicated idea/content review queues, content pipeline, review scoring, modern scheduling calendar, role-scoped automated reports, and CSV report export.
 - Role-aware Marketing Manager user creation changes team/client assignment fields based on the selected role and links Client users to client profiles.
-- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, realtime refresh, toast alerts, server-backed sound preference, and browser notification permission control.
-- Header organization chat drawer for same-company users and assigned client-scope conversations.
+- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, realtime refresh with polling fallback, toast alerts, server-backed sound preference, audio unlock handling, and browser notification permission control.
+- Header organization chat drawer for same-company users and assigned client-scope conversations, with realtime/polling refresh, optimistic sends, unread indicators, and a full-height mobile conversation flow.
 - Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
 - Standalone global search across accessible users, teams, tasks, ideas, content, and reports.
 - Advanced list filters with saved views for tasks, ideas, content, and reports.
@@ -97,7 +97,8 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Calendar uses month/week/day grid views with a separated weekday header, compact toolbar buttons, compact event chips, and day-detail sheets for publishing dates, task due dates, day off, and sick leave.
 - Premium Contento brand asset system with SVG logo/mark, favicon, PNG PWA icons, Apple touch icon, updated metadata, sidebar fallback mark, and sign-in logo.
 - PWA shell with manifest, install prompt, theme color, Apple web app metadata, service worker registration, offline fallback page, and future-ready push notification handlers.
-- Forgot/reset password uses a generic recovery message, production-safe callback URL generation from `NEXT_PUBLIC_SITE_URL`, a Marketing Manager contact fallback, and session-aware reset redirects. Profile password changes update Supabase Auth in place without sending active users back to the dashboard.
+- Forgot/reset password uses a generic recovery message, production-safe callback URL generation from `NEXT_PUBLIC_SITE_URL`, recovery-email lookup for internal recovery routing, a Marketing Manager contact fallback, and session-aware reset redirects. Profile password changes update Supabase Auth in place without sending active users back to the dashboard.
+- Profile security stores an optional recovery email. Supabase Auth reset links still go to the sign-in email; recovery email verification and direct recovery-email reset delivery require a future email-provider workflow, so Contento routes recovery-email requests to the internal Marketing Manager temporary-password flow.
 - Report creation is automated by default from live task, idea publishing, content, comment, work-hours, and time-off data; users add optional notes and editable marketing metrics.
 - Core pages are view-only by default; authorized create, edit, manage, review, comment, and final-output actions open in sheets or collapsed details sections.
 - Filters are collapsed by default with visible active chips on Clients, Tasks, Ideas, Content, Reports, Users, and Reviews.
@@ -128,6 +129,7 @@ supabase/
     202607030001_contento_performance_assignment_refresh_fix.sql
     202607030002_contento_profile_stabilization.sql
     202607030003_contento_push_subscription_foundation.sql
+    202607030004_contento_v7_recovery_and_org_hard_delete.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.
@@ -166,6 +168,6 @@ supabase db lint --linked
 ## Known Limitations
 
 - Email delivery templates and provider-level transactional email customization are configured in Supabase, not in this repository.
-- Real-time subscriptions, background workers, activity-log export, and advanced custom role/permission editing UI remain future enhancements.
+- Background workers, activity-log export, and advanced custom role/permission editing UI remain future enhancements.
 - Real Web Push delivery is prepared but not fully enabled. The app has notification permission UI, service worker push handlers, and subscription storage, but production push sending still needs VAPID keys and a trusted server-side delivery worker.
-- Hard deletion of organizations is intentionally not implemented; Super Admin uses soft delete.
+- Permanent organization deletion removes tenant database rows transactionally first, then server-side code cleans storage objects and Supabase Auth users. Storage/Auth cleanup warnings are logged because they cannot share the database transaction.

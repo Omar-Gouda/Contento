@@ -93,18 +93,57 @@ async function recordSuccessfulLogin(supabase: Awaited<ReturnType<typeof createS
   }
 }
 
-async function notifyMarketingManagersOfPasswordResetRequest(email: string) {
+type PasswordRecoveryUser = {
+  id: string;
+  company_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  recovery_email: string | null;
+  recovery_email_verified_at: string | null;
+};
+
+async function findPasswordRecoveryUser(email: string): Promise<PasswordRecoveryUser | null> {
+  if (!hasSupabaseAdminConfig()) {
+    return null;
+  }
+
+  try {
+    const admin = createSupabaseAdminClient();
+
+    const { data: directUser } = await admin
+      .from("users")
+      .select("id, company_id, email, first_name, last_name, recovery_email, recovery_email_verified_at")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (directUser) {
+      return directUser as PasswordRecoveryUser;
+    }
+
+    const { data: recoveryUser } = await admin
+      .from("users")
+      .select("id, company_id, email, first_name, last_name, recovery_email, recovery_email_verified_at")
+      .eq("recovery_email", email)
+      .maybeSingle();
+
+    return (recoveryUser as PasswordRecoveryUser | null) ?? null;
+  } catch (error) {
+    console.warn(
+      "Contento password recovery lookup failed",
+      error instanceof Error ? error.message : error
+    );
+    return null;
+  }
+}
+
+async function notifyMarketingManagersOfPasswordResetRequest(email: string, requestedUser: PasswordRecoveryUser | null) {
   if (!hasSupabaseAdminConfig()) {
     return;
   }
 
   try {
     const admin = createSupabaseAdminClient();
-    const { data: requestedUser } = await admin
-      .from("users")
-      .select("id, company_id, email, first_name, last_name")
-      .eq("email", email)
-      .maybeSingle();
 
     if (!requestedUser) {
       return;
@@ -133,13 +172,17 @@ async function notifyMarketingManagersOfPasswordResetRequest(email: string) {
 
     if (managerIds.length) {
       const displayName = [requestedUser.first_name, requestedUser.last_name].filter(Boolean).join(" ").trim();
+      const usedRecoveryEmail = requestedUser.recovery_email?.toLowerCase() === email.toLowerCase();
+      const recoveryNote = usedRecoveryEmail
+        ? " using a recovery email. Supabase reset links still go to the sign-in email, so issue a temporary password if needed."
+        : ".";
 
       await admin.from("notifications").insert(
         managerIds.map((userId) => ({
           company_id: requestedUser.company_id,
           user_id: userId,
           title: "Password reset requested",
-          message: `${displayName || requestedUser.email} requested an internal password reset.`,
+          message: `${displayName || requestedUser.email} requested an internal password reset${recoveryNote}`,
           entity_type: "user",
           entity_id: requestedUser.id,
           link_href: "/admin/users",
@@ -156,6 +199,8 @@ async function notifyMarketingManagersOfPasswordResetRequest(email: string) {
       entity_id: requestedUser.id,
       metadata: {
         source: "forgot_password",
+        requested_with_recovery_email: requestedUser.recovery_email?.toLowerCase() === email.toLowerCase(),
+        recovery_email_verified: Boolean(requestedUser.recovery_email_verified_at),
         notified_marketing_manager_count: managerIds.length,
       },
     });
@@ -273,11 +318,17 @@ export async function forgotPasswordAction(input: ForgotPasswordInput): Promise<
 
   const supabase = await createSupabaseServerClient();
   const origin = await getRequestOrigin();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${origin}/auth/callback?next=/reset-password`,
-  });
+  const recoveryUser = await findPasswordRecoveryUser(parsed.data.email);
+  const shouldSendSupabaseEmail =
+    !recoveryUser ||
+    recoveryUser.email.toLowerCase() === parsed.data.email.toLowerCase();
+  const { error } = shouldSendSupabaseEmail
+    ? await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+      redirectTo: `${origin}/auth/callback?next=/reset-password`,
+    })
+    : { error: null };
 
-  await notifyMarketingManagersOfPasswordResetRequest(parsed.data.email);
+  await notifyMarketingManagersOfPasswordResetRequest(parsed.data.email, recoveryUser);
 
   if (error) {
     console.warn("Contento password reset email failed", error.message);

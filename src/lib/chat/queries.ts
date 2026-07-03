@@ -36,6 +36,7 @@ export type OrganizationChatConversation = {
   updatedAt: string;
   messages: OrganizationChatMessage[];
   lastMessage: string | null;
+  unreadCount: number;
 };
 
 export type OrganizationChatData = {
@@ -154,6 +155,11 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
       const otherUser = userById.get(otherUserId);
       const conversationMessages = messagesByConversation.get(conversation.id) ?? [];
       const lastMessage = conversationMessages.at(-1)?.body ?? null;
+      const unreadCount = ((messages as ChatMessageRow[] | null) ?? []).filter((message) => (
+        message.conversation_id === conversation.id &&
+        message.sender_id !== context.userId &&
+        !message.read_at
+      )).length;
 
       return {
         id: conversation.id,
@@ -164,6 +170,7 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
         updatedAt: conversation.updated_at,
         messages: conversationMessages,
         lastMessage,
+        unreadCount,
       };
     }),
     recipients: ((recipients as ChatUserRow[] | null) ?? [])

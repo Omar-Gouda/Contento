@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -30,6 +31,8 @@ const imageTypes = new Map([
   ["image/webp", "webp"],
   ["image/gif", "gif"],
 ]);
+
+const recoveryEmailSchema = z.string().trim().email("Enter a valid recovery email address.").max(254);
 
 export async function updateProfileAction(formData: FormData) {
   await requireAuthContext();
@@ -71,6 +74,62 @@ export async function updateProfileAction(formData: FormData) {
   revalidatePath("/", "layout");
   revalidatePath("/profile");
   safeRedirect("/profile", "notice", "Profile updated.");
+}
+
+export async function updateRecoveryEmailAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const parsed = recoveryEmailSchema.safeParse(formString(formData, "recoveryEmail"));
+
+  if (!parsed.success) {
+    safeRedirect("/profile", "error", parsed.error.issues[0]?.message ?? "Enter a valid recovery email address.");
+  }
+
+  if (parsed.data.toLowerCase() === context.email.toLowerCase()) {
+    safeRedirect("/profile", "error", "Recovery email must be different from your sign-in email.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: updated, error } = await supabase.rpc("update_current_user_recovery_email", {
+    recovery_email_input: parsed.data,
+  });
+
+  if (error || !updated) {
+    safeRedirect("/profile", "error", "Recovery email could not be saved.");
+  }
+
+  await supabase.from("activity_logs").insert({
+    company_id: context.companyId,
+    user_id: context.userId,
+    action: "users.recovery_email_updated",
+    entity_type: "user",
+    entity_id: context.userId,
+    metadata: { source: "profile_security" },
+  });
+
+  revalidatePath("/profile");
+  safeRedirect("/profile", "notice", "Recovery email saved. Verification email delivery is reserved for the next email-provider step.");
+}
+
+export async function removeRecoveryEmailAction() {
+  const context = await requireAuthContext();
+  const supabase = await createSupabaseServerClient();
+  const { data: updated, error } = await supabase.rpc("clear_current_user_recovery_email", {});
+
+  if (error || !updated) {
+    safeRedirect("/profile", "error", "Recovery email could not be removed.");
+  }
+
+  await supabase.from("activity_logs").insert({
+    company_id: context.companyId,
+    user_id: context.userId,
+    action: "users.recovery_email_removed",
+    entity_type: "user",
+    entity_id: context.userId,
+    metadata: { source: "profile_security" },
+  });
+
+  revalidatePath("/profile");
+  safeRedirect("/profile", "notice", "Recovery email removed.");
 }
 
 export async function uploadAvatarAction(formData: FormData) {

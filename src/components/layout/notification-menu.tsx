@@ -26,19 +26,48 @@ const notificationDesktopKey = "contento-notification-desktop-enabled";
 const notificationColumns =
   "id, company_id, user_id, title, message, read, entity_type, entity_id, link_href, read_at, created_at, updated_at";
 type BrowserNotificationPermission = NotificationPermission | "unsupported";
+let notificationAudioContext: AudioContext | null = null;
 
-async function playNotificationSound() {
+async function getNotificationAudioContext() {
   const AudioContextClass =
     window.AudioContext ||
     (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
   if (!AudioContextClass) {
-    return;
+    return null;
   }
 
-  const audioContext = new AudioContextClass();
-  if (audioContext.state === "suspended") {
-    await audioContext.resume();
+  notificationAudioContext ??= new AudioContextClass();
+
+  if (notificationAudioContext.state === "suspended") {
+    await notificationAudioContext.resume();
+  }
+
+  return notificationAudioContext;
+}
+
+async function unlockNotificationSound() {
+  const audioContext = await getNotificationAudioContext();
+
+  if (!audioContext) {
+    return false;
+  }
+
+  const buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
+  const source = audioContext.createBufferSource();
+
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  source.start();
+
+  return true;
+}
+
+async function playNotificationSound() {
+  const audioContext = await getNotificationAudioContext();
+
+  if (!audioContext) {
+    return;
   }
 
   const oscillator = audioContext.createOscillator();
@@ -70,6 +99,7 @@ export function NotificationMenu({
 }) {
   const pathname = usePathname();
   const previousUnreadCount = useRef(unreadCount);
+  const knownUnreadIds = useRef(new Set(notifications.filter((notification) => !notification.read).map((notification) => notification.id)));
   const userInteracted = useRef(false);
   const [isPending, startTransition] = useTransition();
   const [soundEnabled, setSoundEnabled] = useState(initialSoundEnabled);
@@ -86,6 +116,7 @@ export function NotificationMenu({
       setItems(notifications);
       setLocalUnreadCount(unreadCount);
       previousUnreadCount.current = unreadCount;
+      knownUnreadIds.current = new Set(notifications.filter((notification) => !notification.read).map((notification) => notification.id));
     });
   }, [notifications, unreadCount]);
 
@@ -144,18 +175,19 @@ export function NotificationMenu({
       ]);
       const nextItems = (data as NotificationRow[] | null) ?? [];
       const nextUnreadCount = count ?? 0;
+      const nextUnreadIds = new Set(nextItems.filter((notification) => !notification.read).map((notification) => notification.id));
+      const newestUnread = nextItems.find((notification) => !notification.read && !knownUnreadIds.current.has(notification.id));
 
       setItems(nextItems);
       setLocalUnreadCount(nextUnreadCount);
 
-      if (showToast && nextUnreadCount > previousUnreadCount.current) {
-        const newestUnread = nextItems.find((notification) => !notification.read);
-
-        if (newestUnread) {
+      if (showToast && newestUnread) {
           setToastNotification(newestUnread);
 
           if (soundEnabled && userInteracted.current) {
-            void playNotificationSound().catch(() => undefined);
+            void playNotificationSound().catch(() => {
+              setActionStatus("Sound will play after browser audio permission is available.");
+            });
           }
 
           if (
@@ -176,10 +208,10 @@ export function NotificationMenu({
               }
             };
           }
-        }
       }
 
       previousUnreadCount.current = nextUnreadCount;
+      knownUnreadIds.current = nextUnreadIds;
     }
 
     const channel = supabase
@@ -197,8 +229,12 @@ export function NotificationMenu({
         }
       )
       .subscribe();
+    const pollingId = window.setInterval(() => {
+      void refreshNotifications(true);
+    }, 20000);
 
     return () => {
+      window.clearInterval(pollingId);
       void supabase.removeChannel(channel);
     };
   }, [browserPermission, companyId, desktopEnabled, soundEnabled, userId]);
@@ -209,6 +245,13 @@ export function NotificationMenu({
     setSoundEnabled(enabled);
     window.localStorage.setItem(notificationSoundKey, String(enabled));
     setActionStatus(null);
+
+    if (enabled) {
+      userInteracted.current = true;
+      void unlockNotificationSound().catch(() => {
+        setActionStatus("Sound will play after browser audio permission is available.");
+      });
+    }
 
     startTransition(async () => {
       const result = await updateNotificationSoundPreferenceAction(enabled);

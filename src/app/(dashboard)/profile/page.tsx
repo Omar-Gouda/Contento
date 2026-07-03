@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   KeyRound,
+  Mail,
   Save,
   ShieldCheck,
   User,
@@ -25,7 +26,7 @@ import { ChangePasswordForm } from "@/components/forms/change-password-form";
 
 import { routes } from "@/constants/routes";
 import { requirePermission } from "@/lib/auth/context";
-import { updateProfileAction } from "@/lib/settings/actions";
+import { removeRecoveryEmailAction, updateProfileAction, updateRecoveryEmailAction } from "@/lib/settings/actions";
 import { getProfileData } from "@/lib/settings/queries";
 import { formatCairoDateTime } from "@/lib/time";
 
@@ -307,6 +308,50 @@ export default async function ProfilePage({
               <span className="text-muted-foreground">Last login</span>
               <span className="font-medium">{displayDate(profile.last_login_at)}</span>
             </div>
+            <div className="rounded-lg border bg-secondary/25 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Recovery email</span>
+                <Badge variant={profile.recovery_email_verified_at ? "default" : "secondary"}>
+                  {profile.recovery_email_verified_at ? "Verified" : profile.recovery_email ? "Stored" : "Not added"}
+                </Badge>
+              </div>
+              <p className="mt-2 break-all text-xs text-muted-foreground">
+                {profile.recovery_email ?? "Add a real email that your Marketing Manager can use for internal recovery if your sign-in email cannot receive messages."}
+              </p>
+            </div>
+            <FormSheet
+              title="Recovery email"
+              description="Store a reachable recovery email for internal password recovery. Supabase reset links still go to your sign-in email until recovery-email verification delivery is configured."
+              triggerLabel={profile.recovery_email ? "Update recovery email" : "Add recovery email"}
+              triggerIcon={<Mail />}
+            >
+              <div className="grid gap-5">
+                <form action={updateRecoveryEmailAction} className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="recoveryEmail">Recovery email</Label>
+                    <Input
+                      id="recoveryEmail"
+                      name="recoveryEmail"
+                      type="email"
+                      defaultValue={profile.recovery_email ?? profile.recovery_email_pending ?? ""}
+                      autoComplete="email"
+                      required
+                    />
+                  </div>
+                  <Button type="submit">
+                    <Save />
+                    Save recovery email
+                  </Button>
+                </form>
+                {profile.recovery_email && (
+                  <form action={removeRecoveryEmailAction}>
+                    <Button type="submit" variant="outline">
+                      Remove recovery email
+                    </Button>
+                  </form>
+                )}
+              </div>
+            </FormSheet>
             <FormSheet
               title="Change password"
               description="Update your password without leaving your profile."
