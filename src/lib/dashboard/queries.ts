@@ -85,6 +85,8 @@ const contentStatusLabels: Record<string, string> = {
   published: "Published",
   archived: "Archived",
 };
+const dashboardPreviewLimit = 80;
+const dashboardChartLimit = 500;
 
 function countBy<T>(rows: T[], getKey: (row: T) => string | null | undefined) {
   return rows.reduce((counts, row) => {
@@ -298,11 +300,13 @@ export async function getDashboardCharts(context: AuthContext): Promise<Dashboar
     supabase
       .from("tasks")
       .select("id, status, team_id, due_date, assigned_to")
-      .eq("company_id", context.companyId),
+      .eq("company_id", context.companyId)
+      .limit(dashboardChartLimit),
     supabase
       .from("content_items")
       .select("id, status, team_id, creator_id")
-      .eq("company_id", context.companyId),
+      .eq("company_id", context.companyId)
+      .limit(dashboardChartLimit),
     supabase
       .from("teams")
       .select("id, name")
@@ -312,12 +316,14 @@ export async function getDashboardCharts(context: AuthContext): Promise<Dashboar
     supabase
       .from("reports")
       .select("id, report_type")
-      .eq("company_id", context.companyId),
+      .eq("company_id", context.companyId)
+      .limit(dashboardChartLimit),
     supabase
       .from("work_days")
       .select("id, user_id, status, total_worked_minutes, total_break_minutes, total_missing_minutes")
       .eq("company_id", context.companyId)
-      .eq("work_date", today),
+      .eq("work_date", today)
+      .limit(dashboardChartLimit),
   ]);
 
   const tasks = ((tasksData as Array<{
@@ -567,7 +573,7 @@ export async function getDashboardCharts(context: AuthContext): Promise<Dashboar
 }
 
 export async function getDashboardSections(context: AuthContext): Promise<DashboardSections> {
-  const clientsPromise = getClients(context)
+  const clientsPromise = getClients(context, { limit: context.role === "admin" ? 8 : 6 })
     .then((clients) => ({ clients, clientsError: null as string | null }))
     .catch((error: unknown) => {
       console.error("dashboard clients section error", {
@@ -582,10 +588,10 @@ export async function getDashboardSections(context: AuthContext): Promise<Dashbo
 
   const [{ clients, clientsError }, tasks, ideas, content, reports, notifications] = await Promise.all([
     clientsPromise,
-    getWorkflowTasks(context, { status: "all" }),
-    getWorkflowIdeas(context, { status: "all" }),
-    getWorkflowContent(context, { status: "all" }),
-    getWorkflowReports(context),
+    getWorkflowTasks(context, { status: "all", limit: dashboardPreviewLimit }),
+    getWorkflowIdeas(context, { status: "all", limit: dashboardPreviewLimit }),
+    getWorkflowContent(context, { status: "all", limit: dashboardPreviewLimit }),
+    getWorkflowReports(context, { limit: dashboardPreviewLimit }),
     getRecentNotifications(context, 5),
   ]);
 

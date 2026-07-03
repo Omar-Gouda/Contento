@@ -19,6 +19,7 @@ export function FormSheet({
   title,
   description,
   triggerLabel,
+  triggerIcon,
   children,
   className,
   triggerClassName,
@@ -26,11 +27,12 @@ export function FormSheet({
   title: string;
   description?: string;
   triggerLabel: string;
+  triggerIcon?: ReactNode;
   children: ReactNode;
   className?: string;
   triggerClassName?: string;
 }) {
-  const showPlusIcon = !triggerLabel.toLowerCase().startsWith("edit");
+  const showPlusIcon = !triggerIcon && !triggerLabel.toLowerCase().startsWith("edit");
 
   return (
     <Sheet>
@@ -39,7 +41,7 @@ export function FormSheet({
           <Button type="button" className={cn(pageActionButtonClass, triggerClassName)} />
         }
       >
-        {showPlusIcon && <Plus />}
+        {triggerIcon ?? (showPlusIcon && <Plus />)}
         {triggerLabel}
       </SheetTrigger>
       <SheetContent

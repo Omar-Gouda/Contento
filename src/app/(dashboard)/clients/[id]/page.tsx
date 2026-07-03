@@ -32,7 +32,13 @@ import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
 import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
-import { deleteClientAction, saveClientAction, updateClientLifecycleAction } from "@/lib/clients/actions";
+import {
+  assignClientUserAction,
+  deleteClientAction,
+  removeClientUserAssignmentAction,
+  saveClientAction,
+  updateClientLifecycleAction,
+} from "@/lib/clients/actions";
 import { getClientAssignableUsers, getClientWorkspace } from "@/lib/clients/queries";
 import {
   addTaskCommentAction,
@@ -99,6 +105,30 @@ function contractWarning(endDate: string | null) {
   return null;
 }
 
+function assignmentRoleForRoleKey(roleKey: string | null) {
+  if (roleKey === "supervisor") {
+    return "account_manager";
+  }
+
+  if (roleKey === "creator") {
+    return "content_creator";
+  }
+
+  if (roleKey === "graphic-designer") {
+    return "graphic_designer";
+  }
+
+  if (roleKey === "video-editor") {
+    return "video_editor";
+  }
+
+  if (roleKey === "client") {
+    return "client_contact";
+  }
+
+  return "member";
+}
+
 function SectionCard({
   id,
   title,
@@ -153,6 +183,17 @@ export default async function ClientDetailPage({
     hasPermission(context, "clients.update", "limited") ||
     hasPermission(context, "clients.manage", "limited")
   ) && context.role !== "client";
+  const canManageAllClientAssignments =
+    hasPermission(context, "clients.assign", "full") ||
+    hasPermission(context, "clients.assign_account_manager", "full");
+  const canManageScopedClientAssignments =
+    context.role === "supervisor" &&
+    client.assigned_account_manager_id === context.userId &&
+    (
+      hasPermission(context, "clients.assign", "limited") ||
+      hasPermission(context, "clients.assign_account_manager", "limited")
+    );
+  const canManageClientAssignments = canManageAllClientAssignments || canManageScopedClientAssignments;
   const clientAcceptsNewWork = client.status === "active";
   const canCreateIdea = hasPermission(context, "ideas.create", "limited") && context.role !== "client" && clientAcceptsNewWork;
   const canCreateTask = hasPermission(context, "tasks.create", "limited") && context.role !== "client" && clientAcceptsNewWork;
@@ -162,6 +203,30 @@ export default async function ClientDetailPage({
   const productionUsers = users.filter((user) =>
     user.status === "active" && ["creator", "graphic-designer", "video-editor"].includes(user.roleKey ?? "")
   );
+  const currentUserTeamIds = users.find((user) => user.id === context.userId)?.teamIds ?? [];
+  const assignedUserRoleKeys = new Set(
+    client.assignedUsers.map((user) => `${user.id}:${user.assignmentRole}`)
+  );
+  const assignmentCandidates = users.filter((user) => {
+    if (user.status !== "active") {
+      return false;
+    }
+
+    const assignmentRole = assignmentRoleForRoleKey(user.roleKey);
+    if (assignedUserRoleKeys.has(`${user.id}:${assignmentRole}`)) {
+      return false;
+    }
+
+    if (canManageAllClientAssignments) {
+      return true;
+    }
+
+    return (
+      canManageScopedClientAssignments &&
+      isProductionRole(user.roleKey) &&
+      user.teamIds.some((teamId) => currentUserTeamIds.includes(teamId))
+    );
+  });
   const initials = client.name
     .split(/\s+/)
     .filter(Boolean)
@@ -196,6 +261,16 @@ export default async function ClientDetailPage({
       ["chat", "Chat", MessageSquare],
       ["contact", "Contact", Phone],
     ] as const;
+  const accountManagerAssignments = client.assignedUsers.filter((user) => user.assignmentRole === "account_manager");
+  const contentCreatorAssignments = client.assignedUsers.filter((user) => user.assignmentRole === "content_creator");
+  const graphicDesignerAssignments = client.assignedUsers.filter((user) => user.assignmentRole === "graphic_designer");
+  const videoEditorAssignments = client.assignedUsers.filter((user) => user.assignmentRole === "video_editor");
+  const otherAssignments = client.assignedUsers.filter((user) => ![
+    "account_manager",
+    "content_creator",
+    "graphic_designer",
+    "video_editor",
+  ].includes(user.assignmentRole));
 
   return (
     <section className="space-y-6">
@@ -622,21 +697,103 @@ export default async function ClientDetailPage({
           </SectionCard>
 
           <SectionCard id="contact" title="Contact" description="Client contacts and assigned internal owners." icon={Users}>
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
               <div className="rounded-xl border bg-card p-4 text-sm">
                 <p className="font-semibold">Client contact</p>
                 <p className="mt-2 text-muted-foreground">{client.contact_person || "Not set"}</p>
                 <p className="text-muted-foreground">{client.contact_email || "No email"}</p>
                 <p className="text-muted-foreground">{client.contact_phone || "No phone"}</p>
               </div>
-              <div className="grid gap-2">
-                {client.assignedUsers.map((user) => (
-                  <div key={user.id} className="rounded-xl border bg-card p-4 text-sm">
-                    <p className="font-medium">{user.displayName}</p>
-                    <p className="text-muted-foreground">{user.roleName}</p>
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Assigned users</p>
+                    <p className="text-sm text-muted-foreground">
+                      Assign existing users to this client workspace.
+                    </p>
+                  </div>
+                  {canManageClientAssignments && (
+                    <FormSheet
+                      title="Assign user to client"
+                      description="Choose an existing active user. Account Managers can assign same-team production users to their own clients."
+                      triggerLabel="Add existing user"
+                    >
+                      <form action={assignClientUserAction} className="grid gap-4">
+                        <input type="hidden" name="clientId" value={client.id} />
+                        <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
+                        <div className="space-y-2">
+                          <Label htmlFor="assignment-user">User</Label>
+                          <select
+                            id="assignment-user"
+                            name="userId"
+                            required
+                            className={selectClass}
+                            disabled={!assignmentCandidates.length}
+                          >
+                            <option value="">Choose user</option>
+                            {assignmentCandidates.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.displayName} - {user.roleName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {!assignmentCandidates.length && (
+                          <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                            No available users match your assignment scope.
+                          </p>
+                        )}
+                        <Button type="submit" disabled={!assignmentCandidates.length}>
+                          <Plus />
+                          Assign user
+                        </Button>
+                      </form>
+                    </FormSheet>
+                  )}
+                </div>
+
+                {[
+                  ["Assigned Account Manager", accountManagerAssignments],
+                  ["Content Creators", contentCreatorAssignments],
+                  ["Graphic Designers", graphicDesignerAssignments],
+                  ["Video Editors", videoEditorAssignments],
+                  ["Other assigned users", otherAssignments],
+                ].map(([label, assignments]) => (
+                  <div key={label as string} className="rounded-xl border bg-card p-4">
+                    <p className="text-sm font-semibold">{label as string}</p>
+                    <div className="mt-3 grid gap-2">
+                      {(assignments as typeof client.assignedUsers).map((user) => (
+                        <div key={`${user.id}-${user.assignmentRole}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-secondary/25 p-3 text-sm">
+                          <div>
+                            <p className="font-medium">{user.displayName}</p>
+                            <p className="text-muted-foreground">{user.roleName}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="capitalize">
+                              {user.assignmentRole.replaceAll("_", " ")}
+                            </Badge>
+                            {canManageClientAssignments && (
+                              <form action={removeClientUserAssignmentAction}>
+                                <input type="hidden" name="clientId" value={client.id} />
+                                <input type="hidden" name="userId" value={user.id} />
+                                <input type="hidden" name="assignmentRole" value={user.assignmentRole} />
+                                <input type="hidden" name="redirectTo" value={routes.clients.detail(client.id)} />
+                                <Button type="submit" variant="outline" size="sm">
+                                  Remove
+                                </Button>
+                              </form>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {!(assignments as typeof client.assignedUsers).length && (
+                        <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+                          No users assigned yet.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
-                {!client.assignedUsers.length && <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No assigned internal contacts yet.</p>}
               </div>
             </div>
           </SectionCard>

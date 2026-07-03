@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/permissions";
@@ -67,6 +68,8 @@ function safeRedirect(pathname: string | null | undefined, key: "notice" | "erro
   const destination = pathname?.startsWith("/") && !pathname.startsWith("//") ? pathname : fallback;
   const separator = destination.includes("?") ? "&" : "?";
 
+  revalidatePath("/", "layout");
+  revalidatePath(destination);
   redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
 }
 

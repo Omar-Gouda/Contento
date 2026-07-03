@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Building2, Search } from "lucide-react";
 
-import { getClients } from "@/lib/clients/queries";
-import { getWorkflowContent, getWorkflowIdeas, getWorkflowTasks } from "@/lib/workflows/queries";
+import { getClients, getClientWorkspaceSignals } from "@/lib/clients/queries";
 import { requirePermission } from "@/lib/auth/context";
 import { formatCairoDateTime } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
@@ -30,15 +29,6 @@ function initials(name: string) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
-}
-
-function nearestDate(values: Array<string | null>) {
-  const now = Date.now();
-  return values
-    .filter((value): value is string => Boolean(value))
-    .map((value) => ({ value, time: new Date(value).getTime() }))
-    .filter((item) => Number.isFinite(item.time) && item.time >= now)
-    .sort((a, b) => a.time - b.time)[0]?.value ?? null;
 }
 
 function contractWarning(endDate: string | null) {
@@ -68,12 +58,8 @@ export default async function ClientsPage({
 }) {
   const params = await searchParams;
   const context = await requirePermission("clients.view", "view");
-  const [clients, tasks, ideas, content] = await Promise.all([
-    getClients(context, { search: params.q, status: params.status }),
-    getWorkflowTasks(context, { status: "all" }),
-    getWorkflowIdeas(context, { status: "all" }),
-    getWorkflowContent(context, { status: "all" }),
-  ]);
+  const clients = await getClients(context, { search: params.q, status: params.status });
+  const clientSignals = await getClientWorkspaceSignals(context, clients.map((client) => client.id));
 
   return (
     <section className="space-y-6">
@@ -134,15 +120,7 @@ export default async function ClientsPage({
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
             {clients.map((client) => {
-              const clientTasks = tasks.filter((task) => task.client_id === client.id);
-              const clientIdeas = ideas.filter((idea) => idea.client_id === client.id);
-              const clientContent = content.filter((item) => item.client_id === client.id);
-              const openTaskCount = clientTasks.filter((task) => !["completed", "closed"].includes(task.status)).length;
-              const openIdeaCount = clientIdeas.filter((idea) => !["approved", "rejected", "archived"].includes(idea.status)).length;
-              const upcomingPublishingAt = nearestDate([
-                ...clientIdeas.map((idea) => idea.publishing_at),
-                ...clientContent.map((item) => item.scheduled_at),
-              ]);
+              const signal = clientSignals.get(client.id);
               const warning = contractWarning(client.contract_end_date);
 
               return (
@@ -183,11 +161,11 @@ export default async function ClientsPage({
                       </div>
                       <div>
                         <p className="text-muted-foreground">Upcoming publishing</p>
-                        <p className="font-medium">{upcomingPublishingAt ? formatCairoDateTime(upcomingPublishingAt) : "Not scheduled"}</p>
+                        <p className="font-medium">{signal?.upcomingPublishingAt ? formatCairoDateTime(signal.upcomingPublishingAt) : "Not scheduled"}</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Open work</p>
-                        <p className="font-medium">{openTaskCount} tasks / {openIdeaCount} ideas</p>
+                        <p className="font-medium">{signal?.openTaskCount ?? 0} tasks / {signal?.openIdeaCount ?? 0} ideas</p>
                       </div>
                       <div>
                         <p className="text-muted-foreground">Contract end</p>

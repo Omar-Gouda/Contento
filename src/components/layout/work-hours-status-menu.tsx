@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Clock, Coffee, Play, Square } from "lucide-react";
 
 import {
-  clockInAndRefreshAction,
-  clockOutAndRefreshAction,
-  endBreakAndRefreshAction,
-  startBreakAndRefreshAction,
+  clockInAction,
+  clockOutAction,
+  endBreakAction,
+  startBreakAction,
+  type WorkHoursActionResult,
 } from "@/lib/work-hours/actions";
 import type { CurrentWorkHours } from "@/lib/work-hours/queries";
 import { minutesLabel } from "@/lib/time";
@@ -49,29 +50,30 @@ function statusTone(status: string) {
   return "bg-muted-foreground";
 }
 
-function ActionForm({
-  action,
-  children,
-  variant = "outline",
-}: {
-  action: (formData: FormData) => void | Promise<void>;
-  children: ReactNode;
-  variant?: "default" | "outline";
-}) {
-  return (
-    <form action={action}>
-      <Button type="submit" variant={variant} size="sm" className="w-full justify-start">
-        {children}
-      </Button>
-    </form>
-  );
+function statusFromActionState(state: WorkHoursActionResult["state"]) {
+  if (state === "working") {
+    return "Working";
+  }
+
+  if (state === "on_break") {
+    return "On break";
+  }
+
+  if (state === "clocked_out") {
+    return "Clocked out";
+  }
+
+  return "Not clocked in";
 }
 
 export function WorkHoursStatusMenu({ workHours }: { workHours: CurrentWorkHours | null }) {
   const [showPrompt, setShowPrompt] = useState(false);
-  const status = workStatus(workHours);
-  const activeWork = Boolean(workHours?.activeWorkSession);
-  const activeBreak = Boolean(workHours?.activeBreakSession);
+  const [statusOverride, setStatusOverride] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const status = statusOverride ?? workStatus(workHours);
+  const activeBreak = status === "On break";
+  const activeWork = status === "Working" || activeBreak;
   const canClockIn = !activeWork;
   const canClockOut = activeWork && !activeBreak;
   const promptKey = useMemo(() => {
@@ -91,6 +93,23 @@ export function WorkHoursStatusMenu({ workHours }: { workHours: CurrentWorkHours
   function dismissPrompt() {
     window.sessionStorage.setItem(promptKey, "true");
     setShowPrompt(false);
+  }
+
+  function runWorkHoursAction(action: () => Promise<WorkHoursActionResult>) {
+    startTransition(async () => {
+      setActionMessage(null);
+      const result = await action();
+
+      if (result.state) {
+        setStatusOverride(statusFromActionState(result.state));
+      }
+
+      setActionMessage(result.message);
+
+      if (result.success) {
+        setShowPrompt(false);
+      }
+    });
   }
 
   return (
@@ -128,30 +147,63 @@ export function WorkHoursStatusMenu({ workHours }: { workHours: CurrentWorkHours
             </div>
           </div>
           <DropdownMenuSeparator />
+          {actionMessage && (
+            <p className="px-2 pb-2 text-xs text-muted-foreground" aria-live="polite">
+              {actionMessage}
+            </p>
+          )}
           <div className="grid gap-2">
             {canClockIn && (
-              <ActionForm action={clockInAndRefreshAction} variant="default">
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                disabled={isPending}
+                className="w-full justify-start"
+                onClick={() => runWorkHoursAction(clockInAction)}
+              >
                 <Play />
-                Clock in
-              </ActionForm>
+                {isPending ? "Clocking in..." : "Clock in"}
+              </Button>
             )}
             {activeWork && !activeBreak && (
-              <ActionForm action={startBreakAndRefreshAction}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending}
+                className="w-full justify-start"
+                onClick={() => runWorkHoursAction(startBreakAction)}
+              >
                 <Coffee />
-                Start break
-              </ActionForm>
+                {isPending ? "Starting..." : "Start break"}
+              </Button>
             )}
             {activeBreak && (
-              <ActionForm action={endBreakAndRefreshAction} variant="default">
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                disabled={isPending}
+                className="w-full justify-start"
+                onClick={() => runWorkHoursAction(endBreakAction)}
+              >
                 <Coffee />
-                End break
-              </ActionForm>
+                {isPending ? "Ending..." : "End break"}
+              </Button>
             )}
             {canClockOut && (
-              <ActionForm action={clockOutAndRefreshAction}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending}
+                className="w-full justify-start"
+                onClick={() => runWorkHoursAction(clockOutAction)}
+              >
                 <Square />
-                Clock out
-              </ActionForm>
+                {isPending ? "Clocking out..." : "Clock out"}
+              </Button>
             )}
           </div>
         </DropdownMenuContent>
@@ -180,12 +232,10 @@ export function WorkHoursStatusMenu({ workHours }: { workHours: CurrentWorkHours
               <Button type="button" variant="outline" onClick={dismissPrompt}>
                 Later
               </Button>
-              <form action={clockInAndRefreshAction}>
-                <Button type="submit">
-                  <Play />
-                  Clock in
-                </Button>
-              </form>
+              <Button type="button" disabled={isPending} onClick={() => runWorkHoursAction(clockInAction)}>
+                <Play />
+                {isPending ? "Clocking in..." : "Clock in"}
+              </Button>
             </div>
           </div>
         </div>

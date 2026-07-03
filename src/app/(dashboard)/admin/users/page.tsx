@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Search } from "lucide-react";
 
 import {
@@ -21,7 +22,7 @@ import { PageActions, PageHeader } from "@/components/dashboard/page-header";
 import { RoleAwareUserCreateForm } from "@/components/admin/role-aware-user-create-form";
 import { UserTerminationControls } from "@/components/admin/user-termination-controls";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -151,6 +152,9 @@ export default async function AdminUsersPage({
                 <details className="mt-4 rounded-lg border bg-background/60 p-3">
                   <summary className="cursor-pointer text-sm font-medium text-primary">Manage user</summary>
                 <div className="mt-3 grid gap-3">
+                  <Link href={`/users/${user.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    Open profile and assignments
+                  </Link>
                   <form action={updateUserRoleAction} className="grid gap-2">
                     <input type="hidden" name="userId" value={user.id} />
                     <Label htmlFor={`mobile-role-${user.id}`}>Role</Label>
@@ -280,6 +284,9 @@ export default async function AdminUsersPage({
                       <details className="rounded-lg border bg-secondary/20 p-3">
                         <summary className="cursor-pointer text-sm font-medium text-primary">Manage user</summary>
                       <div className="mt-3 grid gap-3">
+                        <Link href={`/users/${user.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                          Open profile and assignments
+                        </Link>
                         <form action={updateUserRoleAction} className="flex gap-2">
                           <input type="hidden" name="userId" value={user.id} />
                           <select

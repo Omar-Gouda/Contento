@@ -23,6 +23,7 @@ export type ClientUser = UserRow & {
   displayName: string;
   roleName: string;
   roleKey: ReturnType<typeof normalizeRoleName>;
+  teamIds: string[];
 };
 
 export type ClientProfile = ClientRow & {
@@ -36,6 +37,13 @@ export type ClientWorkspace = ClientProfile & {
   ideas: Awaited<ReturnType<typeof getWorkflowIdeas>>;
   content: Awaited<ReturnType<typeof getWorkflowContent>>;
   reports: Awaited<ReturnType<typeof getWorkflowReports>>;
+};
+
+export type ClientWorkspaceSignal = {
+  clientId: string;
+  openTaskCount: number;
+  openIdeaCount: number;
+  upcomingPublishingAt: string | null;
 };
 
 function fullName(user: Pick<UserRow, "first_name" | "last_name" | "email"> | null | undefined) {
@@ -83,7 +91,11 @@ async function getSignedLogoUrl(supabase: SupabaseServerClient, logoPath: string
 
 export async function getClientAssignableUsers(context: AuthContext): Promise<ClientUser[]> {
   const supabase = await createSupabaseServerClient();
-  const [{ data: users, error: usersError }, { data: roles, error: rolesError }] = await Promise.all([
+  const [
+    { data: users, error: usersError },
+    { data: roles, error: rolesError },
+    { data: teamMemberships, error: teamMembershipsError },
+  ] = await Promise.all([
     supabase
       .from("users")
       .select("id, email, first_name, last_name, role_id, status")
@@ -93,13 +105,23 @@ export async function getClientAssignableUsers(context: AuthContext): Promise<Cl
       .from("roles")
       .select("id, name")
       .eq("company_id", context.companyId),
+    supabase
+      .from("team_members")
+      .select("team_id, user_id"),
   ]);
 
-  if (usersError || rolesError) {
+  if (usersError || rolesError || teamMembershipsError) {
     throw new Error("Unable to load assignable users.");
   }
 
   const roleById = new Map(((roles as RoleRow[] | null) ?? []).map((role) => [role.id, role.name]));
+  const teamIdsByUserId = new Map<string, string[]>();
+
+  ((teamMemberships as Array<{ team_id: string; user_id: string }> | null) ?? []).forEach((membership) => {
+    const teamIds = teamIdsByUserId.get(membership.user_id) ?? [];
+    teamIds.push(membership.team_id);
+    teamIdsByUserId.set(membership.user_id, teamIds);
+  });
 
   return ((users as UserRow[] | null) ?? []).map((user) => {
     const roleName = user.role_id ? roleById.get(user.role_id) ?? "Unassigned" : "Unassigned";
@@ -109,13 +131,68 @@ export async function getClientAssignableUsers(context: AuthContext): Promise<Cl
       displayName: fullName(user),
       roleName: getRoleDisplayName(roleName),
       roleKey: normalizeRoleName(roleName),
+      teamIds: teamIdsByUserId.get(user.id) ?? [],
+    };
+  });
+}
+
+async function getClientUsersByIds(context: AuthContext, userIds: string[]): Promise<ClientUser[]> {
+  const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+
+  if (!uniqueUserIds.length) {
+    return [];
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const [
+    { data: users, error: usersError },
+    { data: roles, error: rolesError },
+    { data: teamMemberships, error: teamMembershipsError },
+  ] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, email, first_name, last_name, role_id, status")
+      .eq("company_id", context.companyId)
+      .in("id", uniqueUserIds),
+    supabase
+      .from("roles")
+      .select("id, name")
+      .eq("company_id", context.companyId),
+    supabase
+      .from("team_members")
+      .select("team_id, user_id")
+      .in("user_id", uniqueUserIds),
+  ]);
+
+  if (usersError || rolesError || teamMembershipsError) {
+    throw new Error("Unable to load assigned users.");
+  }
+
+  const roleById = new Map(((roles as RoleRow[] | null) ?? []).map((role) => [role.id, role.name]));
+  const teamIdsByUserId = new Map<string, string[]>();
+
+  ((teamMemberships as Array<{ team_id: string; user_id: string }> | null) ?? []).forEach((membership) => {
+    const teamIds = teamIdsByUserId.get(membership.user_id) ?? [];
+    teamIds.push(membership.team_id);
+    teamIdsByUserId.set(membership.user_id, teamIds);
+  });
+
+  return ((users as UserRow[] | null) ?? []).map((user) => {
+    const roleName = user.role_id ? roleById.get(user.role_id) ?? "Unassigned" : "Unassigned";
+
+    return {
+      ...user,
+      displayName: fullName(user),
+      roleName: getRoleDisplayName(roleName),
+      roleKey: normalizeRoleName(roleName),
+      teamIds: teamIdsByUserId.get(user.id) ?? [],
     };
   });
 }
 
 export async function getClients(
   context: AuthContext,
-  filters: { search?: string; status?: string } = {}
+  filters: { search?: string; status?: string; limit?: number } = {}
 ): Promise<ClientProfile[]> {
   const supabase = await createSupabaseServerClient();
   await supabase.rpc("expire_current_company_clients", {});
@@ -137,10 +214,11 @@ export async function getClients(
     query = query.ilike("name", `%${filters.search.trim()}%`);
   }
 
-  const [{ data: clients, error }, users] = await Promise.all([
-    query,
-    getClientAssignableUsers(context),
-  ]);
+  if (filters.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  const { data: clients, error } = await query;
 
   if (error) {
     logGetClientsError(error);
@@ -160,8 +238,12 @@ export async function getClients(
     throw new Error("Unable to load client assignments.");
   }
 
-  const userById = new Map(users.map((user) => [user.id, user]));
   const assignmentRows = (assignments as ClientAssignmentRow[] | null) ?? [];
+  const users = await getClientUsersByIds(context, [
+    ...(clientRows.map((client) => client.assigned_account_manager_id).filter(Boolean) as string[]),
+    ...assignmentRows.map((assignment) => assignment.user_id),
+  ]);
+  const userById = new Map(users.map((user) => [user.id, user]));
 
   return Promise.all(clientRows.map(async (client) => ({
     ...client,
@@ -177,6 +259,103 @@ export async function getClients(
       })
       .filter((user): user is ClientUser & { assignmentRole: ClientAssignmentRow["assignment_role"] } => Boolean(user)),
   })));
+}
+
+export async function getClientWorkspaceSignals(context: AuthContext, clientIds: string[]) {
+  const uniqueClientIds = Array.from(new Set(clientIds.filter(Boolean)));
+
+  if (!uniqueClientIds.length) {
+    return new Map<string, ClientWorkspaceSignal>();
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const [
+    { data: tasks, error: tasksError },
+    { data: ideas, error: ideasError },
+    { data: content, error: contentError },
+  ] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("client_id, status")
+      .eq("company_id", context.companyId)
+      .in("client_id", uniqueClientIds),
+    supabase
+      .from("ideas")
+      .select("client_id, status, publishing_at")
+      .eq("company_id", context.companyId)
+      .in("client_id", uniqueClientIds),
+    supabase
+      .from("content_items")
+      .select("client_id, scheduled_at")
+      .eq("company_id", context.companyId)
+      .in("client_id", uniqueClientIds),
+  ]);
+
+  if (tasksError || ideasError || contentError) {
+    throw new Error("Unable to load client workspace signals.");
+  }
+
+  const signals = new Map<string, ClientWorkspaceSignal>(
+    uniqueClientIds.map((clientId) => [
+      clientId,
+      {
+        clientId,
+        openTaskCount: 0,
+        openIdeaCount: 0,
+        upcomingPublishingAt: null,
+      },
+    ])
+  );
+  const now = Date.now();
+
+  function setNearestDate(clientId: string | null, value: string | null) {
+    if (!clientId || !value) {
+      return;
+    }
+
+    const signal = signals.get(clientId);
+    const candidateTime = new Date(value).getTime();
+
+    if (!signal || !Number.isFinite(candidateTime) || candidateTime < now) {
+      return;
+    }
+
+    const currentTime = signal.upcomingPublishingAt
+      ? new Date(signal.upcomingPublishingAt).getTime()
+      : Number.POSITIVE_INFINITY;
+
+    if (candidateTime < currentTime) {
+      signal.upcomingPublishingAt = value;
+    }
+  }
+
+  ((tasks as Array<{ client_id: string | null; status: string }> | null) ?? []).forEach((task) => {
+    if (!task.client_id || ["completed", "closed"].includes(task.status)) {
+      return;
+    }
+
+    const signal = signals.get(task.client_id);
+    if (signal) {
+      signal.openTaskCount += 1;
+    }
+  });
+
+  ((ideas as Array<{ client_id: string | null; status: string; publishing_at: string | null }> | null) ?? []).forEach((idea) => {
+    if (idea.client_id && !["approved", "rejected", "archived"].includes(idea.status)) {
+      const signal = signals.get(idea.client_id);
+      if (signal) {
+        signal.openIdeaCount += 1;
+      }
+    }
+
+    setNearestDate(idea.client_id, idea.publishing_at);
+  });
+
+  ((content as Array<{ client_id: string | null; scheduled_at: string | null }> | null) ?? []).forEach((item) => {
+    setNearestDate(item.client_id, item.scheduled_at);
+  });
+
+  return signals;
 }
 
 export async function getClientById(context: AuthContext, clientId: string) {

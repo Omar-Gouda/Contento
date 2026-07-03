@@ -1,3 +1,5 @@
+import { unstable_noStore as noStore } from "next/cache";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
 import {
@@ -30,6 +32,8 @@ function elapsedMinutes(startedAt: string | null) {
 }
 
 export async function getCurrentUserWorkHours(context: AuthContext): Promise<CurrentWorkHours> {
+  noStore();
+
   const supabase = await createSupabaseServerClient();
   const today = getCairoDate();
   const { data: workDay, error: workDayError } = await supabase
@@ -59,12 +63,17 @@ export async function getCurrentUserWorkHours(context: AuthContext): Promise<Cur
     };
   }
 
-  const [{ data: activeWorkSession }, { data: breakSessions, error: breakSessionsError }] = await Promise.all([
+  const [
+    { data: activeWorkSession, error: activeWorkSessionError },
+    { data: breakSessions, error: breakSessionsError },
+  ] = await Promise.all([
     supabase
       .from("work_sessions")
       .select("id, company_id, user_id, work_day_id, sign_in_at, sign_out_at, duration_minutes, created_at")
       .eq("work_day_id", workDayRow.id)
       .is("sign_out_at", null)
+      .order("sign_in_at", { ascending: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("break_sessions")
@@ -72,6 +81,10 @@ export async function getCurrentUserWorkHours(context: AuthContext): Promise<Cur
       .eq("work_day_id", workDayRow.id)
       .order("started_at", { ascending: false }),
   ]);
+
+  if (activeWorkSessionError) {
+    throw new Error("Unable to load active work session.");
+  }
 
   if (breakSessionsError) {
     throw new Error("Unable to load break history.");

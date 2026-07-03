@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 
 export default function DashboardError({
-  error,
   reset,
 }: {
   error: Error;
@@ -21,7 +20,9 @@ export default function DashboardError({
       <Alert variant="destructive">
         <AlertCircle className="size-4" />
         <AlertTitle>Dashboard could not load</AlertTitle>
-        <AlertDescription>{error.message}</AlertDescription>
+        <AlertDescription>
+          Something went wrong while loading this workspace page. Try again, or contact your workspace admin if it continues.
+        </AlertDescription>
       </Alert>
       <Button type="button" className="mt-4" onClick={reset}>
         Try again

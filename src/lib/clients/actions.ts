@@ -4,12 +4,13 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { clientProfileSchema } from "@/lib/clients/schemas";
+import { clientAssignmentSchema, clientProfileSchema } from "@/lib/clients/schemas";
 import { requireAuthContext } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { Database, Json } from "@/types/database";
+import { isProductionRole, normalizeRoleName } from "@/types/roles";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
 type DatabaseError = {
@@ -18,6 +19,17 @@ type DatabaseError = {
   details?: string;
   hint?: string;
 };
+type ClientAssignmentRole = Database["public"]["Tables"]["client_assignments"]["Row"]["assignment_role"];
+type ClientAssignmentUser = {
+  id: string;
+  company_id: string;
+  role_id: string | null;
+  roleName: string | null;
+};
+type ClientAssignmentClient = Pick<
+  Database["public"]["Tables"]["clients"]["Row"],
+  "id" | "company_id" | "assigned_account_manager_id" | "name"
+>;
 
 const imageTypes = new Map([
   ["image/jpeg", "jpg"],
@@ -39,6 +51,8 @@ function safeRedirect(pathname: string, key: "notice" | "error", value: string):
   const destination = pathname.startsWith("/") && !pathname.startsWith("//") ? pathname : "/clients";
   const separator = destination.includes("?") ? "&" : "?";
 
+  revalidatePath("/", "layout");
+  revalidatePath(destination);
   redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
 }
 
@@ -228,7 +242,7 @@ async function logActivity(
   });
 }
 
-function assignmentRoleForUserRole(roleName: string | null | undefined) {
+function assignmentRoleForUserRole(roleName: string | null | undefined): ClientAssignmentRole {
   const normalized = (roleName ?? "").trim().toLowerCase();
 
   if (normalized === "supervisor" || normalized === "account manager") {
@@ -254,6 +268,145 @@ function assignmentRoleForUserRole(roleName: string | null | undefined) {
   return "member";
 }
 
+function cleanRedirectTo(value: string | null | undefined) {
+  return value?.startsWith("/") && !value.startsWith("//") ? value : "/clients";
+}
+
+function revalidateClientAssignmentPaths(clientId: string, userId: string, redirectTo?: string | null) {
+  revalidatePath("/", "layout");
+  revalidatePath("/clients");
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath("/admin/users");
+  revalidatePath(`/users/${userId}`);
+  revalidatePath("/team");
+  revalidatePath("/admin/teams");
+
+  const destination = cleanRedirectTo(redirectTo);
+  if (!["/clients", `/clients/${clientId}`, "/admin/users", `/users/${userId}`, "/team", "/admin/teams"].includes(destination)) {
+    revalidatePath(destination);
+  }
+}
+
+async function loadClientAssignmentScope(
+  supabase: SupabaseServerClient,
+  context: AuthContext,
+  clientId: string,
+  userId: string
+) {
+  const [{ data: client, error: clientError }, { data: user, error: userError }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, company_id, assigned_account_manager_id, name")
+      .eq("id", clientId)
+      .eq("company_id", context.companyId)
+      .maybeSingle(),
+    supabase
+      .from("users")
+      .select("id, company_id, role_id")
+      .eq("id", userId)
+      .eq("company_id", context.companyId)
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+
+  if (clientError || !client) {
+    throw new Error("Client is outside your organization.");
+  }
+
+  if (userError || !user) {
+    throw new Error("Choose an active user inside your organization.");
+  }
+
+  let roleName: string | null = null;
+  if (user.role_id) {
+    const { data: role, error: roleError } = await supabase
+      .from("roles")
+      .select("name")
+      .eq("id", user.role_id)
+      .eq("company_id", context.companyId)
+      .maybeSingle();
+
+    if (roleError || !role) {
+      throw new Error("User role could not be resolved.");
+    }
+
+    roleName = role.name;
+  }
+
+  return {
+    client: client as ClientAssignmentClient,
+    user: {
+      ...user,
+      roleName,
+    } as ClientAssignmentUser,
+  };
+}
+
+async function usersShareTeam(supabase: SupabaseServerClient, currentUserId: string, targetUserId: string) {
+  const { data, error } = await supabase
+    .from("team_members")
+    .select("team_id, user_id")
+    .in("user_id", [currentUserId, targetUserId]);
+
+  if (error) {
+    return false;
+  }
+
+  const memberships = (data as Array<{ team_id: string; user_id: string }> | null) ?? [];
+  const currentTeamIds = new Set(
+    memberships
+      .filter((membership) => membership.user_id === currentUserId)
+      .map((membership) => membership.team_id)
+  );
+
+  return memberships.some((membership) => membership.user_id === targetUserId && currentTeamIds.has(membership.team_id));
+}
+
+async function assertCanManageClientAssignment({
+  supabase,
+  context,
+  client,
+  user,
+  assignmentRole,
+}: {
+  supabase: SupabaseServerClient;
+  context: AuthContext;
+  client: ClientAssignmentClient;
+  user: ClientAssignmentUser;
+  assignmentRole: ClientAssignmentRole;
+}) {
+  const hasFullAssignmentAccess =
+    hasPermission(context, "clients.assign", "full") ||
+    hasPermission(context, "clients.assign_account_manager", "full");
+
+  if (hasFullAssignmentAccess) {
+    return;
+  }
+
+  const hasScopedAssignmentAccess =
+    context.role === "supervisor" &&
+    (
+      hasPermission(context, "clients.assign", "limited") ||
+      hasPermission(context, "clients.assign_account_manager", "limited")
+    );
+
+  if (!hasScopedAssignmentAccess || client.assigned_account_manager_id !== context.userId) {
+    throw new Error("You can manage assignments only for clients assigned to you.");
+  }
+
+  const targetRole = normalizeRoleName(user.roleName);
+  const targetIsProductionUser = isProductionRole(targetRole);
+  const targetSharesTeam = await usersShareTeam(supabase, context.userId, user.id);
+
+  if (
+    !targetIsProductionUser ||
+    !["content_creator", "graphic_designer", "video_editor"].includes(assignmentRole) ||
+    !targetSharesTeam
+  ) {
+    throw new Error("Account Managers can assign only same-team production users to their assigned clients.");
+  }
+}
+
 async function updateClientContactUserStatus(
   supabase: SupabaseServerClient,
   companyId: string,
@@ -277,6 +430,142 @@ async function updateClientContactUserStatus(
     .update({ status })
     .eq("company_id", companyId)
     .in("id", userIds);
+}
+
+export async function assignClientUserAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const parsed = clientAssignmentSchema.safeParse({
+    clientId: formString(formData, "clientId"),
+    userId: formString(formData, "userId"),
+    assignmentRole: formString(formData, "assignmentRole") || undefined,
+    redirectTo: formString(formData, "redirectTo") || "/clients",
+  });
+  const redirectTo = cleanRedirectTo(formString(formData, "redirectTo") || "/clients");
+
+  if (!parsed.success) {
+    safeRedirect(redirectTo, "error", parsed.error.issues[0]?.message ?? "Invalid assignment.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  try {
+    const { client, user } = await loadClientAssignmentScope(
+      supabase,
+      context,
+      parsed.data.clientId,
+      parsed.data.userId
+    );
+    const targetRole = normalizeRoleName(user.roleName);
+    const assignmentRole = parsed.data.assignmentRole ?? assignmentRoleForUserRole(user.roleName);
+
+    if (assignmentRole === "account_manager" && targetRole !== "supervisor") {
+      throw new Error("Choose an Account Manager for the account manager assignment.");
+    }
+
+    await assertCanManageClientAssignment({ supabase, context, client, user, assignmentRole });
+
+    if (assignmentRole === "account_manager") {
+      const { error: accountManagerError } = await supabase
+        .from("clients")
+        .update({ assigned_account_manager_id: user.id })
+        .eq("id", client.id)
+        .eq("company_id", context.companyId);
+
+      if (accountManagerError) {
+        throw new Error("Account Manager could not be assigned to this client.");
+      }
+    }
+
+    const { error } = await supabase.from("client_assignments").insert({
+      client_id: client.id,
+      user_id: user.id,
+      assignment_role: assignmentRole,
+    });
+
+    if (error && error.code !== "23505") {
+      throw new Error("Client assignment could not be saved.");
+    }
+
+    await logActivity(context, "clients.user_assigned", client.id, {
+      user_id: user.id,
+      assignment_role: assignmentRole,
+      duplicate_ignored: error?.code === "23505",
+    });
+    revalidateClientAssignmentPaths(client.id, user.id, parsed.data.redirectTo);
+    safeRedirect(redirectTo, "notice", error?.code === "23505" ? "User is already assigned to this client." : "Client assignment saved.");
+  } catch (error) {
+    safeRedirect(redirectTo, "error", error instanceof Error ? error.message : "Client assignment could not be saved.");
+  }
+}
+
+export async function removeClientUserAssignmentAction(formData: FormData) {
+  const context = await requireAuthContext();
+  const parsed = clientAssignmentSchema.safeParse({
+    clientId: formString(formData, "clientId"),
+    userId: formString(formData, "userId"),
+    assignmentRole: formString(formData, "assignmentRole") || undefined,
+    redirectTo: formString(formData, "redirectTo") || "/clients",
+  });
+  const redirectTo = cleanRedirectTo(formString(formData, "redirectTo") || "/clients");
+
+  if (!parsed.success) {
+    safeRedirect(redirectTo, "error", parsed.error.issues[0]?.message ?? "Invalid assignment.");
+  }
+
+  if (!parsed.data.assignmentRole) {
+    safeRedirect(redirectTo, "error", "Choose a valid assignment to remove.");
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  try {
+    const { client, user } = await loadClientAssignmentScope(
+      supabase,
+      context,
+      parsed.data.clientId,
+      parsed.data.userId
+    );
+
+    await assertCanManageClientAssignment({
+      supabase,
+      context,
+      client,
+      user,
+      assignmentRole: parsed.data.assignmentRole,
+    });
+
+    const { error } = await supabase
+      .from("client_assignments")
+      .delete()
+      .eq("client_id", client.id)
+      .eq("user_id", user.id)
+      .eq("assignment_role", parsed.data.assignmentRole);
+
+    if (error) {
+      throw new Error("Client assignment could not be removed.");
+    }
+
+    if (parsed.data.assignmentRole === "account_manager" && client.assigned_account_manager_id === user.id) {
+      const { error: accountManagerError } = await supabase
+        .from("clients")
+        .update({ assigned_account_manager_id: null })
+        .eq("id", client.id)
+        .eq("company_id", context.companyId);
+
+      if (accountManagerError) {
+        throw new Error("Client assignment was removed, but account manager ownership could not be cleared.");
+      }
+    }
+
+    await logActivity(context, "clients.user_unassigned", client.id, {
+      user_id: user.id,
+      assignment_role: parsed.data.assignmentRole,
+    });
+    revalidateClientAssignmentPaths(client.id, user.id, parsed.data.redirectTo);
+    safeRedirect(redirectTo, "notice", "Client assignment removed.");
+  } catch (error) {
+    safeRedirect(redirectTo, "error", error instanceof Error ? error.message : "Client assignment could not be removed.");
+  }
 }
 
 export async function saveClientAction(formData: FormData) {

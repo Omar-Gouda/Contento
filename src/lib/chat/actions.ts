@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import type { AuthContext } from "@/lib/auth/permissions";
@@ -12,10 +12,21 @@ function formString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function safeRedirect(pathname: string | null | undefined, key: "notice" | "error", value: string): never {
-  const destination = pathname?.startsWith("/") && !pathname.startsWith("//") ? pathname : "/tasks";
-  const separator = destination.includes("?") ? "&" : "?";
-  redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
+export type ChatActionResult = {
+  success: boolean;
+  message: string;
+  conversationId?: string;
+  chatMessage?: {
+    id: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    createdAt: string;
+  };
+};
+
+function revalidateChatPath() {
+  revalidatePath("/", "layout");
 }
 
 async function resolveSharedClientId(context: AuthContext, recipientId: string) {
@@ -106,19 +117,18 @@ async function findOrCreateConversation(context: AuthContext, recipientId: strin
   return conversationId;
 }
 
-export async function sendChatMessageAction(formData: FormData) {
+export async function sendChatMessageAction(formData: FormData): Promise<ChatActionResult> {
   const context = await requireAuthContext();
-  const redirectTo = formString(formData, "redirectTo") || "/tasks";
   const body = formString(formData, "body");
   const conversationIdInput = formString(formData, "conversationId");
   const recipientId = formString(formData, "recipientId");
 
   if (!body) {
-    safeRedirect(redirectTo, "error", "Message is required.");
+    return { success: false, message: "Message is required." };
   }
 
   if (body.length > 2000) {
-    safeRedirect(redirectTo, "error", "Message must be 2,000 characters or fewer.");
+    return { success: false, message: "Message must be 2,000 characters or fewer." };
   }
 
   try {
@@ -138,12 +148,15 @@ export async function sendChatMessageAction(formData: FormData) {
       }
     }
 
+    const messageId = randomUUID();
+    const createdAt = new Date().toISOString();
     const { error: messageError } = await supabase.from("chat_messages").insert({
-      id: randomUUID(),
+      id: messageId,
       company_id: context.companyId,
       conversation_id: conversationId,
       sender_id: context.userId,
       body,
+      created_at: createdAt,
     });
 
     if (messageError) {
@@ -155,9 +168,25 @@ export async function sendChatMessageAction(formData: FormData) {
       .update({ updated_at: new Date().toISOString() })
       .eq("id", conversationId)
       .eq("company_id", context.companyId);
-  } catch (error) {
-    safeRedirect(redirectTo, "error", error instanceof Error ? error.message : "Chat message could not be sent.");
-  }
 
-  safeRedirect(redirectTo, "notice", "Message sent.");
+    revalidateChatPath();
+
+    return {
+      success: true,
+      message: "Message sent.",
+      conversationId,
+      chatMessage: {
+        id: messageId,
+        conversationId,
+        senderId: context.userId,
+        body,
+        createdAt,
+      },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Chat message could not be sent.",
+    };
+  }
 }

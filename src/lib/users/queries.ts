@@ -15,6 +15,11 @@ export type OrgUserProfile = UserRow & {
   roleName: string;
   teamNames: string[];
   clientNames: string[];
+  clientAssignments: Array<{
+    clientId: string;
+    clientName: string;
+    assignmentRole: Database["public"]["Tables"]["client_assignments"]["Row"]["assignment_role"];
+  }>;
   taskCount: number;
   ideaCount: number;
   contentCount: number;
@@ -54,7 +59,7 @@ export async function getOrgUserProfile(context: AuthContext, userId: string): P
       .maybeSingle(),
     supabase.from("roles").select("id, name").eq("company_id", context.companyId),
     supabase.from("team_members").select("teams(name)").eq("user_id", userId),
-    supabase.from("client_assignments").select("clients(name)").eq("user_id", userId),
+    supabase.from("client_assignments").select("client_id, assignment_role, clients(name)").eq("user_id", userId),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("assigned_to", userId),
     supabase.from("ideas").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("assigned_to", userId),
     supabase.from("content_items").select("id", { count: "exact", head: true }).eq("company_id", context.companyId).eq("creator_id", userId),
@@ -90,6 +95,21 @@ export async function getOrgUserProfile(context: AuthContext, userId: string): P
     clientNames: ((assignments as Array<{ clients: { name: string } | null }> | null) ?? [])
       .map((assignment) => assignment.clients?.name)
       .filter((name): name is string => Boolean(name)),
+    clientAssignments: ((assignments as Array<{
+      client_id: string;
+      assignment_role: Database["public"]["Tables"]["client_assignments"]["Row"]["assignment_role"];
+      clients: { name: string } | null;
+    }> | null) ?? [])
+      .map((assignment) => assignment.clients?.name ? {
+        clientId: assignment.client_id,
+        clientName: assignment.clients.name,
+        assignmentRole: assignment.assignment_role,
+      } : null)
+      .filter((assignment): assignment is {
+        clientId: string;
+        clientName: string;
+        assignmentRole: Database["public"]["Tables"]["client_assignments"]["Row"]["assignment_role"];
+      } => Boolean(assignment)),
     taskCount: taskCount.count ?? 0,
     ideaCount: ideaCount.count ?? 0,
     contentCount: contentCount.count ?? 0,

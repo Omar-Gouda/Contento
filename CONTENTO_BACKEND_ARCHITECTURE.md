@@ -218,6 +218,8 @@ Implemented responsibilities:
 * Default company roles.
 * Global permissions.
 * Role permissions.
+* Expanded profile metadata for phone, job title, bio, timezone, notification preferences, last login, and completion timestamp.
+* Narrow authenticated self-service RPCs for profile, avatar, notification preference, and login timestamp updates.
 * Admin user listing, filtering, status changes, role assignment, and team assignment.
 * Admin invitations.
 * Admin temporary password reset with `must_change_password` enforcement.

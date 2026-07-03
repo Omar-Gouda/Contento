@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CONTENTO_TIME_ZONE, DAILY_BREAK_ALLOWANCE_MINUTES, DEFAULT_WORK_DAY_TARGET_MINUTES } from "@/lib/time";
+import type { Json } from "@/types/database";
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -31,25 +32,44 @@ const imageTypes = new Map([
 ]);
 
 export async function updateProfileAction(formData: FormData) {
-  const context = await requireAuthContext();
+  await requireAuthContext();
   const firstName = formString(formData, "firstName").trim();
   const lastName = formString(formData, "lastName").trim();
+  const phone = formString(formData, "phone").trim();
+  const jobTitle = formString(formData, "jobTitle").trim();
+  const bio = formString(formData, "bio").trim();
+  const timezone = formString(formData, "timezone").trim() || CONTENTO_TIME_ZONE;
+  const notificationPreferences = {
+    sound: formData.get("notificationSound") === "on",
+    toast: formData.get("notificationToast") === "on",
+    desktop: formData.get("notificationDesktop") === "on",
+  } satisfies Json;
 
   if (!firstName || !lastName) {
     safeRedirect("/profile", "error", "First and last name are required.");
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("users")
-    .update({ first_name: firstName, last_name: lastName })
-    .eq("id", context.userId)
-    .eq("company_id", context.companyId);
+  if (timezone !== CONTENTO_TIME_ZONE) {
+    safeRedirect("/profile", "error", "Contento currently supports Africa/Cairo as the profile timezone.");
+  }
 
-  if (error) {
+  const supabase = await createSupabaseServerClient();
+  const { data: updated, error } = await supabase.rpc("update_current_user_profile", {
+    profile_first_name: firstName,
+    profile_last_name: lastName,
+    profile_phone: phone,
+    profile_job_title: jobTitle,
+    profile_bio: bio,
+    profile_timezone: timezone,
+    profile_notification_preferences: notificationPreferences,
+  });
+
+  if (error || !updated) {
     safeRedirect("/profile", "error", "Profile could not be updated.");
   }
 
+  revalidatePath("/", "layout");
+  revalidatePath("/profile");
   safeRedirect("/profile", "notice", "Profile updated.");
 }
 
@@ -92,13 +112,11 @@ export async function uploadAvatarAction(formData: FormData) {
     safeRedirect("/profile", "error", "Avatar could not be uploaded. Try a smaller image or a different file.");
   }
 
-  const { error } = await supabase
-    .from("users")
-    .update({ avatar_url: path })
-    .eq("id", context.userId)
-    .eq("company_id", context.companyId);
+  const { data: updated, error } = await supabase.rpc("update_current_user_avatar", {
+    avatar_path: path,
+  });
 
-  if (error) {
+  if (error || !updated) {
     await supabase.storage.from("contento-avatars").remove([path]);
     safeRedirect("/profile", "error", "Avatar could not be saved.");
   }
@@ -108,6 +126,7 @@ export async function uploadAvatarAction(formData: FormData) {
   }
 
   revalidatePath("/profile");
+  revalidatePath("/", "layout");
   safeRedirect("/profile", "notice", "Avatar updated.");
 }
 
@@ -125,13 +144,11 @@ export async function removeAvatarAction() {
     safeRedirect("/profile", "error", "Avatar could not be loaded.");
   }
 
-  const { error } = await supabase
-    .from("users")
-    .update({ avatar_url: null })
-    .eq("id", context.userId)
-    .eq("company_id", context.companyId);
+  const { data: updated, error } = await supabase.rpc("update_current_user_avatar", {
+    avatar_path: null,
+  });
 
-  if (error) {
+  if (error || !updated) {
     safeRedirect("/profile", "error", "Avatar could not be removed.");
   }
 
@@ -140,6 +157,7 @@ export async function removeAvatarAction() {
   }
 
   revalidatePath("/profile");
+  revalidatePath("/", "layout");
   safeRedirect("/profile", "notice", "Avatar removed.");
 }
 
