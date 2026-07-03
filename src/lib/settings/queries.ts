@@ -119,7 +119,7 @@ export async function getProfileData(context: AuthContext): Promise<ProfileData>
   ] = await Promise.all([
     supabase
       .from("users")
-      .select("id, company_id, email, first_name, last_name, phone, job_title, bio, timezone, avatar_url, role_id, status, must_change_password, notification_preferences, last_login_at, profile_completed_at, created_at, updated_at")
+      .select("id, company_id, email, first_name, last_name, phone, job_title, bio, timezone, avatar_url, role_id, status, must_change_password, notification_preferences, recovery_email, recovery_email_verified_at, recovery_email_pending, recovery_email_token_hash, recovery_email_token_expires_at, last_login_at, profile_completed_at, created_at, updated_at")
       .eq("id", context.userId)
       .eq("company_id", context.companyId)
       .maybeSingle(),
@@ -193,6 +193,7 @@ export async function getProfileData(context: AuthContext): Promise<ProfileData>
     { label: "Team", complete: teamNames.length > 0 },
     { label: "Timezone", complete: Boolean(profileRow.timezone) },
     { label: "Notification preferences", complete: Boolean(profileRow.notification_preferences) },
+    { label: "Recovery email", complete: Boolean(profileRow.recovery_email?.trim()) },
     { label: "Security", complete: !profileRow.must_change_password },
     { label: "Work hours", complete: Boolean(workHours?.workDay) },
   ];

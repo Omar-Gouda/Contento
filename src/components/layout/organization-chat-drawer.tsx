@@ -1,8 +1,8 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { MessageCircle, Paperclip, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ArrowLeft, MessageCircle, Paperclip, Send } from "lucide-react";
 
 import { sendChatMessageAction } from "@/lib/chat/actions";
 import type { OrganizationChatData, OrganizationChatMessage } from "@/lib/chat/queries";
@@ -45,12 +45,15 @@ function Avatar({ name, url }: { name: string; url: string | null }) {
 export function OrganizationChatDrawer({
   data,
   currentUserId,
+  companyId,
 }: {
   data: OrganizationChatData;
   currentUserId: string;
+  companyId: string;
 }) {
   const [chatData, setChatData] = useState(data);
   const [selectedConversationId, setSelectedConversationId] = useState(data.conversations[0]?.id ?? "");
+  const [mobileMessageOpen, setMobileMessageOpen] = useState(Boolean(data.conversations[0]?.id));
   const [status, setStatus] = useState<string | null>(null);
   const [typingConversationId, setTypingConversationId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -71,6 +74,34 @@ export function OrganizationChatDrawer({
     });
   }, [data]);
 
+  const appendMessage = useCallback((message: OrganizationChatMessage, temporaryId?: string) => {
+    setChatData((current) => ({
+      ...current,
+      conversations: current.conversations.map((conversation) => {
+        if (conversation.id !== message.conversationId) {
+          return conversation;
+        }
+
+        const messages = conversation.messages.some((row) => row.id === message.id)
+          ? conversation.messages
+          : conversation.messages
+            .filter((row) => row.id !== temporaryId)
+            .concat(message)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+        return {
+          ...conversation,
+          updatedAt: message.createdAt,
+          lastMessage: message.body,
+          unreadCount: message.senderId === currentUserId || message.conversationId === selectedConversationId
+            ? conversation.unreadCount
+            : conversation.unreadCount + 1,
+          messages,
+        };
+      }),
+    }));
+  }, [currentUserId, selectedConversationId]);
+
   useEffect(() => {
     const conversationIds = new Set(chatData.conversations.map((conversation) => conversation.id));
 
@@ -79,6 +110,60 @@ export function OrganizationChatDrawer({
     }
 
     const supabase = createSupabaseBrowserClient();
+    async function refreshKnownConversationMessages() {
+      const ids = Array.from(conversationIds);
+
+      if (!ids.length) {
+        return;
+      }
+
+      const { data: rows } = await supabase
+        .from("chat_messages")
+        .select("id, company_id, conversation_id, sender_id, body, read_at, created_at")
+        .eq("company_id", companyId)
+        .in("conversation_id", ids)
+        .order("created_at", { ascending: true })
+        .limit(250);
+
+      const messages = (rows as Array<{
+        id: string;
+        conversation_id: string;
+        sender_id: string;
+        body: string;
+        read_at: string | null;
+        created_at: string;
+      }> | null) ?? [];
+
+      setChatData((current) => ({
+        ...current,
+        conversations: current.conversations.map((conversation) => {
+          const conversationRows = messages.filter((message) => message.conversation_id === conversation.id);
+
+          if (!conversationRows.length) {
+            return conversation;
+          }
+
+          const conversationMessages = conversationRows.map((message) => ({
+            id: message.id,
+            conversationId: message.conversation_id,
+            senderId: message.sender_id,
+            senderName: message.sender_id === currentUserId ? "You" : conversation.otherUserName,
+            senderAvatarUrl: message.sender_id === currentUserId ? null : conversation.otherUserAvatarUrl,
+            body: message.body,
+            createdAt: message.created_at,
+          }));
+
+          return {
+            ...conversation,
+            updatedAt: conversationMessages.at(-1)?.createdAt ?? conversation.updatedAt,
+            lastMessage: conversationMessages.at(-1)?.body ?? conversation.lastMessage,
+            messages: conversationMessages,
+            unreadCount: conversationRows.filter((message) => message.sender_id !== currentUserId && !message.read_at).length,
+          };
+        }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+      }));
+    }
+
     const channel = supabase
       .channel(`contento-chat-${currentUserId}`)
       .on(
@@ -87,6 +172,7 @@ export function OrganizationChatDrawer({
           event: "INSERT",
           schema: "public",
           table: "chat_messages",
+          filter: `company_id=eq.${companyId}`,
         },
         (payload) => {
           const row = payload.new as {
@@ -124,36 +210,15 @@ export function OrganizationChatDrawer({
         }
       )
       .subscribe();
+    const pollingId = window.setInterval(() => {
+      void refreshKnownConversationMessages();
+    }, 25000);
 
     return () => {
+      window.clearInterval(pollingId);
       void supabase.removeChannel(channel);
     };
-  }, [chatData.conversations, currentUserId]);
-
-  function appendMessage(message: OrganizationChatMessage, temporaryId?: string) {
-    setChatData((current) => ({
-      ...current,
-      conversations: current.conversations.map((conversation) => {
-        if (conversation.id !== message.conversationId) {
-          return conversation;
-        }
-
-        const messages = conversation.messages.some((row) => row.id === message.id)
-          ? conversation.messages
-          : conversation.messages
-            .filter((row) => row.id !== temporaryId)
-            .concat(message)
-            .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-
-        return {
-          ...conversation,
-          updatedAt: message.createdAt,
-          lastMessage: message.body,
-          messages,
-        };
-      }),
-    }));
-  }
+  }, [appendMessage, chatData.conversations, companyId, currentUserId]);
 
   function removeMessage(conversationId: string, messageId: string) {
     setChatData((current) => ({
@@ -203,6 +268,7 @@ export function OrganizationChatDrawer({
             clientName: null,
             updatedAt: result.createdAt,
             lastMessage: result.body,
+            unreadCount: 0,
             messages: [{
               id: result.id,
               conversationId: result.conversationId,
@@ -292,14 +358,14 @@ export function OrganizationChatDrawer({
       >
         <MessageCircle />
       </SheetTrigger>
-      <SheetContent side="right" className="w-[min(100vw,30rem)] gap-0 p-0 sm:max-w-[30rem]">
+      <SheetContent side="right" className="h-[100dvh] w-screen gap-0 p-0 sm:w-[min(100vw,34rem)] sm:max-w-[34rem]">
         <SheetHeader className="border-b px-4 py-4">
           <SheetTitle>Organization chat</SheetTitle>
           <SheetDescription>Direct messages inside your workspace and assigned client scope.</SheetDescription>
         </SheetHeader>
 
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto]">
-          <div className="border-b p-4">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr_auto] overflow-hidden">
+          <div className={cn("border-b p-4", mobileMessageOpen && "hidden sm:block")}>
             <form ref={newChatFormRef} onSubmit={(event) => submitMessage(event, "new")} className="grid gap-3">
               <div className="grid gap-2">
                 <Label htmlFor="chat-recipient">Start a chat</Label>
@@ -337,25 +403,37 @@ export function OrganizationChatDrawer({
             </form>
           </div>
 
-          <div className="grid min-h-0 grid-cols-[9rem_1fr] overflow-hidden">
-            <div className="border-r bg-secondary/20 p-2">
+          <div className="grid min-h-0 overflow-hidden sm:grid-cols-[11rem_1fr]">
+            <div className={cn("border-r bg-secondary/20 p-2", mobileMessageOpen && "hidden sm:block")}>
               <div className="grid max-h-full gap-1 overflow-y-auto pr-1">
                 {chatData.conversations.map((conversation) => (
                   <button
                     key={conversation.id}
                     type="button"
-                    onClick={() => setSelectedConversationId(conversation.id)}
+                    onClick={() => {
+                      setSelectedConversationId(conversation.id);
+                      setMobileMessageOpen(true);
+                      setChatData((current) => ({
+                        ...current,
+                        conversations: current.conversations.map((row) => row.id === conversation.id ? { ...row, unreadCount: 0 } : row),
+                      }));
+                    }}
                     className={cn(
-                      "rounded-lg p-2 text-left text-xs transition-colors",
+                      "min-h-14 rounded-lg p-2 text-left text-xs transition-colors",
                       selectedConversation?.id === conversation.id
                         ? "bg-primary text-primary-foreground"
                         : "hover:bg-background"
                     )}
                   >
-                    <span className="block truncate font-semibold">{conversation.otherUserName}</span>
-                    <span className="mt-1 block truncate opacity-75">
-                      {conversation.lastMessage ?? conversation.clientName ?? "No messages yet"}
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="block truncate font-semibold">{conversation.otherUserName}</span>
+                      {conversation.unreadCount > 0 && (
+                        <span className="rounded-full bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold text-foreground">
+                          {conversation.unreadCount}
+                        </span>
+                      )}
                     </span>
+                    <span className="mt-1 block truncate opacity-75">{conversation.lastMessage ?? conversation.clientName ?? "No messages yet"}</span>
                   </button>
                 ))}
                 {!chatData.conversations.length && (
@@ -366,10 +444,13 @@ export function OrganizationChatDrawer({
               </div>
             </div>
 
-            <div className="min-h-0 overflow-y-auto p-4">
+            <div className={cn("min-h-0 overflow-y-auto p-4", !mobileMessageOpen && "hidden sm:block")}>
               {selectedConversation ? (
                 <div className="grid gap-4">
                   <div className="flex items-center gap-3 rounded-lg border bg-secondary/25 p-3">
+                    <Button type="button" variant="ghost" size="icon-sm" className="sm:hidden" onClick={() => setMobileMessageOpen(false)} aria-label="Back to conversations">
+                      <ArrowLeft />
+                    </Button>
                     <Avatar name={selectedConversation.otherUserName} url={selectedConversation.otherUserAvatarUrl} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">{selectedConversation.otherUserName}</p>
@@ -416,7 +497,7 @@ export function OrganizationChatDrawer({
             </div>
           </div>
 
-          <div className="border-t p-4">
+          <div className={cn("border-t p-4", !mobileMessageOpen && "hidden sm:block")}>
             {status && (
               <p className="mb-2 text-xs text-muted-foreground" role="status">
                 {status}

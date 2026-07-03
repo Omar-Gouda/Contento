@@ -30,6 +30,21 @@ export type PlatformOrganizationDetail = PlatformOrganization & {
     metadata: Json;
   }>;
   settings: Json;
+  hardDeletePreview: OrganizationHardDeletePreview;
+};
+
+export type OrganizationHardDeletePreview = {
+  users: number;
+  clients: number;
+  teams: number;
+  tasks: number;
+  ideas: number;
+  content: number;
+  reports: number;
+  calendarItems: number;
+  notifications: number;
+  chatMessages: number;
+  files: number;
 };
 
 function requireAdminConfig() {
@@ -40,7 +55,20 @@ function requireAdminConfig() {
 
 async function getTableCount(
   companyId: string,
-  table: "users" | "teams" | "activity_logs"
+  table:
+    | "users"
+    | "teams"
+    | "activity_logs"
+    | "clients"
+    | "tasks"
+    | "ideas"
+    | "content_items"
+    | "reports"
+    | "calendar_events"
+    | "day_off_requests"
+    | "notifications"
+    | "chat_messages"
+    | "attachments"
 ) {
   const supabase = createSupabaseAdminClient();
   const { count, error } = await supabase
@@ -53,6 +81,50 @@ async function getTableCount(
   }
 
   return count ?? 0;
+}
+
+async function getOrganizationHardDeletePreview(companyId: string): Promise<OrganizationHardDeletePreview> {
+  const [
+    users,
+    clients,
+    teams,
+    tasks,
+    ideas,
+    content,
+    reports,
+    calendarEvents,
+    dayOffRequests,
+    notifications,
+    chatMessages,
+    attachments,
+  ] = await Promise.all([
+    getTableCount(companyId, "users"),
+    getTableCount(companyId, "clients"),
+    getTableCount(companyId, "teams"),
+    getTableCount(companyId, "tasks"),
+    getTableCount(companyId, "ideas"),
+    getTableCount(companyId, "content_items"),
+    getTableCount(companyId, "reports"),
+    getTableCount(companyId, "calendar_events"),
+    getTableCount(companyId, "day_off_requests"),
+    getTableCount(companyId, "notifications"),
+    getTableCount(companyId, "chat_messages"),
+    getTableCount(companyId, "attachments"),
+  ]);
+
+  return {
+    users,
+    clients,
+    teams,
+    tasks,
+    ideas,
+    content,
+    reports,
+    calendarItems: calendarEvents + dayOffRequests,
+    notifications,
+    chatMessages,
+    files: attachments,
+  };
 }
 
 async function enrichOrganizations(
@@ -152,7 +224,7 @@ export async function getPlatformOrganizationDetail(organizationId: string) {
   }
 
   const [enriched] = await enrichOrganizations([organization as Database["public"]["Tables"]["companies"]["Row"]]);
-  const [{ data: roles }, { data: users }, { data: recentActivity }, { data: settings }] = await Promise.all([
+  const [{ data: roles }, { data: users }, { data: recentActivity }, { data: settings }, hardDeletePreview] = await Promise.all([
     supabase.from("roles").select("id, name").eq("company_id", organizationId),
     supabase
       .from("users")
@@ -166,6 +238,7 @@ export async function getPlatformOrganizationDetail(organizationId: string) {
       .order("created_at", { ascending: false })
       .limit(10),
     supabase.from("company_settings").select("settings_json").eq("company_id", organizationId).maybeSingle(),
+    getOrganizationHardDeletePreview(organizationId),
   ]);
 
   const roleById = new Map(((roles as Array<{ id: string; name: string }> | null) ?? []).map((role) => [role.id, role.name]));
@@ -205,5 +278,6 @@ export async function getPlatformOrganizationDetail(organizationId: string) {
       metadata: item.metadata,
     })),
     settings: settings?.settings_json ?? {},
+    hardDeletePreview,
   };
 }

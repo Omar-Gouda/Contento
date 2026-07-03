@@ -25,6 +25,7 @@ This folder contains the database foundation for Contento.
 | `migrations/202607030001_contento_performance_assignment_refresh_fix.sql` | Adds scoped client-assignment RLS helpers, client assignment indexes, and Account Manager same-team production assignment support. |
 | `migrations/202607030002_contento_profile_stabilization.sql` | Adds user profile metadata, notification preferences, last-login/profile-completion timestamps, and narrow authenticated RPCs for self profile, avatar, notification preference, and login timestamp updates. |
 | `migrations/202607030003_contento_push_subscription_foundation.sql` | Adds future-ready Web Push subscription storage with company/user-scoped RLS. Delivery still requires VAPID keys and a trusted sender. |
+| `migrations/202607030004_contento_v7_recovery_and_org_hard_delete.sql` | Adds recovery-email profile fields/RPCs and a platform-admin-only transactional database RPC for permanent organization deletion. |
 
 ## RLS Policy Model
 
@@ -40,8 +41,10 @@ Policy principles:
 * Work-hours writes are performed through authenticated RPCs so explicit Clock In, Clock Out, and break rules stay database-consistent.
 * Platform admins are stored outside company membership and can only operate through platform-specific routes, helpers, and server-side actions.
 * Organization lifecycle policies allow platform admins to view and update organization status while company users remain scoped to their own active company.
+* Permanent organization deletion is confirmation-gated in the app. The database portion runs in `hard_delete_organization_database()` for active platform admins; Supabase Auth user deletion and storage cleanup happen afterward in server-only code.
 * Marketing Manager-created users are created through server-only Supabase Auth code, then linked to `users` with `must_change_password = true`.
 * Self-profile updates use narrow authenticated RPCs instead of broad `users` table update policies.
+* Recovery email updates use narrow authenticated RPCs. Direct Supabase Auth reset links still target the auth email, so recovery-email requests feed the internal Marketing Manager temporary-password flow until email-provider verification is implemented.
 * Workflow pages use server actions that resolve `company_id` from the authenticated profile and let RLS enforce tenant boundaries.
 * Task, idea, content, report, time-off, comments, mentions, and attachment visibility use scope helpers so Admins stay company-wide, Supervisors and Team Leads stay team-scoped, and Creators stay own-scope.
 * Client workspace visibility is company-scoped and uses `clients`, `client_assignments`, `is_same_company_client()`, and `can_access_client_scope()` so client users only see assigned client workspaces and internal users remain inside company/team/client boundaries.

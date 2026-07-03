@@ -214,6 +214,7 @@ export function DashboardShell({
               <OrganizationChatDrawer
                 data={chatData ?? { conversations: [], recipients: [] }}
                 currentUserId={context.userId}
+                companyId={context.companyId}
               />
               <div className="hidden sm:block">
                 <SignOutButton

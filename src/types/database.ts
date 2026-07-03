@@ -41,6 +41,11 @@ export type Database = {
         status: Database["public"]["Enums"]["user_status"];
         must_change_password: boolean;
         notification_preferences: Json;
+        recovery_email: string | null;
+        recovery_email_verified_at: string | null;
+        recovery_email_pending: string | null;
+        recovery_email_token_hash: string | null;
+        recovery_email_token_expires_at: string | null;
         last_login_at: string | null;
         profile_completed_at: string | null;
         created_at: string;
@@ -495,6 +500,16 @@ export type Database = {
         };
         Returns: boolean;
       };
+      update_current_user_recovery_email: {
+        Args: {
+          recovery_email_input: string;
+        };
+        Returns: boolean;
+      };
+      clear_current_user_recovery_email: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       record_current_user_login: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
@@ -629,6 +644,12 @@ export type Database = {
           target_client_id: string;
           target_user_id: string;
           target_assignment_role: string;
+        };
+        Returns: boolean;
+      };
+      hard_delete_organization_database: {
+        Args: {
+          target_company_id: string;
         };
         Returns: boolean;
       };
