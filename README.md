@@ -79,7 +79,7 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Working-hours tracking with explicit Clock In / Clock Out controls, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, header status menu, and Admin company view.
 - Teams, client workspaces, tasks, ideas, dedicated idea/content review queues, content pipeline, review scoring, modern scheduling calendar, role-scoped automated reports, and CSV report export.
 - Role-aware Marketing Manager user creation changes team/client assignment fields based on the selected role and links Client users to client profiles.
-- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, and browser-local sound preference.
+- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, realtime refresh, toast alerts, and server-backed sound preference.
 - Header organization chat drawer for same-company users and assigned client-scope conversations.
 - Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
 - Standalone global search across accessible users, teams, tasks, ideas, content, and reports.
@@ -88,13 +88,14 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Dashboard task and idea previews use sticky-note cards backed by real scoped work data.
 - Organization branding and company settings for logo, colors, work target, break allowance, and timezone.
 - Organization and client logo uploads use company-scoped Supabase Storage paths with signed previews, square object-fit display, persisted sidebar/client-card rendering, and remove actions that clear storage paths.
-- User profile page with profile updates, avatar upload/removal, role/team context, password change, and work-hours link.
+- User profile page with avatar upload/removal, full name, phone, job title, bio, timezone, organization, team, assigned clients, status, notification preferences, security settings, work-hours summary, recent activity, last login, and profile completion.
 - Existing active content templates can still be used during content creation, but the standalone Templates page has been removed from navigation.
 - Dashboard customization at `/settings/preferences` with show/hide widget preferences and reset support.
 - `next-themes` dark mode with light, dark, and system preferences.
 - Purple/violet default brand theme with semantic status colors retained for success, warning, danger, and info states.
 - Responsive dashboard shell with permission-aware navigation, active states, notification interactions, collapsible sidebar, drawer navigation, compact mobile bottom navigation, and sheet-based primary forms.
 - Calendar uses month/week/day grid views with a separated weekday header, compact toolbar buttons, compact event chips, and day-detail sheets for publishing dates, task due dates, day off, and sick leave.
+- PWA shell with manifest, app icons, install prompt, theme color, Apple web app metadata, and offline fallback page.
 - Forgot/reset password uses a generic recovery message, production-safe callback URL generation from `NEXT_PUBLIC_SITE_URL`, a Marketing Manager contact fallback, and session-aware reset redirects. Profile password changes update Supabase Auth in place without sending active users back to the dashboard.
 - Report creation is automated by default from live task, idea publishing, content, comment, work-hours, and time-off data; users add optional notes and editable marketing metrics.
 - Core pages are view-only by default; authorized create, edit, manage, review, comment, and final-output actions open in sheets or collapsed details sections.
@@ -123,6 +124,8 @@ supabase/
     202606300001_contento_client_permission_hotfix.sql
     202607010001_contento_ux_permission_chat_hotfix.sql
     202607020001_contento_client_contract_password_storage_hotfix.sql
+    202607030001_contento_performance_assignment_refresh_fix.sql
+    202607030002_contento_profile_stabilization.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.
@@ -153,6 +156,7 @@ Keep service-role and database credentials server-only in Vercel project setting
 
 ```bash
 npm run lint
+npm run typecheck
 npm run build
 supabase db lint --linked
 ```

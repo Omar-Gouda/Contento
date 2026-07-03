@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { BriefcaseBusiness, UsersRound } from "lucide-react";
 
 import { requirePermission } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
+import { getClients } from "@/lib/clients/queries";
 import { updateTeamMembersAction } from "@/lib/workflows/actions";
 import { getWorkflowTeams, getWorkflowUsers } from "@/lib/workflows/queries";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -22,7 +24,11 @@ export const metadata: Metadata = {
 
 export default async function TeamPage() {
   const context = await requirePermission("teams.view_roster", "view");
-  const [teams, users] = await Promise.all([getWorkflowTeams(context), getWorkflowUsers(context)]);
+  const [teams, users, clients] = await Promise.all([
+    getWorkflowTeams(context),
+    getWorkflowUsers(context),
+    getClients(context).catch(() => []),
+  ]);
   const activeUsers = users.filter((user) => user.status === "active");
   const canManageMembers = hasPermission(context, "teams.assign_members", "limited");
 
@@ -116,6 +122,57 @@ export default async function TeamPage() {
                     No members are assigned to this team yet.
                   </div>
                 )}
+              </div>
+
+              <div className="grid gap-2">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <BriefcaseBusiness className="size-4 text-primary" />
+                  Client coverage
+                </p>
+                {(() => {
+                  const memberIds = new Set(team.members.map((member) => member.id));
+                  const teamClients = clients.filter((client) =>
+                    client.assignedUsers.some((assignment) => memberIds.has(assignment.id))
+                  );
+
+                  return teamClients.length ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {teamClients.map((client) => {
+                        const assignedTeamUsers = client.assignedUsers.filter((assignment) => memberIds.has(assignment.id));
+
+                        return (
+                          <div key={client.id} className="rounded-lg border bg-background p-3 text-sm">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{client.name}</p>
+                                <p className="text-muted-foreground">
+                                  {assignedTeamUsers.length} assigned team member{assignedTeamUsers.length === 1 ? "" : "s"}
+                                </p>
+                              </div>
+                              <Link href={`/clients/${client.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                                Manage
+                              </Link>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {assignedTeamUsers.slice(0, 4).map((assignment) => (
+                                <Badge key={`${client.id}-${assignment.id}-${assignment.assignmentRole}`} variant="secondary">
+                                  {assignment.displayName}
+                                </Badge>
+                              ))}
+                              {assignedTeamUsers.length > 4 && (
+                                <Badge variant="outline">+{assignedTeamUsers.length - 4}</Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      No clients are assigned to this team yet.
+                    </div>
+                  );
+                })()}
               </div>
 
               {canManageMembers && (

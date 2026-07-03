@@ -32,10 +32,17 @@ export type Database = {
         email: string;
         first_name: string;
         last_name: string;
+        phone: string | null;
+        job_title: string | null;
+        bio: string;
+        timezone: string;
         avatar_url: string | null;
         role_id: string | null;
         status: Database["public"]["Enums"]["user_status"];
         must_change_password: boolean;
+        notification_preferences: Json;
+        last_login_at: string | null;
+        profile_completed_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -450,6 +457,34 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      update_current_user_profile: {
+        Args: {
+          profile_first_name: string;
+          profile_last_name: string;
+          profile_phone: string;
+          profile_job_title: string;
+          profile_bio: string;
+          profile_timezone: string;
+          profile_notification_preferences?: Json | null;
+        };
+        Returns: boolean;
+      };
+      update_current_user_avatar: {
+        Args: {
+          avatar_path: string | null;
+        };
+        Returns: boolean;
+      };
+      update_current_user_notification_preferences: {
+        Args: {
+          preferences_input: Json;
+        };
+        Returns: boolean;
+      };
+      record_current_user_login: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       contento_cairo_work_date: {
         Args: {
           input_timestamp: string;
@@ -568,6 +603,20 @@ export type Database = {
       expire_current_company_clients: {
         Args: Record<string, never>;
         Returns: number;
+      };
+      is_client_assignable_production_user: {
+        Args: {
+          target_user_id: string;
+        };
+        Returns: boolean;
+      };
+      can_manage_client_assignment_scope: {
+        Args: {
+          target_client_id: string;
+          target_user_id: string;
+          target_assignment_role: string;
+        };
+        Returns: boolean;
       };
     };
     Enums: {

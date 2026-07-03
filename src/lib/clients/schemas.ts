@@ -91,3 +91,12 @@ export const clientProfileSchema = z.object({
 export const archiveClientSchema = z.object({
   clientId: z.string().trim().uuid(),
 });
+
+export const clientAssignmentSchema = z.object({
+  clientId: z.string().trim().uuid("Choose a valid client."),
+  userId: z.string().trim().uuid("Choose a valid user."),
+  assignmentRole: z
+    .enum(["account_manager", "content_creator", "graphic_designer", "video_editor", "client_contact", "member"])
+    .optional(),
+  redirectTo: z.string().trim().optional().default("/clients"),
+});

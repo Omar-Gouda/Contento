@@ -119,6 +119,7 @@ export default async function ProfileWorkHoursPage({
           <div className="flex flex-wrap gap-3">
             {activeBreak ? (
               <form action={endBreakAndRefreshAction}>
+                <input type="hidden" name="redirectTo" value="/profile/work-hours" />
                 <Button type="submit">
                   <Coffee />
                   End break
@@ -126,6 +127,7 @@ export default async function ProfileWorkHoursPage({
               </form>
             ) : !activeWork ? (
               <form action={clockInAndRefreshAction}>
+                <input type="hidden" name="redirectTo" value="/profile/work-hours" />
                 <Button type="submit">
                   <Clock />
                   Clock in
@@ -133,6 +135,7 @@ export default async function ProfileWorkHoursPage({
               </form>
             ) : (
               <form action={startBreakAndRefreshAction}>
+                <input type="hidden" name="redirectTo" value="/profile/work-hours" />
                 <Button type="submit" variant="outline" disabled={!activeWork}>
                   <Coffee />
                   Start break
@@ -141,6 +144,7 @@ export default async function ProfileWorkHoursPage({
             )}
             {activeWork && !activeBreak && (
               <form action={clockOutAndRefreshAction}>
+                <input type="hidden" name="redirectTo" value="/profile/work-hours" />
                 <Button type="submit" variant="outline">
                   <LogOut />
                   Clock out

@@ -14,7 +14,8 @@ import {
   type ResetPasswordInput,
   type SignInInput,
 } from "@/lib/auth/schemas";
-import { hasSupabaseRuntimeConfig } from "@/lib/env";
+import { hasSupabaseAdminConfig, hasSupabaseRuntimeConfig } from "@/lib/env";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   recordSignOutForSupabaseClient,
@@ -84,6 +85,88 @@ async function acceptPendingInvitation(supabase: Awaited<ReturnType<typeof creat
   }
 }
 
+async function recordSuccessfulLogin(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>) {
+  const { error } = await supabase.rpc("record_current_user_login", {});
+
+  if (error) {
+    console.warn("Contento login timestamp update failed", error.message);
+  }
+}
+
+async function notifyMarketingManagersOfPasswordResetRequest(email: string) {
+  if (!hasSupabaseAdminConfig()) {
+    return;
+  }
+
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data: requestedUser } = await admin
+      .from("users")
+      .select("id, company_id, email, first_name, last_name")
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!requestedUser) {
+      return;
+    }
+
+    const { data: marketingManagerRoles } = await admin
+      .from("roles")
+      .select("id")
+      .eq("company_id", requestedUser.company_id)
+      .in("name", ["Admin", "Marketing Manager"]);
+    const roleIds = ((marketingManagerRoles as Array<{ id: string }> | null) ?? []).map((role) => role.id);
+
+    if (!roleIds.length) {
+      return;
+    }
+
+    const { data: marketingManagers } = await admin
+      .from("users")
+      .select("id")
+      .eq("company_id", requestedUser.company_id)
+      .eq("status", "active")
+      .in("role_id", roleIds);
+    const managerIds = ((marketingManagers as Array<{ id: string }> | null) ?? [])
+      .map((user) => user.id)
+      .filter((userId) => userId !== requestedUser.id);
+
+    if (managerIds.length) {
+      const displayName = [requestedUser.first_name, requestedUser.last_name].filter(Boolean).join(" ").trim();
+
+      await admin.from("notifications").insert(
+        managerIds.map((userId) => ({
+          company_id: requestedUser.company_id,
+          user_id: userId,
+          title: "Password reset requested",
+          message: `${displayName || requestedUser.email} requested an internal password reset.`,
+          entity_type: "user",
+          entity_id: requestedUser.id,
+          link_href: "/admin/users",
+          read: false,
+        }))
+      );
+    }
+
+    await admin.from("activity_logs").insert({
+      company_id: requestedUser.company_id,
+      user_id: requestedUser.id,
+      action: "users.password_reset_requested",
+      entity_type: "user",
+      entity_id: requestedUser.id,
+      metadata: {
+        source: "forgot_password",
+        notified_marketing_manager_count: managerIds.length,
+      },
+    });
+  } catch (error) {
+    console.warn(
+      "Contento internal password reset notification failed",
+      error instanceof Error ? error.message : error
+    );
+  }
+}
+
 export async function signInAction(input: SignInInput): Promise<AuthActionResult> {
   const parsed = signInSchema.safeParse(input);
 
@@ -117,6 +200,8 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
     const acceptedResolution = await loadAuthProfile(supabase);
 
     if (acceptedResolution.state === "active") {
+      await recordSuccessfulLogin(supabase);
+
       return {
         success: true,
         message: "Signed in successfully.",
@@ -164,6 +249,8 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
     };
   }
 
+  await recordSuccessfulLogin(supabase);
+
   return {
     success: true,
     message: "Signed in successfully.",
@@ -189,6 +276,8 @@ export async function forgotPasswordAction(input: ForgotPasswordInput): Promise<
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${origin}/auth/callback?next=/reset-password`,
   });
+
+  await notifyMarketingManagersOfPasswordResetRequest(parsed.data.email);
 
   if (error) {
     console.warn("Contento password reset email failed", error.message);

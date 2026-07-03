@@ -24,7 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ variant = "card" }: { variant?: "card" | "plain" }) {
   const router = useRouter();
   const [result, setResult] = useState<AuthActionResult | null>(null);
   const form = useForm<ChangePasswordInput>({
@@ -48,6 +48,59 @@ export function ChangePasswordForm() {
 
   const isSubmitting = form.formState.isSubmitting;
 
+  const formContent = (
+    <div className="space-y-5">
+      {result && (
+        <Alert variant={result.success ? "default" : "destructive"}>
+          {result.success ? <CheckCircle2 className="size-4" /> : <AlertCircle className="size-4" />}
+          <AlertTitle>{result.success ? "Password updated" : "Update failed"}</AlertTitle>
+          <AlertDescription>{result.message}</AlertDescription>
+        </Alert>
+      )}
+
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
+        <div className="space-y-2">
+          <Label htmlFor="password">New password</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={Boolean(form.formState.errors.password)}
+            {...form.register("password")}
+          />
+          {form.formState.errors.password && (
+            <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={Boolean(form.formState.errors.confirmPassword)}
+            {...form.register("confirmPassword")}
+          />
+          {form.formState.errors.confirmPassword && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.confirmPassword.message}
+            </p>
+          )}
+        </div>
+
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting && <Loader2 className="animate-spin" />}
+          Update password
+        </Button>
+      </form>
+    </div>
+  );
+
+  if (variant === "plain") {
+    return formContent;
+  }
+
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
@@ -59,52 +112,7 @@ export function ChangePasswordForm() {
           Choose a new secure password for your Contento account.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        {result && (
-          <Alert variant={result.success ? "default" : "destructive"}>
-            {result.success ? <CheckCircle2 className="size-4" /> : <AlertCircle className="size-4" />}
-            <AlertTitle>{result.success ? "Password updated" : "Update failed"}</AlertTitle>
-            <AlertDescription>{result.message}</AlertDescription>
-          </Alert>
-        )}
-
-        <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              aria-invalid={Boolean(form.formState.errors.password)}
-              {...form.register("password")}
-            />
-            {form.formState.errors.password && (
-              <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              aria-invalid={Boolean(form.formState.errors.confirmPassword)}
-              {...form.register("confirmPassword")}
-            />
-            {form.formState.errors.confirmPassword && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.confirmPassword.message}
-              </p>
-            )}
-          </div>
-
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="animate-spin" />}
-            Update password
-          </Button>
-        </form>
-      </CardContent>
+      <CardContent>{formContent}</CardContent>
     </Card>
   );
 }

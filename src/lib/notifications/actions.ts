@@ -1,28 +1,37 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 import { requireAuthContext } from "@/lib/auth/context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getDefaultDashboardPath } from "@/types/roles";
+import type { Json } from "@/types/database";
 
-function formString(formData: FormData, key: string) {
+export type NotificationActionResult = {
+  success: boolean;
+  message: string;
+};
+
+function formString(formData: FormData | undefined, key: string) {
+  if (!formData) {
+    return "";
+  }
+
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
 }
 
-function safeRedirect(formData: FormData, fallback = "/notifications"): never {
-  const redirectTo = formString(formData, "redirectTo");
-  redirect(redirectTo.startsWith("/") ? redirectTo : fallback);
+function revalidateNotificationPaths(pathname: string) {
+  revalidatePath("/", "layout");
+  revalidatePath("/notifications");
+  void pathname;
 }
 
-export async function markNotificationReadAction(formData: FormData) {
+export async function markNotificationReadAction(formData: FormData): Promise<NotificationActionResult> {
   const context = await requireAuthContext();
-  const fallbackPath = getDefaultDashboardPath(context.role);
   const notificationId = formString(formData, "notificationId");
 
   if (!notificationId) {
-    redirect(fallbackPath);
+    return { success: false, message: "Notification could not be resolved." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -34,15 +43,16 @@ export async function markNotificationReadAction(formData: FormData) {
     .eq("user_id", context.userId);
 
   if (error) {
-    redirect(fallbackPath);
+    return { success: false, message: "Notification could not be marked read." };
   }
 
-  safeRedirect(formData, fallbackPath);
+  revalidateNotificationPaths(formString(formData, "redirectTo"));
+
+  return { success: true, message: "Notification marked read." };
 }
 
-export async function markAllNotificationsReadAction(formData?: FormData) {
+export async function markAllNotificationsReadAction(formData?: FormData): Promise<NotificationActionResult> {
   const context = await requireAuthContext();
-  const fallbackPath = getDefaultDashboardPath(context.role);
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("notifications")
@@ -52,12 +62,29 @@ export async function markAllNotificationsReadAction(formData?: FormData) {
     .eq("read", false);
 
   if (error) {
-    redirect(fallbackPath);
+    return { success: false, message: "Notifications could not be marked read." };
   }
 
-  if (formData) {
-    safeRedirect(formData, fallbackPath);
+  revalidateNotificationPaths(formString(formData, "redirectTo"));
+
+  return { success: true, message: "All notifications marked read." };
+}
+
+export async function updateNotificationSoundPreferenceAction(
+  enabled: boolean
+): Promise<NotificationActionResult> {
+  await requireAuthContext();
+  const supabase = await createSupabaseServerClient();
+  const preferences = { sound: enabled } satisfies Json;
+  const { data: updated, error } = await supabase.rpc("update_current_user_notification_preferences", {
+    preferences_input: preferences,
+  });
+
+  if (error || !updated) {
+    return { success: false, message: "Notification preference could not be saved." };
   }
 
-  redirect(fallbackPath);
+  revalidatePath("/", "layout");
+
+  return { success: true, message: "Notification preference saved." };
 }

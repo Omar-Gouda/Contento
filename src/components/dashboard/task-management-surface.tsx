@@ -9,7 +9,6 @@ import {
   updateTaskStatusAction,
 } from "@/lib/workflows/actions";
 import {
-  getWorkflowTaskComments,
   getWorkflowTasks,
   getWorkflowTeams,
   getWorkflowUsers,
@@ -76,7 +75,7 @@ export async function TaskManagementSurface({
   description: string;
   searchParams: { q?: string; status?: string; team?: string; client?: string; error?: string; notice?: string };
 }) {
-  const [tasks, users, teams] = await Promise.all([
+  const [tasks, users, teams, clients] = await Promise.all([
     getWorkflowTasks(context, {
       search: searchParams.q,
       status: searchParams.status,
@@ -85,10 +84,8 @@ export async function TaskManagementSurface({
     }),
     getWorkflowUsers(context),
     getWorkflowTeams(context),
+    getClients(context),
   ]);
-  const clients = await getClients(context);
-  const comments = await getWorkflowTaskComments(context, tasks.map((task) => task.id));
-  const commentsByTask = new Map(tasks.map((task) => [task.id, comments.filter((comment) => comment.task_id === task.id)]));
   const activeUsers = users.filter((user) => user.status === "active");
   const productionUsers = activeUsers.filter((user) =>
     ["Content Creator", "Graphic Designer", "Video Editor"].includes(user.roleName)
@@ -260,7 +257,6 @@ export async function TaskManagementSurface({
               <p className="text-sm text-muted-foreground">{group.description}</p>
             </div>
             {group.tasks.map((task) => {
-          const taskComments = commentsByTask.get(task.id) ?? [];
           const taskAssignee = activeUsers.find((user) => user.id === task.assigned_to);
           const taskType = taskAssignee ? productionType(taskAssignee.roleName) : "General";
 
@@ -302,6 +298,10 @@ export async function TaskManagementSurface({
                   <div>
                     <p className="text-muted-foreground">Updated</p>
                     <p className="font-medium">{formatCairoDateTime(task.updated_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Comments</p>
+                    <p className="font-medium">{task.commentCount}</p>
                   </div>
                 </div>
 
@@ -396,20 +396,6 @@ export async function TaskManagementSurface({
                   </div>
                 </form>
                 </details>
-
-                {taskComments.length > 0 && (
-                  <div className="grid gap-2">
-                    {taskComments.slice(0, 3).map((comment) => (
-                      <div key={comment.id} className="rounded-lg border bg-background p-3 text-sm">
-                        <div className="mb-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                          <span>{comment.userName ?? "Unknown user"}</span>
-                          <span>{formatCairoDateTime(comment.created_at)}</span>
-                        </div>
-                        <p>{comment.body}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 {canFinalOutput && (
                   <details className="rounded-lg border bg-secondary/20 p-3">

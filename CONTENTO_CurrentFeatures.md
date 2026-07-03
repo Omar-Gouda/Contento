@@ -125,6 +125,7 @@ Features:
 * Manage client assignments where permitted
 * Marketing Manager can delete users through a confirmation modal with keep-content or remove-content options
 * Marketing Manager can issue a temporary password reset for company users; the user is forced through `/change-password` on next sign-in
+* User profiles include avatar, phone, job title, bio, timezone, notification preferences, last login, assigned clients, recent activity, work-hours summary, and completion score
 
 ## 5.1 User Invitations
 
@@ -282,7 +283,7 @@ Features:
 * Header notification bell with unread count and recent-notification dropdown
 * Read/unread filtering
 * Mark one or all notifications as read
-* Browser-local notification sound preference
+* Server-backed notification sound preference with browser-local fallback during realtime interactions
 * Entity links when a notification maps to a task, idea, content item, report, or organization event
 * Dashboard notification widgets are removed in favor of the header notification dropdown
 
@@ -323,7 +324,9 @@ Features:
 * `/` redirects to sign in after landing page removal
 * Smoother sign-in lock-screen reveal with lower drag threshold and velocity-based unlock
 * Organization and client logos upload to company-scoped storage paths, preview with automatic square object-fit cropping, and render through signed URLs after refresh
-* Profile avatars, organization logos, and client logos can be removed; the database path is cleared and the storage object is deleted when available
+* Profile avatars are cropped square, resized, compressed to WebP in the browser, uploaded to company/user-scoped storage paths, and can be replaced or removed with storage cleanup
+* Organization logos and client logos can be removed; the database path is cleared and the storage object is deleted when available
+* PWA-ready manifest, icons, install prompt, theme color, Apple app metadata, service worker registration, and offline shell
 
 ## 14. Exporting
 
@@ -454,6 +457,7 @@ Created in the final production phase:
 * User profile management at `/profile`
 * Profile password changes update Supabase Auth without redirecting active users away; forced password changes still clear `must_change_password` and redirect by role
 * Forgot/reset password recovery uses safe generic messaging, Marketing Manager contact fallback guidance, and session-aware post-reset routing
+* Profile stabilization migration adds user metadata, notification preferences, last-login tracking, narrow self-profile/avatar/preference RPCs, and an authenticated login timestamp RPC
 * Review scoring fields on content reviews
 * Standalone content templates page removed from navigation; existing active templates can still be used during content creation when present
 * Dashboard widget customization with user preferences under `/settings/preferences`

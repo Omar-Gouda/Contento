@@ -48,10 +48,17 @@ Application user profile table. This should connect to Supabase Auth while keepi
 | `email` | User email address. |
 | `first_name` | User first name. |
 | `last_name` | User last name. |
+| `phone` | Optional user phone number. |
+| `job_title` | Optional job title shown on profiles. |
+| `bio` | Optional profile biography. |
+| `timezone` | User display timezone. Contento v1.0 supports `Africa/Cairo`. |
 | `avatar_url` | Optional profile image URL. |
 | `role_id` | Current role assigned to the user. |
 | `status` | User state, such as invited, active, suspended, or disabled. |
 | `must_change_password` | Forces Marketing Manager-created users to change their temporary password before dashboard access. |
+| `notification_preferences` | Per-user notification preferences for sound, toast, and future desktop push. |
+| `last_login_at` | Last successful Contento sign-in timestamp. |
+| `profile_completed_at` | First timestamp when required profile basics were saved. |
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
@@ -149,6 +156,8 @@ Join table connecting users to client workspaces.
 
 Marketing Manager user creation now writes client assignments when the selected role requires client scope:
 Account Manager assignments use `account_manager`, Content Creator uses `content_creator`, Graphic Designer uses `graphic_designer`, Video Editor uses `video_editor`, and Client users use `client_contact`.
+
+Users do not need client assignments at creation time. Authorized operators can assign existing users to one or more clients later through the same `client_assignments` table. Marketing Managers can manage company-wide client assignments; Account Managers can manage same-team production users on clients assigned to them. Duplicate active rows are prevented by the `(client_id, user_id, assignment_role)` primary key.
 
 | Field | Purpose |
 | --- | --- |

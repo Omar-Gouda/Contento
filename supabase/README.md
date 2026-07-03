@@ -22,6 +22,8 @@ This folder contains the database foundation for Contento.
 | `migrations/202606300001_contento_client_permission_hotfix.sql` | Adds client create/update/delete/assignment permission hardening and client RLS fixes for Marketing Manager and Account Manager client management. |
 | `migrations/202607010001_contento_ux_permission_chat_hotfix.sql` | Tightens report visibility for Account Manager scope, adds direct organization chat tables, helper functions, indexes, triggers, and chat RLS policies. |
 | `migrations/202607020001_contento_client_contract_password_storage_hotfix.sql` | Adds client contract lifecycle fields, disabled/expired statuses, client expiry normalization, and a company-scoped client expiry RPC. |
+| `migrations/202607030001_contento_performance_assignment_refresh_fix.sql` | Adds scoped client-assignment RLS helpers, client assignment indexes, and Account Manager same-team production assignment support. |
+| `migrations/202607030002_contento_profile_stabilization.sql` | Adds user profile metadata, notification preferences, last-login/profile-completion timestamps, and narrow authenticated RPCs for self profile, avatar, notification preference, and login timestamp updates. |
 
 ## RLS Policy Model
 
@@ -38,6 +40,7 @@ Policy principles:
 * Platform admins are stored outside company membership and can only operate through platform-specific routes, helpers, and server-side actions.
 * Organization lifecycle policies allow platform admins to view and update organization status while company users remain scoped to their own active company.
 * Marketing Manager-created users are created through server-only Supabase Auth code, then linked to `users` with `must_change_password = true`.
+* Self-profile updates use narrow authenticated RPCs instead of broad `users` table update policies.
 * Workflow pages use server actions that resolve `company_id` from the authenticated profile and let RLS enforce tenant boundaries.
 * Task, idea, content, report, time-off, comments, mentions, and attachment visibility use scope helpers so Admins stay company-wide, Supervisors and Team Leads stay team-scoped, and Creators stay own-scope.
 * Client workspace visibility is company-scoped and uses `clients`, `client_assignments`, `is_same_company_client()`, and `can_access_client_scope()` so client users only see assigned client workspaces and internal users remain inside company/team/client boundaries.
@@ -47,9 +50,11 @@ Policy principles:
 * Account Manager report visibility is scoped to assigned users, assigned teams, and assigned clients; Marketing Manager remains company-wide.
 * Notifications are readable and updateable only by their recipient inside the same company.
 * Chat conversations and messages are company-scoped, participant-scoped, and optionally client-scoped for Client users and assigned Account Managers.
+* Client assignments use `client_assignments`; Marketing Managers can manage company-wide assignments, while Account Managers can manage same-team production users on clients assigned to them.
 * Saved views and dashboard preferences are private to the owning user.
 * Content templates are company-scoped; active templates can be used by permitted creators, while management requires template permissions.
 * `contento-attachments` and `contento-avatars` storage buckets use company/user folder policies. Avatar, organization logo, and client logo removal clears database paths and removes the private storage object when available.
+* Profile avatar updates are restricted to the authenticated user's company/user storage prefix by `update_current_user_avatar()`.
 * Report CSV export is server-side and requires `exports.reports`.
 * Generated reports are stored as new historical rows based on live task, content, work-hours, and time-off data.
 * Service-role access should remain server-only and must never be exposed to the browser.

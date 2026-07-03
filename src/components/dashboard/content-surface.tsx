@@ -133,7 +133,7 @@ export async function ContentSurface({
   mode: "pipeline" | "reviews";
   searchParams: { q?: string; status?: string; team?: string; client?: string; error?: string; notice?: string };
 }) {
-  const [content, users, tasks, ideas, teams, reviews, ratings, templates] = await Promise.all([
+  const [content, users, tasks, ideas, teams, reviews, ratings, templates, clients] = await Promise.all([
     getWorkflowContent(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team, clientId: searchParams.client }),
     getWorkflowUsers(context),
     getWorkflowTasks(context, { status: "all" }),
@@ -142,8 +142,8 @@ export async function ContentSurface({
     getWorkflowContentReviews(context),
     getWorkflowContentRatings(context),
     getContentTemplates(context),
+    getClients(context),
   ]);
-  const clients = await getClients(context);
   const activeUsers = users.filter((user) => user.status === "active");
   const openTasks = tasks.filter((task) => task.status !== "closed");
   const activeIdeas = ideas.filter((idea) => idea.status !== "archived" && idea.status !== "rejected");

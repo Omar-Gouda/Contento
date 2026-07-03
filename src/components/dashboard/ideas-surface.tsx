@@ -65,12 +65,12 @@ export async function IdeasSurface({
   description: string;
   searchParams: { q?: string; status?: string; team?: string; client?: string; error?: string; notice?: string };
 }) {
-  const [ideas, users, teams] = await Promise.all([
+  const [ideas, users, teams, clients] = await Promise.all([
     getWorkflowIdeas(context, { search: searchParams.q, status: searchParams.status, teamId: searchParams.team, clientId: searchParams.client }),
     getWorkflowUsers(context),
     getWorkflowTeams(context),
+    getClients(context),
   ]);
-  const clients = await getClients(context);
   const activeUsers = users.filter((user) => user.status === "active");
   const activeTeams = teams.filter((team) => team.status === "active");
   const activeClients = clients.filter((client) => client.status === "active");

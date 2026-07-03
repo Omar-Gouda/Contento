@@ -55,8 +55,7 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
   const supabase = await createSupabaseServerClient();
   const [
     { data: conversations, error: conversationsError },
-    { data: users, error: usersError },
-    { data: clients },
+    { data: recipients, error: recipientsError },
   ] = await Promise.all([
     supabase
       .from("chat_conversations")
@@ -70,32 +69,59 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
       .select("id, email, first_name, last_name, avatar_url")
       .eq("company_id", context.companyId)
       .eq("status", "active")
-      .order("first_name", { ascending: true }),
-    supabase
-      .from("clients")
-      .select("id, name")
-      .eq("company_id", context.companyId),
+      .neq("id", context.userId)
+      .order("first_name", { ascending: true })
+      .limit(50),
   ]);
 
-  if (conversationsError || usersError) {
+  if (conversationsError || recipientsError) {
     throw new Error("Unable to load organization chat.");
   }
 
   const conversationRows = (conversations as ChatConversationRow[] | null) ?? [];
   const conversationIds = conversationRows.map((conversation) => conversation.id);
-  const { data: messages, error: messagesError } = conversationIds.length
-    ? await supabase
-      .from("chat_messages")
-      .select("id, company_id, conversation_id, sender_id, body, read_at, created_at")
-      .in("conversation_id", conversationIds)
-      .order("created_at", { ascending: true })
-    : { data: [], error: null };
+  const participantIds = Array.from(new Set(conversationRows.flatMap((conversation) => [
+    conversation.participant_one_id,
+    conversation.participant_two_id,
+  ])));
+  const clientIds = Array.from(new Set(conversationRows.map((conversation) => conversation.client_id).filter(Boolean) as string[]));
+  const [
+    { data: messages, error: messagesError },
+    { data: participantUsers, error: participantUsersError },
+    { data: clients, error: clientsError },
+  ] = await Promise.all([
+    conversationIds.length
+      ? supabase
+        .from("chat_messages")
+        .select("id, company_id, conversation_id, sender_id, body, read_at, created_at")
+        .in("conversation_id", conversationIds)
+        .order("created_at", { ascending: false })
+        .limit(200)
+      : Promise.resolve({ data: [], error: null }),
+    participantIds.length
+      ? supabase
+        .from("users")
+        .select("id, email, first_name, last_name, avatar_url")
+        .eq("company_id", context.companyId)
+        .in("id", participantIds)
+      : Promise.resolve({ data: [], error: null }),
+    clientIds.length
+      ? supabase
+        .from("clients")
+        .select("id, name")
+        .eq("company_id", context.companyId)
+        .in("id", clientIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
-  if (messagesError) {
+  if (messagesError || participantUsersError || clientsError) {
     throw new Error("Unable to load organization chat messages.");
   }
 
-  const userRows = (users as ChatUserRow[] | null) ?? [];
+  const userRows = [
+    ...((recipients as ChatUserRow[] | null) ?? []),
+    ...((participantUsers as ChatUserRow[] | null) ?? []),
+  ];
   const userById = new Map(userRows.map((user) => [user.id, user]));
   const clientById = new Map(((clients as ChatClientRow[] | null) ?? []).map((client) => [client.id, client.name]));
   const messagesByConversation = new Map<string, OrganizationChatMessage[]>();
@@ -114,6 +140,10 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
       createdAt: message.created_at,
     });
     messagesByConversation.set(message.conversation_id, rows);
+  });
+
+  messagesByConversation.forEach((rows) => {
+    rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   });
 
   return {
@@ -136,8 +166,7 @@ export async function getOrganizationChatData(context: AuthContext): Promise<Org
         lastMessage,
       };
     }),
-    recipients: userRows
-      .filter((user) => user.id !== context.userId)
+    recipients: ((recipients as ChatUserRow[] | null) ?? [])
       .map((user) => ({
         id: user.id,
         name: displayName(user),

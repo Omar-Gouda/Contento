@@ -211,8 +211,19 @@ Current Phase 7 implementation:
 * Workflow server actions create activity logs for user, team, task, idea, content, report, and export actions.
 * Platform organization lifecycle changes write `platform_activity_logs`.
 * `/notifications` provides a real notification center with read/unread filters and mark-read actions.
-* Dashboard shell shows an interactive notification bell with unread counts, recent notifications, mark-read controls, and browser-local sound preference.
+* Dashboard shell shows an interactive notification bell with unread counts, recent notifications, mark-read controls, realtime refresh, toast alerts, and server-backed sound preference.
 * Task assignment/status, idea submission/status, content submission/review, comment mentions, team membership, and organization lifecycle changes create notifications where relevant.
+
+## Phase 7.1: v1.0 Stabilization
+
+Current stabilization work:
+
+* Workflow detail pages now query required records directly instead of loading full collections and searching in memory.
+* User profiles include expanded metadata, notification preferences, assigned clients, recent activity, work-hours summary, last login, and completion scoring.
+* Profile/avatar updates use narrow authenticated RPCs instead of broad user-table update permissions.
+* Profile avatars are cropped, resized, and compressed to WebP before upload.
+* Root loading, 404, and unexpected-error surfaces are available without exposing raw errors.
+* PWA shell is prepared with manifest, icons, install prompt, theme color, Apple metadata, service worker registration, and offline fallback.
 
 ## Phase 8: UI/UX Upgrade
 

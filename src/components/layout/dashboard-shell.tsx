@@ -17,6 +17,7 @@ import {
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { OrganizationChatData } from "@/lib/chat/queries";
 import type { NotificationRow } from "@/lib/notifications/queries";
+import type { NotificationPreferences } from "@/lib/settings/queries";
 import type { CurrentWorkHours } from "@/lib/work-hours/queries";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName } from "@/types/roles";
@@ -31,6 +32,7 @@ export function DashboardShell({
   context,
   unreadNotificationCount,
   recentNotifications = [],
+  notificationPreferences,
   chatData,
   branding,
   workHours,
@@ -39,6 +41,7 @@ export function DashboardShell({
   context: AuthContext;
   unreadNotificationCount?: number;
   recentNotifications?: NotificationRow[];
+  notificationPreferences?: NotificationPreferences;
   chatData?: OrganizationChatData;
   workHours?: CurrentWorkHours | null;
   branding?: {
@@ -197,6 +200,9 @@ export function DashboardShell({
               <NotificationMenu
                 unreadCount={unreadNotificationCount ?? 0}
                 notifications={recentNotifications}
+                userId={context.userId}
+                companyId={context.companyId}
+                initialSoundEnabled={notificationPreferences?.sound ?? true}
               />
               {workHours !== undefined && <WorkHoursStatusMenu workHours={workHours} />}
               <OrganizationChatDrawer
