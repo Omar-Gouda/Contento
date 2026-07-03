@@ -269,6 +269,20 @@ export type Database = {
         created_at: string;
         updated_at: string;
       }>;
+      push_subscriptions: Table<{
+        id: string;
+        company_id: string;
+        user_id: string;
+        endpoint_hash: string;
+        endpoint: string;
+        p256dh: string;
+        auth_secret: string;
+        user_agent: string | null;
+        status: "active" | "revoked";
+        created_at: string;
+        updated_at: string;
+        last_seen_at: string;
+      }>;
       chat_conversations: Table<{
         id: string;
         company_id: string;

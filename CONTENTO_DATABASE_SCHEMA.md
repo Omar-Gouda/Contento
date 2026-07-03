@@ -372,6 +372,27 @@ Company-scoped notification table for assignment, review, approval, rejection, a
 | `created_at` | Creation timestamp. |
 | `updated_at` | Last update timestamp. |
 
+### `push_subscriptions`
+
+Future-ready browser Web Push subscription storage.
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary identifier for the subscription row. |
+| `company_id` | Company that owns the subscription. |
+| `user_id` | User that registered the browser or device. |
+| `endpoint_hash` | Stable endpoint hash for deduplication. |
+| `endpoint` | Browser PushSubscription endpoint. Treat as sensitive application data. |
+| `p256dh` | Push subscription public key. |
+| `auth_secret` | Push subscription auth secret. Treat as sensitive application data. |
+| `user_agent` | Optional browser user agent snapshot. |
+| `status` | Subscription lifecycle state: active or revoked. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Last update timestamp. |
+| `last_seen_at` | Last time the subscription was refreshed. |
+
+The app includes notification permission UI and service worker push handlers. Production Web Push delivery remains future work and requires VAPID keys plus a trusted server-side sender.
+
 ### `chat_conversations`
 
 Company-scoped direct chat conversation table. Conversations have two participants and may optionally be tied to a client workspace when a Client role user is involved.

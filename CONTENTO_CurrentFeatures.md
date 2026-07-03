@@ -284,8 +284,10 @@ Features:
 * Read/unread filtering
 * Mark one or all notifications as read
 * Server-backed notification sound preference with browser-local fallback during realtime interactions
+* Browser notification permission prompt and desktop-alert preference for supported browsers
 * Entity links when a notification maps to a task, idea, content item, report, or organization event
 * Dashboard notification widgets are removed in favor of the header notification dropdown
+* Web Push delivery is future-ready through service worker push handlers and `push_subscriptions`, but production push sending still requires VAPID/server delivery
 
 ## 12.1 Organization Chat
 
@@ -327,6 +329,7 @@ Features:
 * Profile avatars are cropped square, resized, compressed to WebP in the browser, uploaded to company/user-scoped storage paths, and can be replaced or removed with storage cleanup
 * Organization logos and client logos can be removed; the database path is cleared and the storage object is deleted when available
 * PWA-ready manifest, icons, install prompt, theme color, Apple app metadata, service worker registration, and offline shell
+* Premium Contento brand assets: full SVG logo, abstract SVG mark, favicon, PNG PWA icons, Apple touch icon, sidebar fallback mark, and sign-in logo
 
 ## 14. Exporting
 

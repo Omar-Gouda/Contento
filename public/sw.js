@@ -1,10 +1,13 @@
-const CACHE_NAME = "contento-shell-v1";
+const CACHE_NAME = "contento-shell-v2";
 const SHELL_ASSETS = [
   "/",
   "/offline.html",
-  "/icon.svg",
-  "/maskable-icon.svg",
-  "/apple-touch-icon.svg",
+  "/favicon.ico",
+  "/brand/contento-mark.svg",
+  "/brand/contento-logo.svg",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -45,5 +48,49 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request))
+  );
+});
+
+self.addEventListener("push", (event) => {
+  if (!event.data) {
+    return;
+  }
+
+  let payload = {};
+
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: "Contento", body: event.data.text() };
+  }
+
+  const title = payload.title || "Contento";
+  const options = {
+    body: payload.body || payload.message || "You have a new workspace update.",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    data: {
+      url: payload.url || payload.link_href || "/",
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+
+      return self.clients.openWindow(targetUrl);
+    })
   );
 });

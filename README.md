@@ -79,7 +79,7 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Working-hours tracking with explicit Clock In / Clock Out controls, Cairo work dates, break sessions, 90-minute break allowance, missing time, user view, header status menu, and Admin company view.
 - Teams, client workspaces, tasks, ideas, dedicated idea/content review queues, content pipeline, review scoring, modern scheduling calendar, role-scoped automated reports, and CSV report export.
 - Role-aware Marketing Manager user creation changes team/client assignment fields based on the selected role and links Client users to client profiles.
-- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, realtime refresh, toast alerts, and server-backed sound preference.
+- Header notification bell with unread count, recent-notification dropdown, mark-one/mark-all read actions, entity links, empty state, realtime refresh, toast alerts, server-backed sound preference, and browser notification permission control.
 - Header organization chat drawer for same-company users and assigned client-scope conversations.
 - Generic comments, mentions, and file attachments for tasks, ideas, content, and reports.
 - Standalone global search across accessible users, teams, tasks, ideas, content, and reports.
@@ -95,7 +95,8 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Purple/violet default brand theme with semantic status colors retained for success, warning, danger, and info states.
 - Responsive dashboard shell with permission-aware navigation, active states, notification interactions, collapsible sidebar, drawer navigation, compact mobile bottom navigation, and sheet-based primary forms.
 - Calendar uses month/week/day grid views with a separated weekday header, compact toolbar buttons, compact event chips, and day-detail sheets for publishing dates, task due dates, day off, and sick leave.
-- PWA shell with manifest, app icons, install prompt, theme color, Apple web app metadata, and offline fallback page.
+- Premium Contento brand asset system with SVG logo/mark, favicon, PNG PWA icons, Apple touch icon, updated metadata, sidebar fallback mark, and sign-in logo.
+- PWA shell with manifest, install prompt, theme color, Apple web app metadata, service worker registration, offline fallback page, and future-ready push notification handlers.
 - Forgot/reset password uses a generic recovery message, production-safe callback URL generation from `NEXT_PUBLIC_SITE_URL`, a Marketing Manager contact fallback, and session-aware reset redirects. Profile password changes update Supabase Auth in place without sending active users back to the dashboard.
 - Report creation is automated by default from live task, idea publishing, content, comment, work-hours, and time-off data; users add optional notes and editable marketing metrics.
 - Core pages are view-only by default; authorized create, edit, manage, review, comment, and final-output actions open in sheets or collapsed details sections.
@@ -126,6 +127,7 @@ supabase/
     202607020001_contento_client_contract_password_storage_hotfix.sql
     202607030001_contento_performance_assignment_refresh_fix.sql
     202607030002_contento_profile_stabilization.sql
+    202607030003_contento_push_subscription_foundation.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.
@@ -165,4 +167,5 @@ supabase db lint --linked
 
 - Email delivery templates and provider-level transactional email customization are configured in Supabase, not in this repository.
 - Real-time subscriptions, background workers, activity-log export, and advanced custom role/permission editing UI remain future enhancements.
+- Real Web Push delivery is prepared but not fully enabled. The app has notification permission UI, service worker push handlers, and subscription storage, but production push sending still needs VAPID keys and a trusted server-side delivery worker.
 - Hard deletion of organizations is intentionally not implemented; Super Admin uses soft delete.

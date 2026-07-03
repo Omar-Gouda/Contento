@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -51,8 +51,9 @@ export function PwaProvider() {
   return (
     <div className="fixed bottom-20 right-4 z-40 w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-card p-3 shadow-xl sm:bottom-4">
       <div className="flex items-start gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Download className="size-4" />
+        <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-primary">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/contento-mark.svg" alt="" className="size-full object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Install Contento</p>

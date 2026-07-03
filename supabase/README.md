@@ -24,6 +24,7 @@ This folder contains the database foundation for Contento.
 | `migrations/202607020001_contento_client_contract_password_storage_hotfix.sql` | Adds client contract lifecycle fields, disabled/expired statuses, client expiry normalization, and a company-scoped client expiry RPC. |
 | `migrations/202607030001_contento_performance_assignment_refresh_fix.sql` | Adds scoped client-assignment RLS helpers, client assignment indexes, and Account Manager same-team production assignment support. |
 | `migrations/202607030002_contento_profile_stabilization.sql` | Adds user profile metadata, notification preferences, last-login/profile-completion timestamps, and narrow authenticated RPCs for self profile, avatar, notification preference, and login timestamp updates. |
+| `migrations/202607030003_contento_push_subscription_foundation.sql` | Adds future-ready Web Push subscription storage with company/user-scoped RLS. Delivery still requires VAPID keys and a trusted sender. |
 
 ## RLS Policy Model
 
@@ -49,6 +50,7 @@ Policy principles:
 * Client-role report visibility requires `reports.sent_to_client_at`; internal users with report access can prepare reports before sharing them with clients.
 * Account Manager report visibility is scoped to assigned users, assigned teams, and assigned clients; Marketing Manager remains company-wide.
 * Notifications are readable and updateable only by their recipient inside the same company.
+* Push subscriptions are readable and writeable only by the owning user inside the same company; production delivery is not enabled until VAPID/server sending is added.
 * Chat conversations and messages are company-scoped, participant-scoped, and optionally client-scoped for Client users and assigned Account Managers.
 * Client assignments use `client_assignments`; Marketing Managers can manage company-wide assignments, while Account Managers can manage same-team production users on clients assigned to them.
 * Saved views and dashboard preferences are private to the owning user.
