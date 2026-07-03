@@ -60,6 +60,10 @@ export function SignInForm({ resetSuccess = false }: { resetSuccess?: boolean })
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
+        <div className="mb-2 flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/contento-logo.svg" alt="Contento" className="h-12 w-auto" />
+        </div>
         <CardTitle>Sign in to Contento</CardTitle>
         <CardDescription>
           Access your company workspace using your Contento account.

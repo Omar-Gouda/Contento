@@ -15,14 +15,17 @@ import {
 import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
+  updateNotificationPreferencesAction,
   updateNotificationSoundPreferenceAction,
 } from "@/lib/notifications/actions";
 import type { NotificationRow } from "@/lib/notifications/queries";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const notificationSoundKey = "contento-notification-sound-enabled";
+const notificationDesktopKey = "contento-notification-desktop-enabled";
 const notificationColumns =
   "id, company_id, user_id, title, message, read, entity_type, entity_id, link_href, read_at, created_at, updated_at";
+type BrowserNotificationPermission = NotificationPermission | "unsupported";
 
 async function playNotificationSound() {
   const AudioContextClass =
@@ -56,18 +59,23 @@ export function NotificationMenu({
   userId,
   companyId,
   initialSoundEnabled = true,
+  initialDesktopEnabled = false,
 }: {
   unreadCount: number;
   notifications: NotificationRow[];
   userId: string;
   companyId: string;
   initialSoundEnabled?: boolean;
+  initialDesktopEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const previousUnreadCount = useRef(unreadCount);
   const userInteracted = useRef(false);
   const [isPending, startTransition] = useTransition();
   const [soundEnabled, setSoundEnabled] = useState(initialSoundEnabled);
+  const [desktopEnabled, setDesktopEnabled] = useState(initialDesktopEnabled);
+  const [browserPermission, setBrowserPermission] =
+    useState<BrowserNotificationPermission>("unsupported");
   const [items, setItems] = useState(notifications);
   const [localUnreadCount, setLocalUnreadCount] = useState(unreadCount);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
@@ -87,6 +95,19 @@ export function NotificationMenu({
       window.localStorage.setItem(notificationSoundKey, String(initialSoundEnabled));
     });
   }, [initialSoundEnabled]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setDesktopEnabled(initialDesktopEnabled);
+      window.localStorage.setItem(notificationDesktopKey, String(initialDesktopEnabled));
+    });
+  }, [initialDesktopEnabled]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setBrowserPermission("Notification" in window ? window.Notification.permission : "unsupported");
+    });
+  }, []);
 
   useEffect(() => {
     function markInteraction() {
@@ -132,10 +153,29 @@ export function NotificationMenu({
 
         if (newestUnread) {
           setToastNotification(newestUnread);
-        }
 
-        if (soundEnabled && userInteracted.current) {
-          void playNotificationSound().catch(() => undefined);
+          if (soundEnabled && userInteracted.current) {
+            void playNotificationSound().catch(() => undefined);
+          }
+
+          if (
+            desktopEnabled &&
+            browserPermission === "granted" &&
+            "Notification" in window &&
+            document.visibilityState !== "visible"
+          ) {
+            const desktopNotification = new window.Notification(newestUnread.title, {
+              body: newestUnread.message || "You have a new Contento update.",
+              icon: "/icons/icon-192.png",
+            });
+
+            desktopNotification.onclick = () => {
+              window.focus();
+              if (newestUnread.link_href) {
+                window.location.href = newestUnread.link_href;
+              }
+            };
+          }
         }
       }
 
@@ -161,7 +201,7 @@ export function NotificationMenu({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [companyId, soundEnabled, userId]);
+  }, [browserPermission, companyId, desktopEnabled, soundEnabled, userId]);
 
   function updateSoundPreference(enabled: boolean) {
     const previous = soundEnabled;
@@ -177,6 +217,65 @@ export function NotificationMenu({
       if (!result.success) {
         setSoundEnabled(previous);
         window.localStorage.setItem(notificationSoundKey, String(previous));
+      }
+    });
+  }
+
+  async function requestBrowserPermission() {
+    if (!("Notification" in window)) {
+      setBrowserPermission("unsupported");
+      setActionStatus("Browser notifications are not supported on this device.");
+      return;
+    }
+
+    setActionStatus(null);
+    const permission = await window.Notification.requestPermission();
+
+    setBrowserPermission(permission);
+
+    if (permission !== "granted") {
+      setDesktopEnabled(false);
+      window.localStorage.setItem(notificationDesktopKey, "false");
+      setActionStatus(
+        permission === "denied"
+          ? "Browser notifications are blocked in this browser."
+          : "Browser notifications were not enabled."
+      );
+      return;
+    }
+
+    setDesktopEnabled(true);
+    window.localStorage.setItem(notificationDesktopKey, "true");
+    startTransition(async () => {
+      const result = await updateNotificationPreferencesAction({ desktop: true });
+      setActionStatus(result.message);
+
+      if (!result.success) {
+        setDesktopEnabled(false);
+        window.localStorage.setItem(notificationDesktopKey, "false");
+      }
+    });
+  }
+
+  function updateDesktopPreference(enabled: boolean) {
+    const previous = desktopEnabled;
+
+    if (enabled && browserPermission !== "granted") {
+      void requestBrowserPermission();
+      return;
+    }
+
+    setDesktopEnabled(enabled);
+    window.localStorage.setItem(notificationDesktopKey, String(enabled));
+    setActionStatus(null);
+
+    startTransition(async () => {
+      const result = await updateNotificationPreferencesAction({ desktop: enabled });
+      setActionStatus(result.message);
+
+      if (!result.success) {
+        setDesktopEnabled(previous);
+        window.localStorage.setItem(notificationDesktopKey, String(previous));
       }
     });
   }
@@ -319,6 +418,26 @@ export function NotificationMenu({
               className="size-4"
             />
           </label>
+          <label className="flex items-center justify-between gap-3 rounded-md px-1.5 py-2 text-sm">
+            <span>Desktop alerts</span>
+            <input
+              type="checkbox"
+              checked={desktopEnabled && browserPermission === "granted"}
+              disabled={browserPermission === "unsupported" || isPending}
+              onChange={(event) => updateDesktopPreference(event.target.checked)}
+              className="size-4"
+            />
+          </label>
+          <div className="rounded-md bg-secondary/40 px-1.5 py-2 text-xs text-muted-foreground">
+            {browserPermission === "unsupported" && "Desktop notifications are not supported on this browser."}
+            {browserPermission === "denied" && "Desktop notifications are blocked in browser settings."}
+            {browserPermission === "default" && (
+              <Button type="button" variant="ghost" size="sm" onClick={requestBrowserPermission} disabled={isPending}>
+                Enable browser notifications
+              </Button>
+            )}
+            {browserPermission === "granted" && "Browser notifications are enabled for this device."}
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </>

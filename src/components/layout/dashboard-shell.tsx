@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
-import { Building2, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 
 import { SignOutButton } from "@/components/forms/sign-out-button";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ export function DashboardShell({
     accentColor: string | null;
   } | null;
 }) {
+  const contentoMarkSrc = "/brand/contento-mark.svg";
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -65,13 +66,6 @@ export function DashboardShell({
     ...(branding?.accentColor ? { "--accent": branding.accentColor } : {}),
   } as CSSProperties;
   const organizationName = branding?.companyName ?? "Workspace";
-  const organizationInitials = organizationName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -96,7 +90,8 @@ export function DashboardShell({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
               ) : (
-                organizationInitials || "C"
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={contentoMarkSrc} alt="" className="size-full object-cover object-center" />
               )}
             </div>
             {!sidebarCollapsed && (
@@ -157,7 +152,8 @@ export function DashboardShell({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
                       ) : (
-                        organizationInitials || "C"
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={contentoMarkSrc} alt="" className="size-full object-cover object-center" />
                       )}
                     </span>
                     <span className="min-w-0 text-left">
@@ -182,8 +178,14 @@ export function DashboardShell({
             </Sheet>
 
             <div className="hidden min-w-0 items-center gap-3 lg:flex">
-              <div className="flex size-9 items-center justify-center rounded-lg border bg-secondary text-primary">
-                <Building2 className="size-4" />
+              <div className="flex size-9 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 text-primary">
+                {branding?.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={contentoMarkSrc} alt="" className="size-full object-cover object-center" />
+                )}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{branding?.companyName ?? "Contento workspace"}</p>
@@ -203,6 +205,7 @@ export function DashboardShell({
                 userId={context.userId}
                 companyId={context.companyId}
                 initialSoundEnabled={notificationPreferences?.sound ?? true}
+                initialDesktopEnabled={notificationPreferences?.desktop ?? false}
               />
               {workHours !== undefined && <WorkHoursStatusMenu workHours={workHours} />}
               <OrganizationChatDrawer

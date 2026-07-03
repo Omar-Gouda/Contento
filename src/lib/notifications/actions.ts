@@ -73,11 +73,23 @@ export async function markAllNotificationsReadAction(formData?: FormData): Promi
 export async function updateNotificationSoundPreferenceAction(
   enabled: boolean
 ): Promise<NotificationActionResult> {
+  return updateNotificationPreferencesAction({ sound: enabled });
+}
+
+export async function updateNotificationPreferencesAction(
+  preferences: {
+    sound?: boolean;
+    desktop?: boolean;
+    toast?: boolean;
+  }
+): Promise<NotificationActionResult> {
   await requireAuthContext();
   const supabase = await createSupabaseServerClient();
-  const preferences = { sound: enabled } satisfies Json;
+  const safePreferences = Object.fromEntries(
+    Object.entries(preferences).filter(([, value]) => typeof value === "boolean")
+  ) satisfies Json;
   const { data: updated, error } = await supabase.rpc("update_current_user_notification_preferences", {
-    preferences_input: preferences,
+    preferences_input: safePreferences,
   });
 
   if (error || !updated) {
