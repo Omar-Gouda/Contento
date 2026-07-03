@@ -38,3 +38,27 @@ export function ThemeToggle() {
     </div>
   );
 }
+
+export function CompactThemeToggle() {
+  const { setTheme, theme } = useTheme();
+  const currentTheme = theme ?? "system";
+  const currentIndex = themeOptions.findIndex((option) => option.value === currentTheme);
+  const activeOption = themeOptions[currentIndex >= 0 ? currentIndex : 2];
+  const nextOption = themeOptions[(currentIndex + 1 + themeOptions.length) % themeOptions.length];
+  const Icon = activeOption.icon;
+
+  return (
+    <Button
+      type="button"
+      size="icon-lg"
+      variant="outline"
+      className="size-10"
+      aria-label={`Theme: ${activeOption.label}. Switch to ${nextOption.label}.`}
+      title={`Theme: ${activeOption.label}. Switch to ${nextOption.label}.`}
+      onClick={() => setTheme(nextOption.value)}
+      suppressHydrationWarning
+    >
+      <Icon />
+    </Button>
+  );
+}
