@@ -164,7 +164,7 @@ export const contentFinalOutputSchema = z.object({
 
 export const reportSchema = z.object({
   clientId: optionalUuidSchema,
-  reportType: z.enum(["daily", "weekly", "creator", "team", "company"]),
+  reportType: z.enum(["daily", "weekly", "monthly", "creator", "team", "company"]),
   title: z.string().trim().min(1, "Report title is required.").max(160, "Report title is too long."),
   body: z.string().trim().min(1, "Report body is required.").max(5000, "Report body is too long."),
   userId: optionalUuidSchema,
@@ -175,7 +175,7 @@ export const reportSchema = z.object({
 
 export const generatedReportSchema = z.object({
   clientId: optionalUuidSchema,
-  reportType: z.enum(["daily", "weekly"]),
+  reportType: z.enum(["daily", "weekly", "monthly"]),
   userId: optionalUuidSchema,
   teamId: optionalUuidSchema,
   note: z.string().trim().max(2000, "Note is too long.").default(""),

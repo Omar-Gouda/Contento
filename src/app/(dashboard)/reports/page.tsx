@@ -8,12 +8,11 @@ import { getClients } from "@/lib/clients/queries";
 import {
   getWorkflowReports,
   getWorkflowTeams,
-  getWorkflowUsers,
 } from "@/lib/workflows/queries";
 import { requireAuthContext } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { canOpenReports } from "@/lib/workflows/scope";
-import { formatCairoDateTime } from "@/lib/time";
+import { CONTENTO_TIME_ZONE, formatCairoDateTime, getCairoDate } from "@/lib/time";
 import { PageMessage } from "@/components/admin/page-message";
 import { FormSheet } from "@/components/dashboard/form-sheet";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
@@ -29,41 +28,37 @@ import {
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { routes } from "@/constants/routes";
-import { getDefaultDashboardPath } from "@/types/roles";
+import { getDefaultDashboardPath, getRoleDisplayName, isInternalUserRole, type UserRole } from "@/types/roles";
 
 export const metadata: Metadata = {
   title: "Reports",
 };
 
-const reportTypes = ["daily", "weekly", "creator", "team", "company"] as const;
-const generatedReportTypes = ["daily", "weekly"] as const;
+const reportTypes = ["daily", "weekly", "monthly", "creator", "team", "company"] as const;
+const generatedReportTypes = ["daily", "weekly", "monthly"] as const;
 const selectClass =
   "h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
-const generatedSections = [
-  ["Completed tasks", "tasks.status + updated_at"],
-  ["Pending tasks", "tasks.status"],
-  ["Submitted content", "content_items.submitted_at"],
-  ["Approved / declined content", "content_items.status"],
-  ["Revision count", "content_items change-request statuses"],
-  ["Client comments", "task and entity comments"],
-  ["Work-hours summary", "work_days totals"],
-  ["Missing hours", "work_days.total_missing_minutes"],
-] as const;
-const manualMetrics = [
-  ["reachGrowth", "Reach growth %"],
-  ["engagementRate", "Engagement rate %"],
-  ["followerGrowth", "Follower growth"],
-  ["totalAdSpend", "Total ad spend"],
-  ["reach", "Reach"],
-  ["impressions", "Impressions"],
-  ["clicks", "Clicks"],
-  ["ctr", "CTR"],
-  ["cpc", "CPC"],
-  ["cpm", "CPM"],
-  ["leadsGenerated", "Leads generated"],
-  ["conversions", "Conversions"],
-  ["roas", "ROAS"],
-] as const;
+const roleGeneratedSections: Record<UserRole, string[]> = {
+  admin: ["Company overview", "Client activity summary", "Reports reviewed/finalized", "Users and teams activity", "Content approval overview", "Key decisions"],
+  supervisor: ["Assigned clients summary", "Tasks assigned/reviewed", "Client communication/actions", "Reports reviewed", "Blockers"],
+  "team-lead": ["Team progress", "Tasks reviewed", "Content review handoff", "Blockers"],
+  creator: ["Ideas created", "Content submitted", "Tasks completed or in progress", "Client feedback handled", "Blockers"],
+  "graphic-designer": ["Assigned production tasks", "Final drive links submitted", "Revisions handled", "Pending work", "Blockers"],
+  "video-editor": ["Assigned video/reel tasks", "Final drive links submitted", "Revisions handled", "Pending work", "Blockers"],
+  client: ["Sent client reports"],
+};
+
+function reportAvailability() {
+  const today = getCairoDate();
+  const dayOfMonth = Number(today.slice(-2));
+  const dayOfWeek = new Date(`${today}T00:00:00.000Z`).getUTCDay();
+
+  return {
+    daily: { available: true, label: "Daily", helper: "Available every day." },
+    weekly: { available: dayOfWeek === 5, label: "Weekly", helper: "Available only on Friday." },
+    monthly: { available: dayOfMonth === 27, label: "Monthly", helper: "Available only on day 27 of the month." },
+  } as const;
+}
 
 export default async function ReportsPage({
   searchParams,
@@ -77,18 +72,17 @@ export default async function ReportsPage({
     redirect(`${getDefaultDashboardPath(context.role)}?error=permission-denied`);
   }
 
-  const [reports, users, teams, clients] = await Promise.all([
+  const [reports, teams, clients] = await Promise.all([
     getWorkflowReports(context, { type: params.type, teamId: params.team, clientId: params.client }),
-    getWorkflowUsers(context),
     getWorkflowTeams(context),
     getClients(context),
   ]);
-  const activeUsers = users.filter((user) => user.status === "active");
   const activeTeams = teams.filter((team) => team.status === "active");
   const activeClients = clients.filter((client) => client.status === "active");
-  const canSubmit = hasPermission(context, "reports.submit", "limited");
-  const canSubmitForTeam = hasPermission(context, "reports.view_team", "limited");
+  const canSubmit = isInternalUserRole(context.role) && hasPermission(context, "reports.submit", "limited");
   const canExport = hasPermission(context, "exports.reports", "limited");
+  const availability = reportAvailability();
+  const roleSections = roleGeneratedSections[context.role];
 
   return (
     <section className="space-y-6">
@@ -109,115 +103,56 @@ export default async function ReportsPage({
             )}
             {canSubmit && (
           <FormSheet
-            title="Generated report builder"
-            description="Contento generates the operational report from live records. Add optional notes and editable marketing metrics before saving."
+            title="Generate report"
+            description={`Contento generates your ${getRoleDisplayName(context.role)} report from live activity, tasks, content, reviews, comments, final links, and work-hours data in ${CONTENTO_TIME_ZONE}.`}
             triggerLabel="Generate report"
           >
-            <form action={generateReportAction} className="grid gap-4 lg:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="reportType">Type</Label>
-                <select id="reportType" name="reportType" className={selectClass}>
-                  {generatedReportTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                </select>
+            <form action={generateReportAction} className="grid gap-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {generatedReportTypes.map((type) => {
+                  const state = availability[type];
+
+                  return (
+                    <label
+                      key={type}
+                      className={`rounded-lg border p-3 text-sm ${state.available ? "bg-secondary/20" : "bg-muted/30 text-muted-foreground"}`}
+                    >
+                      <span className="flex items-center gap-2 font-medium">
+                        <input type="radio" name="reportType" value={type} defaultChecked={type === "daily"} disabled={!state.available} />
+                        {state.label}
+                      </span>
+                      <span className="mt-2 block text-xs text-muted-foreground">{state.helper}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="rounded-lg border bg-secondary/25 p-4">
+                <p className="text-sm font-medium">{getRoleDisplayName(context.role)} report sections</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {roleSections.map((section) => (
+                    <Badge key={section} variant="secondary">{section}</Badge>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  The saved report is generated from accessible activity logs, tasks, ideas, content, comments, final output links, reviews, work sessions, breaks, and missing-time records.
+                </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="userId">User scope</Label>
-                <select id="userId" name="userId" defaultValue={context.userId} className={selectClass}>
-                  {canSubmitForTeam
-                    ? (
-                      <>
-                        <option value="">Team summary when a team is selected</option>
-                        {activeUsers.map((user) => <option key={user.id} value={user.id}>{user.displayName}</option>)}
-                      </>
-                    )
-                    : <option value={context.userId}>{context.email}</option>}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="teamId">Team</Label>
-                <select id="teamId" name="teamId" className={selectClass}>
-                  <option value="">No team</option>
-                  {activeTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clientId">Client</Label>
-                <select id="clientId" name="clientId" className={selectClass}>
-                  <option value="">No client scope</option>
-                  {activeClients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-                </select>
-              </div>
-              <div className="grid gap-3 lg:col-span-4 md:grid-cols-2">
-                {generatedSections.map(([label, source]) => (
-                  <div key={label} className="rounded-lg border bg-secondary/25 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{label}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Source: {source}</p>
-                      </div>
-                      <Badge variant="secondary">Auto</Badge>
-                    </div>
-                    <p className="mt-3 rounded-md bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-                      Generated from the selected report range when saved.
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid gap-4 lg:col-span-4 lg:grid-cols-3">
-                {manualMetrics.map(([name, label]) => (
-                  <div key={name} className="space-y-2">
-                    <Label htmlFor={name}>{label}</Label>
-                    <input id={name} name={name} className={selectClass} />
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="keyAchievements">Key achievements</Label>
-                <textarea
-                  id="keyAchievements"
-                  name="keyAchievements"
-                  className="min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                />
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="mainChallenges">Main challenges</Label>
-                <textarea
-                  id="mainChallenges"
-                  name="mainChallenges"
-                  className="min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                />
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="nextMonthFocus">Next month&apos;s focus</Label>
-                <textarea
-                  id="nextMonthFocus"
-                  name="nextMonthFocus"
-                  className="min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                />
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <Label htmlFor="customSection">Custom section</Label>
-                <textarea
-                  id="customSection"
-                  name="customSection"
-                  className="min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                />
-              </div>
-              <div className="space-y-2 lg:col-span-4">
                 <Label htmlFor="note">Internal review note</Label>
                 <textarea
                   id="note"
                   name="note"
+                  placeholder="Optional note only. Contento fills the report body from recorded activity."
                   className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </div>
-              <div className="lg:col-span-4">
+              <div>
                 <Button type="submit">
                   <Sparkles />
-                  Generate draft
+                  Generate report
                 </Button>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Flow: Generated Draft / Account Manager Review / Marketing Manager Final / Sent to Client.
+                  Flow: generated by user, reviewed by Account Manager when scoped, then finalized or sent by Marketing Manager.
                 </p>
               </div>
             </form>

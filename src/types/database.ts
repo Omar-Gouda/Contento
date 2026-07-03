@@ -692,7 +692,7 @@ export type Database = {
         | "published"
         | "archived";
       review_decision: "approved" | "rejected" | "changes_requested" | "commented";
-      report_type: "daily" | "weekly" | "creator" | "team" | "company";
+      report_type: "daily" | "weekly" | "monthly" | "creator" | "team" | "company";
       day_off_status: "pending" | "approved" | "rejected" | "cancelled";
       calendar_event_type: "content" | "work_hours" | "day_off" | "general";
     };

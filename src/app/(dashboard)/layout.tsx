@@ -7,6 +7,7 @@ import { getOrganizationChatData } from "@/lib/chat/queries";
 import { getRecentNotifications, getUnreadNotificationCount } from "@/lib/notifications/queries";
 import { getCompanyBranding, getUserNotificationPreferences } from "@/lib/settings/queries";
 import { getCurrentUserWorkHours } from "@/lib/work-hours/queries";
+import { isInternalUserRole } from "@/types/roles";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const context = await requireAuthContext();
@@ -17,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     getUserNotificationPreferences(context),
     getCompanyBranding(context),
     getOrganizationChatData(context).catch(() => emptyChatData),
-    hasPermission(context, "work_hours.view_own", "view")
+    isInternalUserRole(context.role) || hasPermission(context, "work_hours.view_own", "view")
       ? getCurrentUserWorkHours(context).catch(() => null)
       : null,
   ]);
