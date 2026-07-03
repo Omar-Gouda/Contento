@@ -24,7 +24,7 @@ import { getRoleDisplayName } from "@/types/roles";
 import { DashboardMobileBottomNavigation, DashboardNavigation } from "./dashboard-navigation";
 import { NotificationMenu } from "./notification-menu";
 import { OrganizationChatDrawer } from "./organization-chat-drawer";
-import { ThemeToggle } from "./theme-toggle";
+import { CompactThemeToggle, ThemeToggle } from "./theme-toggle";
 import { WorkHoursStatusMenu } from "./work-hours-status-menu";
 
 export function DashboardShell({
@@ -196,6 +196,9 @@ export function DashboardShell({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
+              <div className="sm:hidden">
+                <CompactThemeToggle />
+              </div>
               <div className="hidden sm:block">
                 <ThemeToggle />
               </div>
