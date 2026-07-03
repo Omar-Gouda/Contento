@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext, PermissionGrant } from "@/lib/auth/permissions";
-import { AuthorizationError, hasPermission, hasRole } from "@/lib/auth/permissions";
+import { hasPermission, hasRole } from "@/lib/auth/permissions";
 import { hasSupabaseRuntimeConfig } from "@/lib/env";
 import type { Database } from "@/types/database";
 import {
@@ -358,7 +358,7 @@ export async function requirePermission(
   const context = await requireAuthContext();
 
   if (!hasPermission(context, permissionKey, minimumAccess)) {
-    throw new AuthorizationError();
+    redirect(`${getDefaultDashboardPath(context.role)}?error=permission-denied`);
   }
 
   return context;

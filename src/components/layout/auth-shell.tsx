@@ -226,10 +226,10 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main className="relative min-h-svh overflow-hidden bg-background">
+    <main className="relative min-h-[100svh] overflow-hidden bg-background">
       <section
         id="auth-form"
-        className="relative z-0 flex min-h-svh items-center justify-center px-4 py-12"
+        className="relative z-0 flex min-h-[100svh] items-center justify-center px-4 py-12"
       >
         <div
           aria-hidden={!unlocked}
@@ -261,7 +261,7 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
         onPointerCancel={finishDrag}
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,color-mix(in_oklch,var(--primary),transparent_70%),transparent_34%),radial-gradient(circle_at_82%_78%,color-mix(in_oklch,var(--accent),transparent_62%),transparent_30%),linear-gradient(135deg,var(--background),var(--secondary))]" />
-        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-5 sm:px-8">
+        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-4 py-4 sm:px-8 sm:py-5">
           <SiteLogo />
           <div className="rounded-full border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
             Contento
@@ -270,7 +270,7 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
 
         <div
           className={cn(
-            "relative z-10 mx-auto flex min-h-svh w-full max-w-6xl flex-col items-center justify-center px-5 py-24 text-center",
+            "relative z-10 mx-auto flex min-h-[100svh] w-full max-w-6xl flex-col items-center justify-center px-4 pb-6 pt-20 text-center sm:px-5 sm:py-24",
             transitionClass
           )}
           style={{
@@ -278,22 +278,22 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
             transform: `translate3d(0, ${contentLift}, 0)`,
           }}
         >
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-sm font-medium text-primary shadow-sm backdrop-blur">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-medium text-primary shadow-sm backdrop-blur sm:mb-5 sm:text-sm">
             <Sparkles className="size-4" />
             Content operations, unlocked
           </div>
-          <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] tracking-normal text-foreground sm:text-6xl lg:text-7xl">
+          <h1 className="max-w-4xl text-3xl font-semibold leading-tight tracking-normal text-foreground sm:text-6xl sm:leading-[1.02] lg:text-7xl">
             Because great ideas deserve better than sticky notes.
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:mt-6 sm:text-lg sm:leading-8">
             Plan content, manage clients, review ideas, and keep every campaign moving.
           </p>
 
-          <div className="mt-10 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid w-full max-w-3xl grid-cols-3 gap-2 sm:mt-10 sm:gap-3">
             {heroStats.map((stat) => (
-              <div key={stat.label} className="rounded-2xl border bg-background/70 px-4 py-4 shadow-sm backdrop-blur">
-                <p className="text-2xl font-semibold">{stat.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+              <div key={stat.label} className="rounded-xl border bg-background/70 px-2 py-3 shadow-sm backdrop-blur sm:rounded-2xl sm:px-4 sm:py-4">
+                <p className="text-lg font-semibold sm:text-2xl">{stat.value}</p>
+                <p className="mt-1 text-[10px] leading-4 text-muted-foreground sm:text-xs">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -301,15 +301,15 @@ function SignInLockScreen({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={revealForm}
-            className="mt-12 inline-flex items-center gap-3 rounded-full border bg-background/80 px-5 py-3 text-sm font-semibold shadow-xl backdrop-blur transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="mt-6 inline-flex items-center gap-3 rounded-full border bg-background/80 px-4 py-2.5 text-sm font-semibold shadow-xl backdrop-blur transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:mt-12 sm:px-5 sm:py-3"
           >
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <span className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground sm:size-8">
               <ChevronUp className="size-4 animate-bounce motion-reduce:animate-none" />
             </span>
             Swipe up to continue
           </button>
 
-          <div className="mt-8 flex flex-col items-center gap-2 text-muted-foreground">
+          <div className="mt-8 hidden flex-col items-center gap-2 text-muted-foreground sm:flex">
             <div className="h-16 w-px rounded-full bg-gradient-to-b from-transparent via-current to-transparent opacity-50" />
             <ChevronUp className="size-5 animate-bounce opacity-70 motion-reduce:animate-none" />
           </div>

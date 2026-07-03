@@ -2,9 +2,11 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
-import { Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { AlertCircle, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 
 import { SignOutButton } from "@/components/forms/sign-out-button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -52,6 +54,7 @@ export function DashboardShell({
     accentColor: string | null;
   } | null;
 }) {
+  const searchParams = useSearchParams();
   const contentoMarkSrc = "/brand/contento-mark.svg";
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") {
@@ -233,6 +236,15 @@ export function DashboardShell({
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">
+          {searchParams.get("error") === "permission-denied" && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertCircle className="size-4" />
+              <AlertTitle>Permission denied</AlertTitle>
+              <AlertDescription>
+                Your role does not have access to that workspace area. You have been returned to your dashboard.
+              </AlertDescription>
+            </Alert>
+          )}
           {children}
         </main>
       </div>
