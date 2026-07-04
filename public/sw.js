@@ -1,10 +1,16 @@
-const CACHE_NAME = "contento-shell-v2";
+const CACHE_NAME = "contento-shell-v3";
 const SHELL_ASSETS = [
   "/",
   "/offline.html",
   "/favicon.ico",
+  "/favicon.svg",
   "/brand/contento-mark.svg",
+  "/brand/contento-icon.svg",
   "/brand/contento-logo.svg",
+  "/brand/contento-logo-dark.svg",
+  "/brand/contento-logo-light.svg",
+  "/android-192.png",
+  "/android-512.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/apple-touch-icon.png",
@@ -67,8 +73,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Contento";
   const options = {
     body: payload.body || payload.message || "You have a new workspace update.",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    icon: "/android-192.png",
+    badge: "/android-192.png",
     data: {
       url: payload.url || payload.link_href || "/",
     },

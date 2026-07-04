@@ -198,7 +198,7 @@ export function NotificationMenu({
           ) {
             const desktopNotification = new window.Notification(newestUnread.title, {
               body: newestUnread.message || "You have a new Contento update.",
-              icon: "/icons/icon-192.png",
+              icon: "/android-192.png",
             });
 
             desktopNotification.onclick = () => {

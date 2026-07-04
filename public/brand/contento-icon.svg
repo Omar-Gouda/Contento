@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Contento icon">
+  <defs>
+    <linearGradient id="bg" x1="72" y1="64" x2="440" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C084FC"/>
+      <stop offset=".42" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#3B0FA8"/>
+    </linearGradient>
+    <linearGradient id="c" x1="130" y1="112" x2="387" y2="399" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4E8FF"/>
+      <stop offset=".18" stop-color="#E9D5FF"/>
+      <stop offset=".5" stop-color="#9D5CFF"/>
+      <stop offset=".78" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#4C1D95"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="221" y1="143" x2="359" y2="327" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E1065" stop-opacity=".05"/>
+      <stop offset=".48" stop-color="#3B0764" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#120322" stop-opacity=".7"/>
+    </linearGradient>
+    <filter id="shadow" x="82" y="80" width="352" height="360" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="22" flood-color="#240046" flood-opacity=".38"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M448 144v224c0 44-36 80-80 80H144c-44 0-80-36-80-80V144c0-44 36-80 80-80h224c44 0 80 36 80 80Z" fill="#0F0B1A" opacity=".1"/>
+  <g filter="url(#shadow)">
+    <path d="M269 91c75 0 140 40 176 100l-78 54c-19-35-56-58-99-58-62 0-112 50-112 112s50 112 112 112c43 0 80-24 99-59l78 54c-36 61-101 101-176 101-115 0-208-93-208-208S154 91 269 91Z" fill="url(#c)"/>
+    <path d="M356 189c-19-19-48-33-87-33-79 0-143 64-143 143 0 27 7 52 20 74-39-38-54-98-33-151 25-66 91-108 163-98 35 5 63 20 80 65Z" fill="#F5E9FF" opacity=".42"/>
+    <path d="M367 245 246 366c-16 16-7 43 16 46 44 6 85-15 106-59l77 53c-35 59-98 99-171 101-51 1-98-17-134-48L367 245Z" fill="url(#fold)" opacity=".9"/>
+    <path d="M341 294c0 39-32 71-72 71s-71-32-71-71 32-72 71-72 72 32 72 72Z" fill="#0F0B1A"/>
+  </g>
+</svg>

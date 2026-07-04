@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Contento favicon">
+  <defs>
+    <linearGradient id="g" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9D5FF"/><stop offset=".35" stop-color="#9D5CFF"/><stop offset=".68" stop-color="#7C3AED"/><stop offset="1" stop-color="#3B0FA8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0F0B1A"/>
+  <path d="M35 11c10 0 19 5 24 14l-11 8c-3-5-8-8-14-8-9 0-16 7-16 16s7 16 16 16c6 0 11-3 14-8l11 8c-5 9-14 14-24 14-17 0-30-13-30-30s13-30 30-30Z" fill="url(#g)" transform="translate(0 -4)"/>
+  <circle cx="35" cy="37" r="8" fill="#0F0B1A"/>
+</svg>

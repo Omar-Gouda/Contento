@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 220" role="img" aria-label="Contento monochrome logo">
+  <g fill="currentColor">
+    <path d="M154 43c56 0 104 30 131 75l-58 40c-14-26-42-43-73-43-46 0-84 38-84 84s38 84 84 84c31 0 59-18 73-44l58 40c-27 45-75 75-131 75-85 0-154-69-154-155S69 43 154 43Z"/>
+    <circle cx="154" cy="199" r="31" fill="white" opacity=".9"/>
+  </g>
+  <text x="330" y="118" fill="currentColor" font-family="Inter, Avenir Next, Montserrat, ui-sans-serif, system-ui, sans-serif" font-size="76" font-weight="500" letter-spacing="6">contento</text>
+  <text x="336" y="164" fill="currentColor" opacity=".72" font-family="Inter, Avenir Next, Montserrat, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" letter-spacing="7">CREATE. CONTENT. IMPACT.</text>
+</svg>

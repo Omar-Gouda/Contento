@@ -4,17 +4,33 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Contento",
     short_name: "Contento",
-    description: "Content operations, collaboration, reports, and calendar planning for modern teams.",
+    description: "Premium content operations for agencies managing clients, ideas, reports, and approvals.",
     start_url: "/",
     scope: "/",
     display: "standalone",
-    background_color: "#0f0a1f",
-    theme_color: "#7c3aed",
+    background_color: "#0F0B1A",
+    theme_color: "#7C3AED",
     icons: [
       {
-        src: "/brand/contento-mark.svg",
+        src: "/favicon.svg",
         sizes: "any",
         type: "image/svg+xml",
+      },
+      {
+        src: "/android-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        src: "/android-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+      {
+        src: "/maskable-icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+        purpose: "maskable",
       },
       {
         src: "/icons/icon-192.png",
@@ -30,12 +46,6 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/icon-512.png",
         sizes: "512x512",
         type: "image/png",
-        purpose: "maskable",
-      },
-      {
-        src: "/brand/contento-mark.svg",
-        sizes: "any",
-        type: "image/svg+xml",
         purpose: "maskable",
       },
       {

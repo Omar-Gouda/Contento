@@ -17,15 +17,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { AuthContext } from "@/lib/auth/permissions";
-import type { OrganizationChatData } from "@/lib/chat/queries";
 import type { NotificationRow } from "@/lib/notifications/queries";
 import type { NotificationPreferences } from "@/lib/settings/queries";
 import type { CurrentWorkHours } from "@/lib/work-hours/queries";
 import { cn } from "@/lib/utils";
 import { getRoleDisplayName } from "@/types/roles";
 import { DashboardMobileBottomNavigation, DashboardNavigation } from "./dashboard-navigation";
+import { ChatMaintenanceButton } from "./chat-maintenance-button";
 import { NotificationMenu } from "./notification-menu";
-import { OrganizationChatDrawer } from "./organization-chat-drawer";
 import { CompactThemeToggle, ThemeToggle } from "./theme-toggle";
 import { WorkHoursStatusMenu } from "./work-hours-status-menu";
 
@@ -35,7 +34,6 @@ export function DashboardShell({
   unreadNotificationCount,
   recentNotifications = [],
   notificationPreferences,
-  chatData,
   branding,
   workHours,
 }: {
@@ -44,7 +42,6 @@ export function DashboardShell({
   unreadNotificationCount?: number;
   recentNotifications?: NotificationRow[];
   notificationPreferences?: NotificationPreferences;
-  chatData?: OrganizationChatData;
   workHours?: CurrentWorkHours | null;
   branding?: {
     companyName?: string | null;
@@ -214,11 +211,7 @@ export function DashboardShell({
                 initialDesktopEnabled={notificationPreferences?.desktop ?? false}
               />
               {workHours !== undefined && <WorkHoursStatusMenu workHours={workHours} />}
-              <OrganizationChatDrawer
-                data={chatData ?? { conversations: [], recipients: [] }}
-                currentUserId={context.userId}
-                companyId={context.companyId}
-              />
+              <ChatMaintenanceButton />
               <div className="hidden sm:block">
                 <SignOutButton
                   hasActiveWorkSession={Boolean(workHours?.activeWorkSession)}
