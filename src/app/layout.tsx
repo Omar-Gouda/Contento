@@ -14,28 +14,65 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  applicationName: "Contento",
   title: {
     default: "Contento",
     template: "%s | Contento",
   },
   description:
-    "A multi-company SaaS foundation for content operations, approvals, reporting, schedules, and role-based dashboards.",
+    "Premium content operations software for agencies managing clients, ideas, tasks, reports, approvals, and growth.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     title: "Contento",
     statusBarStyle: "black-translucent",
   },
+  openGraph: {
+    title: "Contento",
+    description:
+      "Plan content, manage clients, review ideas, and keep every campaign moving with Contento.",
+    siteName: "Contento",
+    type: "website",
+    images: [
+      {
+        url: "/android-512.png",
+        width: 512,
+        height: 512,
+        alt: "Contento",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Contento",
+    description:
+      "Premium content operations software for modern marketing agencies.",
+    images: ["/android-512.png"],
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", type: "image/x-icon" },
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/android-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/android-512.png", sizes: "512x512", type: "image/png" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
     shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
+    other: [
+      {
+        rel: "mask-icon",
+        url: "/mask-icon.svg",
+        color: "#7c3aed",
+      },
+    ],
   },
 };
 

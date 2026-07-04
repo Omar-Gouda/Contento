@@ -164,7 +164,12 @@ export function AvatarUpload({
         {previewUrl ? (
           // Private Supabase Storage paths are rendered through short-lived signed URLs.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt={`${displayName} avatar`} className="size-full object-cover" />
+          <img
+            src={previewUrl}
+            alt={`${displayName} avatar`}
+            className="size-full object-cover"
+            onError={() => setPreviewUrl(null)}
+          />
         ) : (
           displayName
             .split(" ")

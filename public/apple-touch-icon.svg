@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Contento">
-  <rect width="180" height="180" rx="40" fill="#7c3aed"/>
-  <path fill="#fff" d="M52 57c0-10 8-18 18-18h41c12 0 21 9 21 21v8h-22v-5c0-3-2-5-5-5H76c-3 0-5 2-5 5v54c0 3 2 5 5 5h29c3 0 5-2 5-5v-6h22v9c0 12-9 21-21 21H70c-10 0-18-8-18-18V57Z"/>
+  <defs><linearGradient id="g" x1="24" y1="20" x2="156" y2="160" gradientUnits="userSpaceOnUse"><stop stop-color="#C084FC"/><stop offset=".44" stop-color="#7C3AED"/><stop offset="1" stop-color="#3B0FA8"/></linearGradient></defs>
+  <rect width="180" height="180" rx="40" fill="url(#g)"/>
+  <path d="M95 28c27 0 51 14 64 36l-29 20c-7-13-20-22-36-22-24 0-43 19-43 43s19 43 43 43c16 0 29-9 36-22l29 20c-13 22-37 36-64 36-43 0-78-35-78-78s35-76 78-76Z" fill="#F5E9FF" transform="translate(0 -14)"/>
+  <circle cx="95" cy="104" r="23" fill="#0F0B1A"/>
 </svg>

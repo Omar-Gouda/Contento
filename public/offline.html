@@ -16,17 +16,28 @@
         margin: 0;
         display: grid;
         place-items: center;
-        background: #f8fafc;
-        color: #18181b;
+        background:
+          radial-gradient(circle at 20% 18%, rgba(124, 58, 237, 0.28), transparent 34%),
+          radial-gradient(circle at 82% 80%, rgba(192, 132, 252, 0.18), transparent 28%),
+          #0f0b1a;
+        color: #f8fafc;
       }
 
       main {
         width: min(32rem, calc(100vw - 2rem));
-        border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+        border: 1px solid rgba(233, 213, 255, 0.16);
         border-radius: 18px;
         padding: 2rem;
-        background: color-mix(in srgb, canvas 94%, #7c3aed 6%);
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.16);
+        background: rgba(15, 11, 26, 0.78);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(22px);
+      }
+
+      img {
+        width: 12rem;
+        max-width: 70%;
+        height: auto;
+        margin-bottom: 1.75rem;
       }
 
       h1 {
@@ -37,7 +48,7 @@
       p {
         margin: 0.75rem 0 0;
         line-height: 1.6;
-        color: color-mix(in srgb, currentColor 68%, transparent);
+        color: rgba(248, 250, 252, 0.7);
       }
 
       a {
@@ -56,6 +67,7 @@
   </head>
   <body>
     <main>
+      <img src="/brand/contento-logo-dark.svg" alt="Contento" />
       <h1>Contento is offline</h1>
       <p>The app shell is available, but this page needs a network connection to load fresh workspace data.</p>
       <a href="/">Try again</a>

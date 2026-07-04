@@ -53,7 +53,7 @@ export function PwaProvider() {
       <div className="flex items-start gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-primary">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/contento-mark.svg" alt="" className="size-full object-cover" />
+          <img src="/brand/contento-icon.svg" alt="" className="size-full object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">Install Contento</p>

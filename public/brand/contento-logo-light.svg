@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 220" role="img" aria-label="Contento">
+  <defs>
+    <linearGradient id="brand" x1="22" y1="20" x2="172" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9D5FF"/><stop offset=".2" stop-color="#C084FC"/><stop offset=".52" stop-color="#7C3AED"/><stop offset=".82" stop-color="#5B21B6"/><stop offset="1" stop-color="#2E1065"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="86" y1="56" x2="160" y2="154" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F0B1A" stop-opacity="0"/><stop offset=".55" stop-color="#1E0648" stop-opacity=".48"/><stop offset="1" stop-color="#0B0317" stop-opacity=".68"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(26 25)">
+    <path d="M103 0c60 0 111 32 140 80l-62 43c-15-28-45-47-78-47-50 0-90 40-90 90s40 90 90 90c34 0 63-19 78-47l62 43c-29 48-80 80-140 80C12 332-62 258-62 166S12 0 103 0Z" fill="url(#brand)" transform="translate(62 -1) scale(.62)"/>
+    <path d="M181 123 92 212c-12 12-5 31 12 34 34 5 67-11 84-45l59 41c-27 46-76 77-133 78-40 1-76-13-104-37l171-160Z" fill="url(#fold)" transform="translate(22 -4) scale(.82)"/>
+    <circle cx="119" cy="102" r="33" fill="#FFFFFF"/>
+  </g>
+  <text x="218" y="118" fill="#0F0B1A" font-family="Inter, Avenir Next, Montserrat, ui-sans-serif, system-ui, sans-serif" font-size="76" font-weight="500" letter-spacing="6">contento</text>
+  <text x="224" y="164" fill="#7C3AED" font-family="Inter, Avenir Next, Montserrat, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="700" letter-spacing="7">CREATE. CONTENT. IMPACT.</text>
+</svg>

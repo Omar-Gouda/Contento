@@ -124,7 +124,12 @@ function LogoUploadForm({
         {previewUrl ? (
           // Private storage paths are rendered through signed URLs. Object-fit provides a safe square crop preview.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={previewUrl} alt={`${fallbackLabel} logo`} className="size-full object-cover object-center" />
+          <img
+            src={previewUrl}
+            alt={`${fallbackLabel} logo`}
+            className="size-full object-cover object-center"
+            onError={() => setPreviewUrl(null)}
+          />
         ) : (
           initials || "C"
         )}

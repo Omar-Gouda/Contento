@@ -56,6 +56,10 @@ export default async function AccountInactivePage() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
+        <span className="mb-2 flex size-12 overflow-hidden rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/contento-mark.svg" alt="" className="size-full object-cover" />
+        </span>
         <CardTitle>Workspace access unavailable</CardTitle>
         <CardDescription>
           This account cannot access Contento dashboards right now.

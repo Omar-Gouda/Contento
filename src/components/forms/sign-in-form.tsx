@@ -61,8 +61,18 @@ export function SignInForm({ resetSuccess = false }: { resetSuccess?: boolean })
     <Card className="w-full max-w-md">
       <CardHeader>
         <div className="mb-2 flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/contento-logo.svg" alt="Contento" className="h-12 w-auto" />
+          <div className="flex items-center gap-3" aria-label="Contento">
+            <span className="flex size-11 overflow-hidden rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/contento-mark.svg" alt="" className="size-full object-cover" />
+            </span>
+            <span className="text-left leading-none">
+              <span className="block text-lg font-semibold tracking-[0.14em]">contento</span>
+              <span className="mt-1 block text-[0.6rem] font-bold uppercase tracking-[0.28em] text-primary">
+                Create. Content. Impact.
+              </span>
+            </span>
+          </div>
         </div>
         <CardTitle>Sign in to Contento</CardTitle>
         <CardDescription>
