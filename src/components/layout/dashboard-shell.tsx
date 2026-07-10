@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 
@@ -18,6 +19,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import type { AuthContext } from "@/lib/auth/permissions";
+import { isSubscriptionReadOnly, type OrganizationSubscription } from "@/lib/billing/constants";
 import type { NotificationRow } from "@/lib/notifications/queries";
 import type { NotificationPreferences } from "@/lib/settings/queries";
 import type { CurrentWorkHours } from "@/lib/work-hours/queries";
@@ -37,6 +39,7 @@ export function DashboardShell({
   notificationPreferences,
   branding,
   workHours,
+  subscription,
 }: {
   children: ReactNode;
   context: AuthContext;
@@ -44,6 +47,7 @@ export function DashboardShell({
   recentNotifications?: NotificationRow[];
   notificationPreferences?: NotificationPreferences;
   workHours?: CurrentWorkHours | null;
+  subscription?: OrganizationSubscription | null;
   branding?: {
     companyName?: string | null;
     logoUrl?: string | null;
@@ -67,6 +71,34 @@ export function DashboardShell({
     ...(branding?.accentColor ? { "--accent": branding.accentColor } : {}),
   } as CSSProperties;
   const organizationName = branding?.companyName ?? "Workspace";
+  const subscriptionIsReadOnly = isSubscriptionReadOnly(subscription?.status);
+  const billingBanner = subscription
+    ? subscription.status === "trial_active"
+      ? {
+        title: "Free trial active",
+        description: subscription.trial_ends_at
+          ? `Your Contento trial runs until ${new Date(subscription.trial_ends_at).toLocaleDateString()}.`
+          : "Your Contento trial is active.",
+      }
+      : subscription.status === "grace_period"
+        ? {
+          title: "Your free trial has ended",
+          description: subscription.grace_ends_at
+            ? `Workspace is read-only. Renew before ${new Date(subscription.grace_ends_at).toLocaleDateString()} to avoid scheduled deletion.`
+            : "Workspace is read-only. Renew within the 10 Egypt business-day grace period.",
+        }
+        : subscription.status === "scheduled_deletion"
+          ? {
+            title: "Subscription inactive",
+            description: "Workspace is read-only and scheduled for Super Admin deletion review.",
+          }
+          : subscription.status === "expired"
+            ? {
+              title: "Subscription expired",
+              description: "Workspace is read-only until billing is renewed.",
+            }
+            : null
+    : null;
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -231,6 +263,23 @@ export function DashboardShell({
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">
           {context.isDemo && <DemoWorkspaceBanner context={context} />}
+          {billingBanner && !context.isDemo && (
+            <Alert variant={subscriptionIsReadOnly ? "destructive" : "default"} className="mb-6">
+              <AlertCircle className="size-4" />
+              <AlertTitle>{billingBanner.title}</AlertTitle>
+              <AlertDescription>
+                {billingBanner.description}
+                {context.role === "admin" && (
+                  <>
+                    {" "}
+                    <Link href="/settings/billing" className="font-medium underline underline-offset-4">
+                      Open billing
+                    </Link>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           {searchParams.get("error") === "permission-denied" && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="size-4" />

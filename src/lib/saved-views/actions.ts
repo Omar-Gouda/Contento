@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/auth/context";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
 
@@ -17,12 +18,24 @@ function safeRedirect(pathname: string, key: "notice" | "error", value: string):
   redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
 }
 
-export async function saveViewAction(formData: FormData) {
+async function requireWritableSavedViews(redirectTo: string) {
   const context = await requirePermission("saved_views.manage", "limited");
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    safeRedirect(redirectTo, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
+}
+
+export async function saveViewAction(formData: FormData) {
   const name = formString(formData, "name").trim();
   const moduleName = formString(formData, "module").trim();
   const redirectTo = formString(formData, "redirectTo") || "/tasks";
   const filtersRaw = formString(formData, "filtersJson") || "{}";
+  const context = await requireWritableSavedViews(redirectTo);
 
   if (!name || !moduleName) {
     safeRedirect(redirectTo, "error", "Saved view name is required.");
@@ -56,9 +69,9 @@ export async function saveViewAction(formData: FormData) {
 }
 
 export async function deleteViewAction(formData: FormData) {
-  const context = await requirePermission("saved_views.manage", "limited");
   const viewId = formString(formData, "viewId");
   const redirectTo = formString(formData, "redirectTo") || "/tasks";
+  const context = await requireWritableSavedViews(redirectTo);
 
   if (!viewId) {
     safeRedirect(redirectTo, "error", "Saved view is invalid.");

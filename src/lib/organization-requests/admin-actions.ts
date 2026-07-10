@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 
 import { requireSuperiorAdminContext } from "@/lib/auth/context";
+import { createTrialPendingSubscription } from "@/lib/billing/service";
 import { hasSupabaseAdminConfig } from "@/lib/env";
 import {
   organizationRequestRejectSchema,
@@ -213,6 +214,8 @@ export async function approveOrganizationRequestAction(formData: FormData) {
       },
     })
     .eq("id", request.id);
+
+  await createTrialPendingSubscription(companyId);
 
   await logRequestActivity(admin, platformAdminId, "organization_requests.approved", request.id, {
     company_id: companyId,

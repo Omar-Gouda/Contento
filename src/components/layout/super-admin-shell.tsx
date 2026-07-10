@@ -8,6 +8,7 @@ import {
   Building2,
   ChevronDown,
   ClipboardCheck,
+  CreditCard,
   LayoutDashboard,
   Menu,
   PanelLeftClose,
@@ -62,6 +63,7 @@ const platformGroups: PlatformGroup[] = [
     items: [
       { label: "All organizations", href: routes.superiorAdmin.organizations, icon: Building2 },
       { label: "Organization requests", href: routes.superiorAdmin.organizationRequests, icon: ClipboardCheck },
+      { label: "Billing", href: routes.superiorAdmin.billing, icon: CreditCard },
     ],
   },
 ];

@@ -3,6 +3,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { hasSupabaseAdminConfig } from "@/lib/env";
 import { resolveAuthProfile } from "@/lib/auth/context";
+import { normalizeBillingEmail } from "@/lib/billing/constants";
 import { organizationRequestSchema } from "@/lib/organization-requests/schemas";
 import type { OrganizationRequestActionState } from "@/lib/organization-requests/state";
 
@@ -72,6 +73,20 @@ export async function submitOrganizationRequestAction(
   }
 
   const admin = createSupabaseAdminClient();
+  const normalizedEmail = normalizeBillingEmail(parsed.data.businessEmail);
+  const { data: blacklistedEmail } = await admin
+    .from("trial_blacklist")
+    .select("id")
+    .eq("normalized_email", normalizedEmail)
+    .maybeSingle();
+
+  if (blacklistedEmail?.id) {
+    return {
+      success: false,
+      message: "This email is not eligible for another free trial.",
+    };
+  }
+
   const { data, error } = await admin
     .from("organization_requests")
     .insert({

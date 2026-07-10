@@ -102,6 +102,8 @@ The app root route redirects to `/sign-in`. Contento is currently an authenticat
 - Report creation is automated by default from live task, idea publishing, content, comment, work-hours, and time-off data; users add optional notes and editable marketing metrics.
 - Core pages are view-only by default; authorized create, edit, manage, review, comment, and final-output actions open in sheets or collapsed details sections.
 - Filters are collapsed by default with visible active chips on Clients, Tasks, Ideas, Content, Reports, Users, and Reviews.
+- Subscription billing foundation is in place with Starter, Growth, Business, and Enterprise plans, 1/5/7-year duration pricing, 30-day trials, a 10 Egypt business-day grace period, read-only inactive workspaces, manual InstaPay receipt upload, and Super Admin receipt review.
+- Billing uses manual InstaPay verification only. Online card or wallet payments are intentionally marked Coming Soon and no payment credentials are stored.
 
 ## Supabase
 
@@ -130,6 +132,11 @@ supabase/
     202607030002_contento_profile_stabilization.sql
     202607030003_contento_push_subscription_foundation.sql
     202607030004_contento_v7_recovery_and_org_hard_delete.sql
+    202607040001_contento_critical_ux_rbac_reports_hotfix.sql
+    202607100001_contento_public_demo_mode.sql
+    202607100002_contento_organization_requests.sql
+    202607100003_contento_demo_action_tagging.sql
+    202607100004_contento_subscription_billing.sql
 ```
 
 Apply migrations with the Supabase CLI or a trusted migration pipeline. Do not expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.
@@ -146,6 +153,9 @@ NEXT_PUBLIC_APP_ENV
 SUPABASE_SERVICE_ROLE_KEY
 DATABASE_URL
 SUPABASE_PROJECT_ID
+CONTENTO_INSTAPAY_NAME
+CONTENTO_INSTAPAY_HANDLE
+CONTENTO_INSTAPAY_PHONE
 ```
 
 Set `NEXT_PUBLIC_SITE_URL` to the production domain, for example `https://your-app.vercel.app`. In Supabase Auth, add the production site URL and callback URL, including:
@@ -171,3 +181,4 @@ supabase db lint --linked
 - Background workers, activity-log export, and advanced custom role/permission editing UI remain future enhancements.
 - Real Web Push delivery is prepared but not fully enabled. The app has notification permission UI, service worker push handlers, and subscription storage, but production push sending still needs VAPID keys and a trusted server-side delivery worker.
 - Permanent organization deletion removes tenant database rows transactionally first, then server-side code cleans storage objects and Supabase Auth users. Storage/Auth cleanup warnings are logged because they cannot share the database transaction.
+- Subscription grace processing is explicit through Super Admin billing controls. Expired grace periods are marked `scheduled_deletion` and blacklisted before a Super Admin performs the existing confirmation-gated hard delete.

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { clientAssignmentSchema, clientProfileSchema } from "@/lib/clients/schemas";
 import { requireAuthContext } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import { demoWriteMarker } from "@/lib/demo/markers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
@@ -55,6 +56,18 @@ function safeRedirect(pathname: string, key: "notice" | "error", value: string):
   revalidatePath("/", "layout");
   revalidatePath(destination);
   redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
+}
+
+async function requireWritableContext(pathname = "/clients") {
+  const context = await requireAuthContext();
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    safeRedirect(pathname, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
 }
 
 function normalizeClientSlug(value: string) {
@@ -435,7 +448,7 @@ async function updateClientContactUserStatus(
 }
 
 export async function assignClientUserAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableContext();
   const parsed = clientAssignmentSchema.safeParse({
     clientId: formString(formData, "clientId"),
     userId: formString(formData, "userId"),
@@ -502,7 +515,7 @@ export async function assignClientUserAction(formData: FormData) {
 }
 
 export async function removeClientUserAssignmentAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableContext();
   const parsed = clientAssignmentSchema.safeParse({
     clientId: formString(formData, "clientId"),
     userId: formString(formData, "userId"),
@@ -572,7 +585,7 @@ export async function removeClientUserAssignmentAction(formData: FormData) {
 }
 
 export async function saveClientAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableContext();
   const parsed = clientProfileSchema.safeParse({
     clientId: formString(formData, "clientId"),
     name: formString(formData, "name"),
@@ -808,7 +821,7 @@ export async function saveClientAction(formData: FormData) {
 }
 
 export async function updateClientLifecycleAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableContext();
   const clientId = formString(formData, "clientId");
   const status = formString(formData, "status");
   const disabledReason = formString(formData, "disabledReason").trim();
@@ -859,7 +872,7 @@ export async function updateClientLifecycleAction(formData: FormData) {
 }
 
 export async function deleteClientAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableContext();
   const clientId = formString(formData, "clientId");
 
   if (!clientId) {
@@ -894,8 +907,8 @@ export async function deleteClientAction(formData: FormData) {
 }
 
 export async function uploadClientLogoAction(formData: FormData) {
-  const context = await requireAuthContext();
   const clientId = formString(formData, "clientId");
+  const context = await requireWritableContext(clientId ? `/clients/${clientId}` : "/clients");
   const file = formData.get("logo");
   const canUpdateClient =
     hasPermission(context, "clients.update", "limited") ||
@@ -979,8 +992,8 @@ export async function uploadClientLogoAction(formData: FormData) {
 }
 
 export async function removeClientLogoAction(formData: FormData) {
-  const context = await requireAuthContext();
   const clientId = formString(formData, "clientId");
+  const context = await requireWritableContext(clientId ? `/clients/${clientId}` : "/clients");
   const canUpdateClient =
     hasPermission(context, "clients.update", "limited") ||
     hasPermission(context, "clients.manage", "limited");

@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/auth/context";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import { createNotificationForUser } from "@/lib/notifications/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { EntityType } from "@/lib/collaboration/queries";
@@ -22,6 +23,18 @@ function safeRedirect(pathname: string, key: "notice" | "error", value: string):
   redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
 }
 
+async function requireWritablePermission(permissionKey: string, redirectTo: string) {
+  const context = await requirePermission(permissionKey, "limited");
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    safeRedirect(redirectTo, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
+}
+
 function parseEntity(formData: FormData) {
   const entityType = formString(formData, "entityType");
   const entityId = formString(formData, "entityId");
@@ -35,8 +48,8 @@ function parseEntity(formData: FormData) {
 }
 
 export async function addCollaborationCommentAction(formData: FormData) {
-  const context = await requirePermission("comments.create", "limited");
   const { entityType, entityId, redirectTo } = parseEntity(formData);
+  const context = await requireWritablePermission("comments.create", redirectTo);
   const body = formString(formData, "body").trim();
   const mentionUserIds = formData.getAll("mentionUserIds").filter((value): value is string => typeof value === "string");
 
@@ -89,9 +102,9 @@ export async function addCollaborationCommentAction(formData: FormData) {
 }
 
 export async function deleteCollaborationCommentAction(formData: FormData) {
-  const context = await requirePermission("comments.delete", "limited");
   const commentId = formString(formData, "commentId");
   const redirectTo = formString(formData, "redirectTo") || "/tasks";
+  const context = await requireWritablePermission("comments.delete", redirectTo);
 
   if (!commentId) {
     safeRedirect(redirectTo, "error", "Invalid comment.");
@@ -112,8 +125,8 @@ export async function deleteCollaborationCommentAction(formData: FormData) {
 }
 
 export async function uploadAttachmentAction(formData: FormData) {
-  const context = await requirePermission("attachments.manage", "limited");
   const { entityType, entityId, redirectTo } = parseEntity(formData);
+  const context = await requireWritablePermission("attachments.manage", redirectTo);
   const file = formData.get("file");
 
   if (!(file instanceof File) || file.size === 0) {
@@ -158,9 +171,9 @@ export async function uploadAttachmentAction(formData: FormData) {
 }
 
 export async function deleteAttachmentAction(formData: FormData) {
-  const context = await requirePermission("attachments.manage", "limited");
   const attachmentId = formString(formData, "attachmentId");
   const redirectTo = formString(formData, "redirectTo") || "/tasks";
+  const context = await requireWritablePermission("attachments.manage", redirectTo);
 
   if (!attachmentId) {
     safeRedirect(redirectTo, "error", "Invalid attachment.");

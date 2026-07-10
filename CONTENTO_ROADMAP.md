@@ -295,6 +295,7 @@ Current Phase 9 implementation:
 * Profile avatar, organization logo, and client logo removal clears database paths and deletes private storage objects when available.
 * Temporary TODO/debug marker files were removed.
 * `npm run lint`, `npm run build`, and `supabase db lint --linked` are the required release checks.
+* Subscription billing foundation adds plan catalog, trial lifecycle, manual InstaPay receipt verification, Super Admin billing review, explicit expired-grace processing, and read-only inactive workspaces.
 
 ## Final Production SaaS Readiness
 
@@ -313,6 +314,7 @@ Implemented:
 * Role-scoped real analytics
 * Organization branding and settings
 * User profile management
+* Subscription/trial billing foundation with manual InstaPay receipts and Super Admin review
 * Content review scoring
 * Content template storage retained for existing reusable assets; standalone template management page removed from the active UI
 * Dashboard widget customization
@@ -322,6 +324,7 @@ Future enhancements:
 
 * Real-time notification delivery
 * Background workers for scheduled jobs
+* Real online payment integration for card/wallet checkout and automated renewal charging
 * Activity log export
 * Advanced custom role and permission editing UI
 * Rich text editing and media preview workflows

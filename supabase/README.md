@@ -26,6 +26,11 @@ This folder contains the database foundation for Contento.
 | `migrations/202607030002_contento_profile_stabilization.sql` | Adds user profile metadata, notification preferences, last-login/profile-completion timestamps, and narrow authenticated RPCs for self profile, avatar, notification preference, and login timestamp updates. |
 | `migrations/202607030003_contento_push_subscription_foundation.sql` | Adds future-ready Web Push subscription storage with company/user-scoped RLS. Delivery still requires VAPID keys and a trusted sender. |
 | `migrations/202607030004_contento_v7_recovery_and_org_hard_delete.sql` | Adds recovery-email profile fields/RPCs and a platform-admin-only transactional database RPC for permanent organization deletion. |
+| `migrations/202607040001_contento_critical_ux_rbac_reports_hotfix.sql` | Adds work-hours/report/search/chat/avatar hotfixes and report generation access hardening. |
+| `migrations/202607100001_contento_public_demo_mode.sql` | Adds public demo sandbox infrastructure and safe demo isolation. |
+| `migrations/202607100002_contento_organization_requests.sql` | Adds public demo organization request submissions for Super Admin review. |
+| `migrations/202607100003_contento_demo_action_tagging.sql` | Adds demo action tagging and cleanup support. |
+| `migrations/202607100004_contento_subscription_billing.sql` | Adds subscription plans, organization subscription lifecycle, manual InstaPay payment receipts, billing events, trial blacklist, and private receipt storage. |
 
 ## RLS Policy Model
 
@@ -63,6 +68,8 @@ Policy principles:
 * Report CSV export is server-side and requires `exports.reports`.
 * Generated reports are stored as new historical rows based on live task, content, work-hours, and time-off data.
 * Service-role access should remain server-only and must never be exposed to the browser.
+* Subscription billing RLS keeps billing rows company-scoped for tenant users and platform-scoped for Super Admins. Billing writes are performed only by server-only actions with trusted service-role access so browser clients cannot spoof subscription state or receipt metadata.
+* Read-only subscription states are enforced in application server actions because existing workflow tables remain readable under normal tenant RLS.
 
 ## Working-Hours Rules
 
@@ -83,6 +90,7 @@ The final production migration creates these Supabase Storage buckets:
 | --- | --- |
 | `contento-attachments` | Private task, idea, content, and report attachments. Paths are company-scoped. |
 | `contento-avatars` | Private user avatar uploads. Paths are company and user scoped. |
+| `contento-billing-receipts` | Private manual InstaPay receipt uploads. Paths are company and subscription scoped. |
 
 Do not make these buckets public unless the access model is deliberately redesigned.
 
@@ -94,5 +102,14 @@ Use the Supabase CLI or a trusted database migration pipeline to apply migration
 supabase db push --linked
 supabase db lint --linked
 ```
+
+Backfill existing organizations that predate subscription billing without starting trials:
+
+```bash
+node scripts/backfill-missing-subscriptions.mjs --dry-run
+node scripts/backfill-missing-subscriptions.mjs
+```
+
+The same operation is available to Super Admins from `/super-admin/billing` through **Backfill missing subscriptions**.
 
 Do not store database passwords or service-role keys in this repository.

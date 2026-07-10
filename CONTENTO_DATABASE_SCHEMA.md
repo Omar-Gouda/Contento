@@ -946,3 +946,13 @@ Migration `202607020001_contento_client_contract_password_storage_hotfix.sql` ad
 * Client lifecycle states: active, disabled, expired, and archived.
 * Automatic expiry normalization for active clients whose contract end date has passed in `Africa/Cairo`.
 * Company-scoped `expire_current_company_clients()` RPC that also disables assigned Client-role users for expired client workspaces.
+
+Migration `202607100004_contento_subscription_billing.sql` adds the subscription billing foundation:
+
+* `subscription_plans` stores Starter, Growth, Business, and Enterprise catalog rows with EGP yearly pricing.
+* `organization_subscriptions` stores one subscription lifecycle per organization, including trial dates, grace dates, current paid period, duration, manual payment method, and auto-renewal reminder intent.
+* `payment_receipts` stores private manual InstaPay receipt submissions for Super Admin review.
+* `billing_events` stores company-scoped trial, grace, receipt, activation, and deletion-scheduling audit events.
+* `trial_blacklist` stores normalized emails that are no longer eligible for another free trial.
+* Private `contento-billing-receipts` storage bucket stores receipt files.
+* RLS allows company users to read their own subscription/billing history. Billing writes run through server-only actions using trusted service-role access so receipt metadata, subscription status, and billing events cannot be spoofed from the browser.
