@@ -10,6 +10,7 @@ import {
   isSuperiorAdminRoute,
   type RedirectAuthState,
 } from "@/lib/auth/route-access";
+import { DEMO_SESSION_COOKIE } from "@/lib/demo/config";
 import { normalizeRoleName } from "@/types/roles";
 import type { Database } from "@/types/database";
 
@@ -18,13 +19,16 @@ type ProxyProfileRow = {
   role_id: string | null;
   status: "invited" | "active" | "suspended" | "disabled";
   must_change_password: boolean | null;
+  is_demo: boolean | null;
 };
 
 type ProxyCompanyRow = {
   status: Database["public"]["Enums"]["company_status"];
+  is_demo: boolean | null;
 };
 
 type ProxyRoleRow = {
+  id?: string;
   name: string;
 };
 
@@ -229,7 +233,7 @@ export async function proxy(request: NextRequest) {
   async function loadCompanyUserState(): Promise<RedirectAuthState> {
     const { data: profile, error: profileError } = await supabase
       .from("users")
-      .select("company_id, role_id, status, must_change_password")
+      .select("company_id, role_id, status, must_change_password, is_demo")
       .eq("id", userId)
       .maybeSingle();
     proxyTiming("proxy:profile", start);
@@ -278,18 +282,42 @@ export async function proxy(request: NextRequest) {
     const [{ data: company, error: companyError }, { data: roleData, error: roleError }] = await Promise.all([
       supabase
         .from("companies")
-        .select("status")
+        .select("status, is_demo")
         .eq("id", profileRow.company_id)
         .maybeSingle(),
       supabase
         .from("roles")
-        .select("name")
-        .eq("id", profileRow.role_id)
-        .maybeSingle(),
+        .select("id, name")
+        .eq("company_id", profileRow.company_id),
     ]);
 
     const companyRow = company as ProxyCompanyRow | null;
-    const roleRow = roleData as ProxyRoleRow | null;
+    const roleRows = (roleData as ProxyRoleRow[] | null) ?? [];
+    const isDemo = Boolean(profileRow.is_demo || companyRow?.is_demo);
+    let demoRoleName: string | null = null;
+
+    if (isDemo) {
+      const demoSessionId = request.cookies.get(DEMO_SESSION_COOKIE)?.value ?? null;
+
+      if (demoSessionId) {
+        const { data: demoSession } = await supabase
+          .from("demo_sessions")
+          .select("role_name")
+          .eq("id", demoSessionId)
+          .eq("company_id", profileRow.company_id)
+          .eq("auth_user_id", userId)
+          .eq("status", "active")
+          .gt("expires_at", new Date().toISOString())
+          .maybeSingle();
+
+        demoRoleName = demoSession?.role_name ?? null;
+      }
+    }
+
+    const demoRole = normalizeRoleName(demoRoleName);
+    const roleRow = isDemo
+      ? roleRows.find((row) => normalizeRoleName(row.name) === demoRole) ?? null
+      : roleRows.find((row) => row.id === profileRow.role_id) ?? null;
     const role = normalizeRoleName(roleRow?.name);
 
     authDebug.companyStatus = normalizeStatus(companyRow?.status);
@@ -314,6 +342,11 @@ export async function proxy(request: NextRequest) {
     if (companyStatus === "deleted" || companyStatus === "archived") {
       authDebug.branch = "organization_unavailable";
       return { state: "organization_unavailable" };
+    }
+
+    if (isDemo && !demoRole) {
+      authDebug.branch = "demo_needs_role";
+      return { state: "demo_needs_role" };
     }
 
     if (roleError || !roleRow?.name || !role) {

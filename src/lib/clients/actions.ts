@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { clientAssignmentSchema, clientProfileSchema } from "@/lib/clients/schemas";
 import { requireAuthContext } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
+import { demoWriteMarker } from "@/lib/demo/markers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
 import type { Database, Json } from "@/types/database";
@@ -239,6 +240,7 @@ async function logActivity(
     entity_type: "client",
     entity_id: entityId,
     metadata,
+    ...demoWriteMarker(context),
   });
 }
 
@@ -467,7 +469,7 @@ export async function assignClientUserAction(formData: FormData) {
     if (assignmentRole === "account_manager") {
       const { error: accountManagerError } = await supabase
         .from("clients")
-        .update({ assigned_account_manager_id: user.id })
+        .update({ assigned_account_manager_id: user.id, ...demoWriteMarker(context) })
         .eq("id", client.id)
         .eq("company_id", context.companyId);
 
@@ -480,6 +482,7 @@ export async function assignClientUserAction(formData: FormData) {
       client_id: client.id,
       user_id: user.id,
       assignment_role: assignmentRole,
+      ...demoWriteMarker(context),
     });
 
     if (error && error.code !== "23505") {
@@ -548,7 +551,7 @@ export async function removeClientUserAssignmentAction(formData: FormData) {
     if (parsed.data.assignmentRole === "account_manager" && client.assigned_account_manager_id === user.id) {
       const { error: accountManagerError } = await supabase
         .from("clients")
-        .update({ assigned_account_manager_id: null })
+        .update({ assigned_account_manager_id: null, ...demoWriteMarker(context) })
         .eq("id", client.id)
         .eq("company_id", context.companyId);
 
@@ -688,6 +691,7 @@ export async function saveClientAction(formData: FormData) {
     disabled_reason: parsed.data.status === "active" ? null : parsed.data.disabledReason || null,
     disabled_at: parsed.data.status === "active" ? null : new Date().toISOString(),
     status: parsed.data.status,
+    ...demoWriteMarker(context),
   };
 
   let result: { data: { id: string } | null; error: DatabaseError | null } = { data: null, error: null };
@@ -782,6 +786,7 @@ export async function saveClientAction(formData: FormData) {
     assignment_role: user.id === parsed.data.assignedAccountManagerId
       ? "account_manager"
       : assignmentRoleForUserRole(user.roles?.name),
+    ...demoWriteMarker(context),
   }));
 
   await supabase.from("client_assignments").delete().eq("client_id", clientId);
@@ -837,6 +842,7 @@ export async function updateClientLifecycleAction(formData: FormData) {
       status: nextStatus,
       disabled_at: nextStatus === "active" ? null : new Date().toISOString(),
       disabled_reason: nextStatus === "active" ? null : disabledReason || (nextStatus === "expired" ? "Contract end date has passed." : "Manually disabled."),
+      ...demoWriteMarker(context),
     })
     .eq("id", clientId)
     .eq("company_id", context.companyId);
@@ -899,6 +905,10 @@ export async function uploadClientLogoAction(formData: FormData) {
     safeRedirect("/clients", "error", "Client profile could not be resolved.");
   }
 
+  if (context.isDemo) {
+    safeRedirect(`/clients/${clientId}`, "error", "This action is disabled in demo mode.");
+  }
+
   if (!canUpdateClient) {
     safeRedirect(`/clients/${clientId}`, "error", "You do not have permission to update client profiles.");
   }
@@ -949,7 +959,7 @@ export async function uploadClientLogoAction(formData: FormData) {
 
   const { error } = await supabase
     .from("clients")
-    .update({ logo_url: path })
+    .update({ logo_url: path, ...demoWriteMarker(context) })
     .eq("id", clientId)
     .eq("company_id", context.companyId);
 
@@ -1003,7 +1013,7 @@ export async function removeClientLogoAction(formData: FormData) {
 
   const { error } = await supabase
     .from("clients")
-    .update({ logo_url: null })
+    .update({ logo_url: null, ...demoWriteMarker(context) })
     .eq("id", clientId)
     .eq("company_id", context.companyId);
 

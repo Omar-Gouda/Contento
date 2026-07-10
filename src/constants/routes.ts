@@ -8,6 +8,9 @@ export const routes = {
   accountInactive: "/account-inactive",
   organizationDisabled: "/organization-disabled",
   organizationUnavailable: "/organization-unavailable",
+  demo: {
+    chooseRole: "/demo/choose-role",
+  },
   profile: {
     home: "/profile",
     workHours: "/profile/work-hours",
@@ -46,6 +49,7 @@ export const routes = {
   superiorAdmin: {
     home: "/super-admin",
     organizations: "/super-admin/organizations",
+    organizationRequests: "/super-admin/organization-requests",
     organization: (id: string) => `/super-admin/organizations/${id}`,
   },
   dashboards: {

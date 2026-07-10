@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { AlertCircle, Menu, PanelLeftClose, PanelLeftOpen, ShieldCheck } from "lucide-react";
 
 import { SignOutButton } from "@/components/forms/sign-out-button";
+import { DemoWorkspaceBanner } from "@/components/demo/demo-workspace-banner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -229,6 +230,7 @@ export function DashboardShell({
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">
+          {context.isDemo && <DemoWorkspaceBanner context={context} />}
           {searchParams.get("error") === "permission-denied" && (
             <Alert variant="destructive" className="mb-6">
               <AlertCircle className="size-4" />

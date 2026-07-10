@@ -74,7 +74,7 @@ export async function CollaborationPanel({
         )}
 
         {canUpload && (
-          <form action={uploadAttachmentAction} encType="multipart/form-data" className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
+          <form action={uploadAttachmentAction} className="grid gap-3 rounded-lg border bg-secondary/30 p-3">
             <input type="hidden" name="entityType" value={entityType} />
             <input type="hidden" name="entityId" value={entityId} />
             <input type="hidden" name="redirectTo" value={redirectTo} />

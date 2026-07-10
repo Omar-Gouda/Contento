@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 
 import { signInAction, type AuthActionResult } from "@/lib/auth/actions";
 import { signInSchema, type SignInInput } from "@/lib/auth/schemas";
+import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo/config";
 import { routes } from "@/constants/routes";
 import {
   Alert,
@@ -36,6 +37,7 @@ export function SignInForm({ resetSuccess = false }: { resetSuccess?: boolean })
         }
       : null
   );
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
   const form = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -55,7 +57,19 @@ export function SignInForm({ resetSuccess = false }: { resetSuccess?: boolean })
     }
   }
 
-  const isSubmitting = form.formState.isSubmitting;
+  async function tryDemo() {
+    setDemoSubmitting(true);
+    form.setValue("email", DEMO_EMAIL, { shouldValidate: true });
+    form.setValue("password", DEMO_PASSWORD, { shouldValidate: true });
+
+    try {
+      await onSubmit({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+    } finally {
+      setDemoSubmitting(false);
+    }
+  }
+
+  const isSubmitting = form.formState.isSubmitting || demoSubmitting;
 
   return (
     <Card className="w-full max-w-md">
@@ -136,6 +150,17 @@ export function SignInForm({ resetSuccess = false }: { resetSuccess?: boolean })
             Sign in
           </Button>
         </form>
+
+        <div className="rounded-xl border bg-secondary/35 p-4 text-center">
+          <p className="text-sm font-medium">Want to explore before signing in?</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Try the public demo with temporary sandbox data and role switching.
+          </p>
+          <Button type="button" variant="outline" className="mt-3 w-full" onClick={tryDemo} disabled={isSubmitting}>
+            {demoSubmitting && <Loader2 className="animate-spin" />}
+            Try Contento Demo
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

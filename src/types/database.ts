@@ -23,6 +23,7 @@ export type Database = {
         logo_url: string | null;
         owner_user_id: string | null;
         status: Database["public"]["Enums"]["company_status"];
+        is_demo: boolean;
         created_at: string;
         updated_at: string;
       }>;
@@ -48,6 +49,9 @@ export type Database = {
         recovery_email_token_expires_at: string | null;
         last_login_at: string | null;
         profile_completed_at: string | null;
+        is_demo: boolean;
+        demo_session_id: string | null;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -76,6 +80,9 @@ export type Database = {
         status: Database["public"]["Enums"]["team_status"];
         team_lead_id: string | null;
         created_by: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -101,6 +108,9 @@ export type Database = {
         disabled_reason: string | null;
         status: "active" | "disabled" | "expired" | "archived";
         created_by: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -114,11 +124,17 @@ export type Database = {
           | "video_editor"
           | "client_contact"
           | "member";
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
       }>;
       team_members: Table<{
         team_id: string;
         user_id: string;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
       }>;
       tasks: Table<{
         id: string;
@@ -136,6 +152,9 @@ export type Database = {
         final_drive_link: string | null;
         final_output_submitted_at: string | null;
         final_output_submitted_by: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -145,6 +164,9 @@ export type Database = {
         task_id: string;
         user_id: string | null;
         body: string;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
       }>;
       ideas: Table<{
@@ -168,6 +190,9 @@ export type Database = {
         urgency: "low" | "normal" | "high" | "urgent";
         publishing_at: string | null;
         final_drive_link: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -189,6 +214,9 @@ export type Database = {
         final_drive_link: string | null;
         final_output_submitted_at: string | null;
         final_output_submitted_by: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -204,6 +232,9 @@ export type Database = {
         accuracy_score: number | null;
         overall_rating: number | null;
         score_comment: string;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         reviewed_at: string;
       }>;
       content_ratings: Table<{
@@ -213,6 +244,9 @@ export type Database = {
         reviewer_id: string | null;
         rating_value: number;
         comment: string;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
       }>;
       reports: Table<{
@@ -229,6 +263,9 @@ export type Database = {
         sent_to_client_by: string | null;
         date_range_start: string | null;
         date_range_end: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -245,6 +282,9 @@ export type Database = {
         start_date: string;
         end_date: string;
         created_by: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         updated_at: string;
       }>;
       day_off_requests: Table<{
@@ -258,6 +298,9 @@ export type Database = {
         status: Database["public"]["Enums"]["day_off_status"];
         reviewed_by: string | null;
         reviewed_at: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         updated_at: string;
       }>;
       notifications: Table<{
@@ -271,6 +314,9 @@ export type Database = {
         entity_id: string | null;
         link_href: string | null;
         read_at: string | null;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -315,6 +361,9 @@ export type Database = {
         entity_type: string;
         entity_id: string | null;
         metadata: Json;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
       }>;
       company_settings: Table<{
@@ -394,7 +443,53 @@ export type Database = {
         entity_type: string;
         entity_id: string | null;
         metadata: Json;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
+      }>;
+      organization_requests: Table<{
+        id: string;
+        status: "pending" | "approved" | "rejected" | "archived" | "ready_for_onboarding";
+        organization_name: string;
+        agency_name: string;
+        owner_full_name: string;
+        business_email: string;
+        phone: string;
+        country: string;
+        city: string;
+        agency_size: string;
+        number_of_employees: number;
+        expected_users: number;
+        expected_clients: number;
+        website: string | null;
+        industry: string;
+        preferred_contract: "monthly" | "yearly";
+        needs_enterprise_pricing: boolean;
+        additional_notes: string;
+        source_demo_session_id: string | null;
+        source_user_id: string | null;
+        reviewed_by: string | null;
+        reviewed_at: string | null;
+        rejection_reason: string | null;
+        archived_at: string | null;
+        approved_company_id: string | null;
+        approved_owner_user_id: string | null;
+        temporary_password_generated: boolean;
+        activation_email_placeholder: Json;
+        submitted_at: string;
+        created_at: string;
+        updated_at: string;
+      }>;
+      demo_sessions: Table<{
+        id: string;
+        company_id: string;
+        auth_user_id: string;
+        role_name: string | null;
+        status: "active" | "ended" | "expired";
+        expires_at: string;
+        created_at: string;
+        updated_at: string;
       }>;
       attachments: Table<{
         id: string;
@@ -406,6 +501,9 @@ export type Database = {
         file_path: string;
         file_type: string;
         file_size: number;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
       }>;
       comments: Table<{
@@ -415,6 +513,9 @@ export type Database = {
         entity_id: string;
         author_id: string | null;
         body: string;
+        demo_session_id: string | null;
+        created_by_demo: boolean;
+        demo_expires_at: string | null;
         created_at: string;
         updated_at: string;
         deleted_at: string | null;

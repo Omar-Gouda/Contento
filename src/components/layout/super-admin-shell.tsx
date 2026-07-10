@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   ChevronDown,
+  ClipboardCheck,
   LayoutDashboard,
   Menu,
   PanelLeftClose,
@@ -58,7 +59,10 @@ const platformGroups: PlatformGroup[] = [
     id: "organizations",
     label: "Organizations",
     icon: Building2,
-    items: [{ label: "All organizations", href: routes.superiorAdmin.organizations, icon: Building2 }],
+    items: [
+      { label: "All organizations", href: routes.superiorAdmin.organizations, icon: Building2 },
+      { label: "Organization requests", href: routes.superiorAdmin.organizationRequests, icon: ClipboardCheck },
+    ],
   },
 ];
 

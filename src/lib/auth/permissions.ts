@@ -24,6 +24,9 @@ export type AuthContext = {
   status: "invited" | "active" | "suspended" | "disabled";
   mustChangePassword: boolean;
   permissions: PermissionGrant[];
+  isDemo?: boolean;
+  demoSessionId?: string | null;
+  demoExpiresAt?: string | null;
 };
 
 export function hasRole(context: AuthContext | null, roles: UserRole | UserRole[]) {

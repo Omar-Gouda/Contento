@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext, PermissionGrant } from "@/lib/auth/permissions";
 import { hasPermission, hasRole } from "@/lib/auth/permissions";
 import { hasSupabaseRuntimeConfig } from "@/lib/env";
+import { getActiveDemoSession } from "@/lib/demo/server";
 import type { Database } from "@/types/database";
 import {
   getDefaultDashboardPath,
@@ -22,8 +23,15 @@ type ProfileRow = {
   role_id: string | null;
   status: AuthContext["status"];
   must_change_password: boolean | null;
+  is_demo: boolean | null;
+  demo_session_id: string | null;
+  demo_expires_at: string | null;
 };
 
+type CompanyRow = {
+  status: Database["public"]["Enums"]["company_status"];
+  is_demo: boolean | null;
+};
 type CompanyStatus = Database["public"]["Enums"]["company_status"];
 
 type RoleRow = {
@@ -58,6 +66,7 @@ export type AuthProfileResolution =
   | { state: "unauthenticated" }
   | { state: "superior_admin"; user: AuthUserSummary; superiorAdmin: SuperiorAdminContext }
   | { state: "missing_profile"; user: AuthUserSummary }
+  | { state: "demo_needs_role"; user: AuthUserSummary; profile: ProfileRow }
   | { state: "organization_disabled"; user: AuthUserSummary; profile: ProfileRow; companyStatus: CompanyStatus }
   | { state: "organization_unavailable"; user: AuthUserSummary; profile: ProfileRow; companyStatus: CompanyStatus }
   | { state: "inactive"; user: AuthUserSummary; profile: ProfileRow }
@@ -124,7 +133,7 @@ export async function loadAuthProfile(
 
   const { data: profile, error: profileError } = await supabase
     .from("users")
-    .select("id, company_id, email, first_name, last_name, role_id, status, must_change_password")
+    .select("id, company_id, email, first_name, last_name, role_id, status, must_change_password, is_demo, demo_session_id, demo_expires_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -157,7 +166,7 @@ export async function loadAuthProfile(
 
   const { data: company, error: companyError } = await supabase
     .from("companies")
-    .select("status")
+    .select("status, is_demo")
     .eq("id", profileRow.company_id)
     .maybeSingle();
 
@@ -169,32 +178,55 @@ export async function loadAuthProfile(
     };
   }
 
-  if (company.status === "disabled" || company.status === "suspended") {
+  const companyRow = company as CompanyRow;
+
+  if (companyRow.status === "disabled" || companyRow.status === "suspended") {
     return {
       state: "organization_disabled",
       user: authUser,
       profile: profileRow,
-      companyStatus: company.status,
+      companyStatus: companyRow.status,
     };
   }
 
-  if (company.status === "deleted" || company.status === "archived") {
+  if (companyRow.status === "deleted" || companyRow.status === "archived") {
     return {
       state: "organization_unavailable",
       user: authUser,
       profile: profileRow,
-      companyStatus: company.status,
+      companyStatus: companyRow.status,
     };
   }
+
+  const isDemo = Boolean(profileRow.is_demo || companyRow.is_demo);
+  const demoSession = isDemo
+    ? await getActiveDemoSession(supabase, {
+      id: profileRow.id,
+      company_id: profileRow.company_id,
+      email: profileRow.email,
+      is_demo: true,
+    })
+    : null;
+  const demoRole = demoSession?.role_name ? normalizeRoleName(demoSession.role_name) : null;
 
   const { data: role, error: roleError } = await supabase
     .from("roles")
     .select("id, name")
-    .eq("id", profileRow.role_id)
-    .maybeSingle();
+    .eq("company_id", profileRow.company_id);
 
-  const roleRow = role as RoleRow | null;
+  const roleRows = (role as RoleRow[] | null) ?? [];
+  const roleRow = isDemo
+    ? roleRows.find((row) => normalizeRoleName(row.name) === demoRole) ?? null
+    : roleRows.find((row) => row.id === profileRow.role_id) ?? null;
   const normalizedRole = normalizeRoleName(roleRow?.name);
+
+  if (isDemo && !demoRole) {
+    return {
+      state: "demo_needs_role",
+      user: authUser,
+      profile: profileRow,
+    };
+  }
 
   if (roleError || !roleRow?.name || !normalizedRole) {
     return {
@@ -208,7 +240,7 @@ export async function loadAuthProfile(
   const { data: rolePermissions, error: permissionsError } = await supabase
     .from("role_permissions")
     .select("permission_id, access_level")
-    .eq("role_id", profileRow.role_id);
+    .eq("role_id", roleRow.id);
 
   if (permissionsError) {
     return {
@@ -263,12 +295,15 @@ export async function loadAuthProfile(
       lastName: profileRow.last_name,
       displayName: [profileRow.first_name, profileRow.last_name].filter(Boolean).join(" ").trim() || profileRow.email,
       companyId: profileRow.company_id,
-      roleId: profileRow.role_id,
+      roleId: roleRow.id,
       roleName: roleRow.name,
       role: normalizedRole,
       status: profileRow.status,
       mustChangePassword: Boolean(profileRow.must_change_password),
       permissions,
+      isDemo,
+      demoSessionId: demoSession?.id ?? null,
+      demoExpiresAt: demoSession?.expires_at ?? null,
     },
   };
 }
@@ -310,6 +345,10 @@ export async function requireAuthContext() {
 
   if (resolution.state === "missing_profile") {
     redirect("/onboarding");
+  }
+
+  if (resolution.state === "demo_needs_role") {
+    redirect("/demo/choose-role");
   }
 
   if (resolution.state === "unauthenticated") {
