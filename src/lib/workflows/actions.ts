@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@/lib/auth/permissions";
 import { createNotificationForUser } from "@/lib/notifications/service";
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
+import { demoWriteMarker } from "@/lib/demo/markers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   contentReviewSchema,
@@ -365,6 +366,7 @@ async function logActivity(
     entity_type: entityType,
     entity_id: entityId,
     metadata,
+    ...demoWriteMarker(context),
   });
 }
 
@@ -416,6 +418,7 @@ export async function createTeamAction(formData: FormData) {
       team_lead_id: parsed.data.teamLeadId,
       created_by: context.userId,
       status: "active",
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -455,6 +458,7 @@ export async function updateTeamAction(formData: FormData) {
       name: parsed.data.name,
       description: parsed.data.description,
       team_lead_id: parsed.data.teamLeadId,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.teamId)
     .eq("company_id", context.companyId);
@@ -478,7 +482,7 @@ export async function archiveTeamAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
     .from("teams")
-    .update({ status: "archived" })
+    .update({ status: "archived", ...demoWriteMarker(context) })
     .eq("id", parsed.data.teamId)
     .eq("company_id", context.companyId);
 
@@ -524,7 +528,11 @@ export async function updateTeamMembersAction(formData: FormData) {
   if (parsed.data.memberIds.length) {
     const { error: insertError } = await supabase
       .from("team_members")
-      .insert(parsed.data.memberIds.map((userId) => ({ team_id: parsed.data.teamId, user_id: userId })));
+      .insert(parsed.data.memberIds.map((userId) => ({
+        team_id: parsed.data.teamId,
+        user_id: userId,
+        ...demoWriteMarker(context),
+      })));
 
     if (insertError) {
       safeRedirect(parsed.data.redirectTo, "error", "Team members could not be assigned.");
@@ -591,6 +599,7 @@ export async function createTaskAction(formData: FormData) {
       final_output_submitted_by: parsed.data.finalDriveLink ? context.userId : null,
       status: parsed.data.assignedTo ? "assigned" : "pending",
       created_by: context.userId,
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -645,6 +654,7 @@ export async function assignTaskAction(formData: FormData) {
       assigned_by: parsed.data.assignedTo ? context.userId : null,
       team_id: parsed.data.teamId,
       status: parsed.data.assignedTo ? "assigned" : "pending",
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.taskId)
     .eq("company_id", context.companyId);
@@ -694,7 +704,7 @@ export async function updateTaskStatusAction(formData: FormData) {
     .maybeSingle();
   const { error } = await supabase
     .from("tasks")
-    .update({ status: parsed.data.status })
+    .update({ status: parsed.data.status, ...demoWriteMarker(context) })
     .eq("id", parsed.data.taskId)
     .eq("company_id", context.companyId);
 
@@ -733,6 +743,7 @@ export async function addTaskCommentAction(formData: FormData) {
     task_id: parsed.data.taskId,
     user_id: context.userId,
     body: parsed.data.body,
+    ...demoWriteMarker(context),
   });
 
   if (error) {
@@ -762,6 +773,7 @@ export async function submitTaskFinalOutputAction(formData: FormData) {
       final_drive_link: parsed.data.finalDriveLink,
       final_output_submitted_at: new Date().toISOString(),
       final_output_submitted_by: context.userId,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.taskId)
     .eq("company_id", context.companyId);
@@ -832,6 +844,7 @@ export async function createIdeaAction(formData: FormData) {
       publishing_at: parsed.data.publishingAt,
       final_drive_link: parsed.data.finalDriveLink || null,
       status: "draft",
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -909,6 +922,7 @@ export async function updateIdeaAction(formData: FormData) {
       urgency: parsed.data.urgency,
       publishing_at: parsed.data.publishingAt,
       final_drive_link: parsed.data.finalDriveLink || null,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.ideaId)
     .eq("company_id", context.companyId);
@@ -942,7 +956,7 @@ export async function updateIdeaStatusAction(formData: FormData) {
     .maybeSingle();
   const { error } = await supabase
     .from("ideas")
-    .update({ status: parsed.data.status })
+    .update({ status: parsed.data.status, ...demoWriteMarker(context) })
     .eq("id", parsed.data.ideaId)
     .eq("company_id", context.companyId);
 
@@ -1014,6 +1028,7 @@ export async function reviewIdeaAction(formData: FormData) {
       entity_id: parsed.data.ideaId,
       author_id: context.userId,
       body: parsed.data.feedback,
+      ...demoWriteMarker(context),
     });
 
     if (commentError) {
@@ -1023,7 +1038,7 @@ export async function reviewIdeaAction(formData: FormData) {
 
   const { error } = await supabase
     .from("ideas")
-    .update({ status: nextStatus })
+    .update({ status: nextStatus, ...demoWriteMarker(context) })
     .eq("id", parsed.data.ideaId)
     .eq("company_id", context.companyId);
 
@@ -1149,6 +1164,7 @@ export async function createContentAction(formData: FormData) {
       team_id: parsed.data.teamId,
       final_drive_link: parsed.data.finalDriveLink || null,
       status: "draft",
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -1195,6 +1211,7 @@ export async function submitContentAction(formData: FormData) {
       status: "submitted_to_team_lead",
       submitted_at: new Date().toISOString(),
       approved_at: null,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.contentId)
     .eq("company_id", context.companyId);
@@ -1270,6 +1287,7 @@ export async function reviewContentAction(formData: FormData) {
     accuracy_score: parsed.data.accuracyScore ?? null,
     overall_rating: parsed.data.overallRating ?? null,
     score_comment: parsed.data.scoreComment,
+    ...demoWriteMarker(context),
   });
 
   if (reviewError) {
@@ -1281,6 +1299,7 @@ export async function reviewContentAction(formData: FormData) {
     .update({
       status: nextStatus,
       approved_at: parsed.data.decision === "approved" ? new Date().toISOString() : null,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.contentId)
     .eq("company_id", context.companyId);
@@ -1336,6 +1355,7 @@ export async function rateContentAction(formData: FormData) {
       reviewer_id: context.userId,
       rating_value: parsed.data.ratingValue,
       comment: parsed.data.comment,
+      ...demoWriteMarker(context),
     },
     { onConflict: "content_id,reviewer_id" }
   );
@@ -1376,7 +1396,7 @@ export async function scheduleContentAction(formData: FormData) {
 
   const { error: updateError } = await supabase
     .from("content_items")
-    .update({ status: "scheduled", scheduled_at: parsed.data.scheduledAt })
+    .update({ status: "scheduled", scheduled_at: parsed.data.scheduledAt, ...demoWriteMarker(context) })
     .eq("id", parsed.data.contentId)
     .eq("company_id", context.companyId);
 
@@ -1397,6 +1417,7 @@ export async function scheduleContentAction(formData: FormData) {
     start_date: parsed.data.scheduledAt,
     end_date: endDate.toISOString(),
     created_by: context.userId,
+    ...demoWriteMarker(context),
   });
 
   await logActivity(context, "content.scheduled", "content", parsed.data.contentId, {
@@ -1424,6 +1445,7 @@ export async function submitContentFinalOutputAction(formData: FormData) {
       final_drive_link: parsed.data.finalDriveLink,
       final_output_submitted_at: new Date().toISOString(),
       final_output_submitted_by: context.userId,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.contentId)
     .eq("company_id", context.companyId);
@@ -1461,6 +1483,7 @@ export async function createTimeOffRequestAction(formData: FormData) {
       end_date: parsed.data.endDate,
       reason: parsed.data.reason,
       status: "pending",
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -1513,6 +1536,7 @@ export async function reviewTimeOffRequestAction(formData: FormData) {
       status: parsed.data.decision,
       reviewed_by: context.userId,
       reviewed_at: new Date().toISOString(),
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.requestId)
     .eq("company_id", context.companyId);
@@ -1869,6 +1893,7 @@ export async function generateReportAction(formData: FormData) {
       metrics_json: content.metrics as Json,
       date_range_start: range.startDate,
       date_range_end: range.endDate,
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -1937,6 +1962,7 @@ export async function createReportAction(formData: FormData) {
       metrics_json: {},
       date_range_start: parsed.data.dateRangeStart,
       date_range_end: parsed.data.dateRangeEnd,
+      ...demoWriteMarker(context),
     })
     .select("id")
     .single();
@@ -1987,6 +2013,7 @@ export async function sendReportToClientAction(formData: FormData) {
     .update({
       sent_to_client_at: new Date().toISOString(),
       sent_to_client_by: context.userId,
+      ...demoWriteMarker(context),
     })
     .eq("id", parsed.data.reportId)
     .eq("company_id", context.companyId);

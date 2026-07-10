@@ -2,6 +2,7 @@ import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { AuthContext } from "@/lib/auth/permissions";
+import { demoWriteMarker } from "@/lib/demo/markers";
 
 export async function createNotificationForUser({
   context,
@@ -34,5 +35,6 @@ export async function createNotificationForUser({
     entity_id: entityId ?? null,
     link_href: linkHref ?? null,
     read: false,
+    ...demoWriteMarker(context),
   });
 }

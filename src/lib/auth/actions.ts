@@ -17,6 +17,8 @@ import {
 import { hasSupabaseAdminConfig, hasSupabaseRuntimeConfig } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createDemoSessionForCurrentUser, cleanupCurrentDemoSession, ensurePublicDemoAccount } from "@/lib/demo/server";
+import { isDemoCredential } from "@/lib/demo/config";
 import {
   recordSignOutForSupabaseClient,
 } from "@/lib/work-hours/actions";
@@ -101,6 +103,7 @@ type PasswordRecoveryUser = {
   last_name: string;
   recovery_email: string | null;
   recovery_email_verified_at: string | null;
+  is_demo: boolean | null;
 };
 
 async function findPasswordRecoveryUser(email: string): Promise<PasswordRecoveryUser | null> {
@@ -113,7 +116,7 @@ async function findPasswordRecoveryUser(email: string): Promise<PasswordRecovery
 
     const { data: directUser } = await admin
       .from("users")
-      .select("id, company_id, email, first_name, last_name, recovery_email, recovery_email_verified_at")
+      .select("id, company_id, email, first_name, last_name, recovery_email, recovery_email_verified_at, is_demo")
       .eq("email", email)
       .maybeSingle();
 
@@ -123,7 +126,7 @@ async function findPasswordRecoveryUser(email: string): Promise<PasswordRecovery
 
     const { data: recoveryUser } = await admin
       .from("users")
-      .select("id, company_id, email, first_name, last_name, recovery_email, recovery_email_verified_at")
+      .select("id, company_id, email, first_name, last_name, recovery_email, recovery_email_verified_at, is_demo")
       .eq("recovery_email", email)
       .maybeSingle();
 
@@ -223,11 +226,54 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
     return configurationError();
   }
 
+  const isDemoSignIn = isDemoCredential(parsed.data.email, parsed.data.password);
+
+  if (isDemoSignIn) {
+    if (!hasSupabaseAdminConfig()) {
+      return {
+        success: false,
+        message: "The public demo is not configured on this deployment.",
+      };
+    }
+
+    try {
+      await ensurePublicDemoAccount();
+    } catch (error) {
+      console.error("public demo preparation failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+
+      return {
+        success: false,
+        message: "The public demo could not be prepared. Please try again shortly. The deployment team can check the demo migration and Supabase logs.",
+      };
+    }
+  }
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
     return { success: false, message: "Invalid email or password." };
+  }
+
+  if (isDemoSignIn) {
+    const demoSessionId = await createDemoSessionForCurrentUser(supabase);
+
+    if (!demoSessionId) {
+      console.error("public demo session creation failed after successful auth");
+
+      return {
+        success: false,
+        message: "The public demo session could not be created. Please try again shortly.",
+      };
+    }
+
+    return {
+      success: true,
+      message: "Choose a role to explore the Contento demo.",
+      redirectTo: "/demo/choose-role",
+    };
   }
 
   const resolution = await loadAuthProfile(supabase);
@@ -319,6 +365,14 @@ export async function forgotPasswordAction(input: ForgotPasswordInput): Promise<
   const supabase = await createSupabaseServerClient();
   const origin = await getRequestOrigin();
   const recoveryUser = await findPasswordRecoveryUser(parsed.data.email);
+
+  if (recoveryUser?.is_demo) {
+    return {
+      success: true,
+      message: "Demo password recovery is disabled. Use the public demo credentials to start a new sandbox session.",
+    };
+  }
+
   const shouldSendSupabaseEmail =
     !recoveryUser ||
     recoveryUser.email.toLowerCase() === parsed.data.email.toLowerCase();
@@ -417,6 +471,14 @@ export async function resetPasswordAction(input: ResetPasswordInput): Promise<Au
       success: true,
       message: "Your password was updated.",
       redirectTo: "/onboarding",
+    };
+  }
+
+  if (resolution.state === "demo_needs_role") {
+    return {
+      success: true,
+      message: "Choose a role to explore the Contento demo.",
+      redirectTo: "/demo/choose-role",
     };
   }
 
@@ -610,6 +672,7 @@ export async function completeOnboardingAction(input: OnboardingInput): Promise<
 export async function signOutAction() {
   if (hasSupabaseRuntimeConfig()) {
     const supabase = await createSupabaseServerClient();
+    await cleanupCurrentDemoSession();
     const workHoursStatus = await recordSignOutForSupabaseClient(supabase);
 
     if (workHoursStatus === "active_break") {

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
+import { demoWriteMarker } from "@/lib/demo/markers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CONTENTO_TIME_ZONE, DAILY_BREAK_ALLOWANCE_MINUTES, DEFAULT_WORK_DAY_TARGET_MINUTES } from "@/lib/time";
 import type { Json } from "@/types/database";
@@ -78,6 +79,11 @@ export async function updateProfileAction(formData: FormData) {
 
 export async function updateRecoveryEmailAction(formData: FormData) {
   const context = await requireAuthContext();
+
+  if (context.isDemo) {
+    safeRedirect("/profile", "error", "This action is disabled in demo mode.");
+  }
+
   const parsed = recoveryEmailSchema.safeParse(formString(formData, "recoveryEmail"));
 
   if (!parsed.success) {
@@ -104,6 +110,7 @@ export async function updateRecoveryEmailAction(formData: FormData) {
     entity_type: "user",
     entity_id: context.userId,
     metadata: { source: "profile_security" },
+    ...demoWriteMarker(context),
   });
 
   revalidatePath("/profile");
@@ -112,6 +119,11 @@ export async function updateRecoveryEmailAction(formData: FormData) {
 
 export async function removeRecoveryEmailAction() {
   const context = await requireAuthContext();
+
+  if (context.isDemo) {
+    safeRedirect("/profile", "error", "This action is disabled in demo mode.");
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data: updated, error } = await supabase.rpc("clear_current_user_recovery_email", {});
 
@@ -126,6 +138,7 @@ export async function removeRecoveryEmailAction() {
     entity_type: "user",
     entity_id: context.userId,
     metadata: { source: "profile_security" },
+    ...demoWriteMarker(context),
   });
 
   revalidatePath("/profile");
@@ -134,6 +147,10 @@ export async function removeRecoveryEmailAction() {
 
 export async function uploadAvatarAction(formData: FormData) {
   const context = await requireAuthContext();
+
+  if (context.isDemo) {
+    safeRedirect("/profile", "error", "This action is disabled in demo mode.");
+  }
 
   const file = formData.get("avatar");
 
@@ -222,6 +239,11 @@ export async function removeAvatarAction() {
 
 export async function uploadOrganizationLogoAction(formData: FormData) {
   const context = await requirePermission("settings.company", "limited");
+
+  if (context.isDemo) {
+    safeRedirect("/settings", "error", "This action is disabled in demo mode.");
+  }
+
   const file = formData.get("logo");
 
   if (!(file instanceof File) || file.size === 0) {
@@ -278,6 +300,11 @@ export async function uploadOrganizationLogoAction(formData: FormData) {
 
 export async function removeOrganizationLogoAction() {
   const context = await requirePermission("settings.company", "limited");
+
+  if (context.isDemo) {
+    safeRedirect("/settings", "error", "This action is disabled in demo mode.");
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data: currentCompany, error: loadError } = await supabase
     .from("companies")
@@ -309,6 +336,11 @@ export async function removeOrganizationLogoAction() {
 
 export async function updateCompanySettingsAction(formData: FormData) {
   const context = await requirePermission("settings.company", "limited");
+
+  if (context.isDemo) {
+    safeRedirect("/settings", "error", "This action is disabled in demo mode.");
+  }
+
   const companyName = formString(formData, "companyName").trim();
   const logoUrl = formString(formData, "logoUrl").trim();
   const primaryColor = colorOrNull(formString(formData, "primaryColor"));

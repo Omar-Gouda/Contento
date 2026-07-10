@@ -7,6 +7,7 @@ const onboardingRoutes = ["/onboarding"];
 const accountInactiveRoutes = ["/account-inactive"];
 const organizationDisabledRoutes = ["/organization-disabled"];
 const organizationUnavailableRoutes = ["/organization-unavailable"];
+const demoRoutes = ["/demo/choose-role"];
 const sharedProtectedRoutes = [
   "/profile",
   "/users",
@@ -74,12 +75,17 @@ export function isChangePasswordRoute(pathname: string) {
   return matchesPathPrefix(pathname, "/change-password");
 }
 
+export function isDemoRoute(pathname: string) {
+  return demoRoutes.some((route) => matchesPathPrefix(pathname, route));
+}
+
 export function isSetupRoute(pathname: string) {
   return (
     isOnboardingRoute(pathname) ||
     isAccountInactiveRoute(pathname) ||
     isOrganizationDisabledRoute(pathname) ||
     isOrganizationUnavailableRoute(pathname) ||
+    isDemoRoute(pathname) ||
     isChangePasswordRoute(pathname)
   );
 }
@@ -118,6 +124,7 @@ export type RedirectAuthState =
   | { state: "unauthenticated" }
   | { state: "superior_admin" }
   | { state: "missing_profile" }
+  | { state: "demo_needs_role" }
   | { state: "organization_disabled" | "organization_unavailable" }
   | { state: "inactive" | "incomplete_profile" | "unresolved" }
   | { state: "active"; role: UserRole; mustChangePassword: boolean };
@@ -141,6 +148,10 @@ export function redirectStateFromResolution(resolution: AuthProfileResolution): 
 
   if (resolution.state === "missing_profile") {
     return { state: "missing_profile" };
+  }
+
+  if (resolution.state === "demo_needs_role") {
+    return { state: "demo_needs_role" };
   }
 
   if (resolution.state === "organization_disabled" || resolution.state === "organization_unavailable") {
@@ -176,6 +187,10 @@ export function getRedirectPathForAuthState(pathname: string, authState: Redirec
     return isOnboardingRoute(pathname) ? null : normalizeRedirect(pathname, "/onboarding");
   }
 
+  if (authState.state === "demo_needs_role") {
+    return isDemoRoute(pathname) ? null : normalizeRedirect(pathname, "/demo/choose-role");
+  }
+
   if (authState.state === "organization_disabled") {
     return isOrganizationDisabledRoute(pathname) ? null : normalizeRedirect(pathname, "/organization-disabled");
   }
@@ -200,7 +215,7 @@ export function getRedirectPathForAuthState(pathname: string, authState: Redirec
     return isChangePasswordRoute(pathname) ? null : normalizeRedirect(pathname, "/change-password");
   }
 
-  if (isPublicOrAuthRoute(pathname) || isSetupRoute(pathname)) {
+  if (isPublicOrAuthRoute(pathname) || (isSetupRoute(pathname) && !isDemoRoute(pathname))) {
     return normalizeRedirect(pathname, getDefaultDashboardPath(authState.role));
   }
 
