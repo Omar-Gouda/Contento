@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import { demoWriteMarker } from "@/lib/demo/markers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { CONTENTO_TIME_ZONE, DAILY_BREAK_ALLOWANCE_MINUTES, DEFAULT_WORK_DAY_TARGET_MINUTES } from "@/lib/time";
@@ -19,6 +20,30 @@ function formString(formData: FormData, key: string) {
 function safeRedirect(pathname: string, key: "notice" | "error", value: string): never {
   const separator = pathname.includes("?") ? "&" : "?";
   redirect(`${pathname}${separator}${key}=${encodeURIComponent(value)}`);
+}
+
+async function requireWritableAuthContext(pathname = "/profile") {
+  const context = await requireAuthContext();
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    safeRedirect(pathname, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
+}
+
+async function requireWritableSettingsContext(pathname = "/settings") {
+  const context = await requirePermission("settings.company", "limited");
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    safeRedirect(pathname, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
 }
 
 function colorOrNull(value: string) {
@@ -36,7 +61,7 @@ const imageTypes = new Map([
 const recoveryEmailSchema = z.string().trim().email("Enter a valid recovery email address.").max(254);
 
 export async function updateProfileAction(formData: FormData) {
-  await requireAuthContext();
+  await requireWritableAuthContext();
   const firstName = formString(formData, "firstName").trim();
   const lastName = formString(formData, "lastName").trim();
   const phone = formString(formData, "phone").trim();
@@ -78,7 +103,7 @@ export async function updateProfileAction(formData: FormData) {
 }
 
 export async function updateRecoveryEmailAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableAuthContext();
 
   if (context.isDemo) {
     safeRedirect("/profile", "error", "This action is disabled in demo mode.");
@@ -118,7 +143,7 @@ export async function updateRecoveryEmailAction(formData: FormData) {
 }
 
 export async function removeRecoveryEmailAction() {
-  const context = await requireAuthContext();
+  const context = await requireWritableAuthContext();
 
   if (context.isDemo) {
     safeRedirect("/profile", "error", "This action is disabled in demo mode.");
@@ -146,7 +171,7 @@ export async function removeRecoveryEmailAction() {
 }
 
 export async function uploadAvatarAction(formData: FormData) {
-  const context = await requireAuthContext();
+  const context = await requireWritableAuthContext();
 
   if (context.isDemo) {
     safeRedirect("/profile", "error", "This action is disabled in demo mode.");
@@ -207,7 +232,7 @@ export async function uploadAvatarAction(formData: FormData) {
 }
 
 export async function removeAvatarAction() {
-  const context = await requireAuthContext();
+  const context = await requireWritableAuthContext();
   const supabase = await createSupabaseServerClient();
   const { data: currentProfile, error: loadError } = await supabase
     .from("users")
@@ -238,7 +263,7 @@ export async function removeAvatarAction() {
 }
 
 export async function uploadOrganizationLogoAction(formData: FormData) {
-  const context = await requirePermission("settings.company", "limited");
+  const context = await requireWritableSettingsContext();
 
   if (context.isDemo) {
     safeRedirect("/settings", "error", "This action is disabled in demo mode.");
@@ -299,7 +324,7 @@ export async function uploadOrganizationLogoAction(formData: FormData) {
 }
 
 export async function removeOrganizationLogoAction() {
-  const context = await requirePermission("settings.company", "limited");
+  const context = await requireWritableSettingsContext();
 
   if (context.isDemo) {
     safeRedirect("/settings", "error", "This action is disabled in demo mode.");
@@ -335,7 +360,7 @@ export async function removeOrganizationLogoAction() {
 }
 
 export async function updateCompanySettingsAction(formData: FormData) {
-  const context = await requirePermission("settings.company", "limited");
+  const context = await requireWritableSettingsContext();
 
   if (context.isDemo) {
     safeRedirect("/settings", "error", "This action is disabled in demo mode.");

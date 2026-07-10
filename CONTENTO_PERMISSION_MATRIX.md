@@ -243,6 +243,17 @@ The current implementation uses this matrix for Teams, Tasks, Ideas, Content, Ca
 * Saved views and dashboard preferences are private to the owning user.
 * Content templates are company-scoped; Creators can use active templates but cannot manage them.
 
+## Billing And Subscription Access
+
+Billing is not a general tenant role permission yet. It is intentionally limited by existing role and settings access:
+
+* Marketing Manager (`admin` internally) with `settings.company` can open `/settings/billing`, update auto-renewal reminder intent, and upload manual InstaPay payment receipts.
+* Other internal roles do not see billing management navigation and cannot submit receipts through server actions.
+* Client role users cannot generate internal billing actions.
+* Super Admin/Platform Admin users review receipts and process expired grace periods from `/super-admin/billing`.
+* Subscription states `grace_period`, `expired`, and `scheduled_deletion` put the workspace into read-only mode. Server actions block client, user, workflow, attachment, saved-view, settings, and work-hours writes while view routes remain available.
+* Billing renewal actions remain available to Marketing Managers during read-only mode so organizations can recover from grace or expired states.
+
 Phase 4 also seeds permission aliases for future shared-module code:
 
 | Alias Permission | Current Granular Equivalent |

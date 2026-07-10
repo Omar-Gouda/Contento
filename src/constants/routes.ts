@@ -18,6 +18,7 @@ export const routes = {
   notifications: "/notifications",
   search: "/search",
   settings: "/settings",
+  billing: "/settings/billing",
   team: "/team",
   users: {
     detail: (id: string) => `/users/${id}`,
@@ -50,6 +51,7 @@ export const routes = {
     home: "/super-admin",
     organizations: "/super-admin/organizations",
     organizationRequests: "/super-admin/organization-requests",
+    billing: "/super-admin/billing",
     organization: (id: string) => `/super-admin/organizations/${id}`,
   },
   dashboards: {

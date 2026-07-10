@@ -19,6 +19,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createDemoSessionForCurrentUser, cleanupCurrentDemoSession, ensurePublicDemoAccount } from "@/lib/demo/server";
 import { isDemoCredential } from "@/lib/demo/config";
+import { createTrialPendingSubscription, startTrialIfPending } from "@/lib/billing/service";
 import {
   recordSignOutForSupabaseClient,
 } from "@/lib/work-hours/actions";
@@ -292,6 +293,7 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
 
     if (acceptedResolution.state === "active") {
       await recordSuccessfulLogin(supabase);
+      await startTrialIfPending(acceptedResolution.context);
 
       return {
         success: true,
@@ -341,6 +343,7 @@ export async function signInAction(input: SignInInput): Promise<AuthActionResult
   }
 
   await recordSuccessfulLogin(supabase);
+  await startTrialIfPending(resolution.context);
 
   return {
     success: true,
@@ -661,6 +664,9 @@ export async function completeOnboardingAction(input: OnboardingInput): Promise<
       message: "Your workspace was created, but your profile could not be resolved yet. Sign in again to continue.",
     };
   }
+
+  await createTrialPendingSubscription(createdResolution.context.companyId);
+  await startTrialIfPending(createdResolution.context);
 
   return {
     success: true,

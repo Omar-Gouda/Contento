@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { requireAuthContext } from "@/lib/auth/context";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
 
@@ -68,7 +70,26 @@ function revalidateWorkHoursPaths() {
   revalidatePath("/profile/work-hours");
 }
 
+async function ensureWorkHoursWritable(): Promise<WorkHoursActionResult | null> {
+  const context = await requireAuthContext();
+
+  try {
+    await assertWorkspaceWritable(context);
+    return null;
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Workspace is read-only.",
+    };
+  }
+}
+
 export async function clockInAction(): Promise<WorkHoursActionResult> {
+  const readOnly = await ensureWorkHoursWritable();
+  if (readOnly) {
+    return readOnly;
+  }
+
   const supabase = await createSupabaseServerClient();
   const clockedIn = await clockInForSupabaseClient(supabase);
   revalidateWorkHoursPaths();
@@ -88,6 +109,11 @@ export async function clockInAction(): Promise<WorkHoursActionResult> {
 }
 
 export async function clockOutAction(): Promise<WorkHoursActionResult> {
+  const readOnly = await ensureWorkHoursWritable();
+  if (readOnly) {
+    return readOnly;
+  }
+
   const supabase = await createSupabaseServerClient();
   const status = await clockOutForSupabaseClient(supabase);
   revalidateWorkHoursPaths();
@@ -137,6 +163,11 @@ export async function clockOutAndRefreshAction(formData?: FormData) {
 }
 
 export async function startBreakAction(): Promise<WorkHoursActionResult> {
+  const readOnly = await ensureWorkHoursWritable();
+  if (readOnly) {
+    return readOnly;
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("start_break_session", {});
   revalidateWorkHoursPaths();
@@ -157,6 +188,11 @@ export async function startBreakAction(): Promise<WorkHoursActionResult> {
 }
 
 export async function endBreakAction(): Promise<WorkHoursActionResult> {
+  const readOnly = await ensureWorkHoursWritable();
+  if (readOnly) {
+    return readOnly;
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("end_break_session", {});
   revalidateWorkHoursPaths();

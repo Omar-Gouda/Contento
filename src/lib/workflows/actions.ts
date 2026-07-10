@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { hasPermission } from "@/lib/auth/permissions";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import { createNotificationForUser } from "@/lib/notifications/service";
 import { requireAuthContext, requirePermission } from "@/lib/auth/context";
 import { demoWriteMarker } from "@/lib/demo/markers";
@@ -73,6 +74,18 @@ function safeRedirect(pathname: string | null | undefined, key: "notice" | "erro
   revalidatePath("/", "layout");
   revalidatePath(destination);
   redirect(`${destination}${separator}${key}=${encodeURIComponent(value)}`);
+}
+
+async function requireWritablePermission(permissionKey: string, minimumAccess: "view" | "limited" | "full" = "limited") {
+  const context = await requirePermission(permissionKey, minimumAccess);
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    safeRedirect(null, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
 }
 
 function addDaysToDateKey(dateKey: string, days: number) {
@@ -391,7 +404,7 @@ async function notifyUser(
 }
 
 export async function createTeamAction(formData: FormData) {
-  const context = await requirePermission("teams.create", "limited");
+  const context = await requireWritablePermission("teams.create", "limited");
   const parsed = teamSchema.safeParse({
     name: formString(formData, "name"),
     description: formString(formData, "description"),
@@ -432,7 +445,7 @@ export async function createTeamAction(formData: FormData) {
 }
 
 export async function updateTeamAction(formData: FormData) {
-  const context = await requirePermission("teams.create", "limited");
+  const context = await requireWritablePermission("teams.create", "limited");
   const parsed = teamSchema.safeParse({
     teamId: formString(formData, "teamId"),
     name: formString(formData, "name"),
@@ -472,7 +485,7 @@ export async function updateTeamAction(formData: FormData) {
 }
 
 export async function archiveTeamAction(formData: FormData) {
-  const context = await requirePermission("teams.create", "limited");
+  const context = await requireWritablePermission("teams.create", "limited");
   const parsed = teamArchiveSchema.safeParse({ teamId: formString(formData, "teamId") });
 
   if (!parsed.success) {
@@ -495,7 +508,7 @@ export async function archiveTeamAction(formData: FormData) {
 }
 
 export async function updateTeamMembersAction(formData: FormData) {
-  const context = await requirePermission("teams.assign_members", "limited");
+  const context = await requireWritablePermission("teams.assign_members", "limited");
   const parsed = teamMembersSchema.safeParse({
     teamId: formString(formData, "teamId"),
     memberIds: formStringArray(formData, "memberIds"),
@@ -555,7 +568,7 @@ export async function updateTeamMembersAction(formData: FormData) {
 }
 
 export async function createTaskAction(formData: FormData) {
-  const context = await requirePermission("tasks.create", "limited");
+  const context = await requireWritablePermission("tasks.create", "limited");
   const parsed = taskSchema.safeParse({
     clientId: formString(formData, "clientId"),
     title: formString(formData, "title"),
@@ -622,7 +635,7 @@ export async function createTaskAction(formData: FormData) {
 }
 
 export async function assignTaskAction(formData: FormData) {
-  const context = await requirePermission("tasks.assign", "limited");
+  const context = await requireWritablePermission("tasks.assign", "limited");
   const parsed = taskAssignmentSchema.safeParse({
     taskId: formString(formData, "taskId"),
     clientId: formString(formData, "clientId"),
@@ -692,8 +705,8 @@ export async function updateTaskStatusAction(formData: FormData) {
   }
 
   const context = parsed.data.status === "closed"
-    ? await requirePermission("tasks.close", "limited")
-    : await requirePermission("tasks.update_status", "limited");
+    ? await requireWritablePermission("tasks.close", "limited")
+    : await requireWritablePermission("tasks.update_status", "limited");
 
   const supabase = await createSupabaseServerClient();
   const { data: taskBeforeUpdate } = await supabase
@@ -726,7 +739,7 @@ export async function updateTaskStatusAction(formData: FormData) {
 }
 
 export async function addTaskCommentAction(formData: FormData) {
-  const context = await requirePermission("tasks.view", "view");
+  const context = await requireWritablePermission("tasks.view", "view");
   const parsed = taskCommentSchema.safeParse({
     taskId: formString(formData, "taskId"),
     body: formString(formData, "body"),
@@ -755,7 +768,7 @@ export async function addTaskCommentAction(formData: FormData) {
 }
 
 export async function submitTaskFinalOutputAction(formData: FormData) {
-  const context = await requirePermission("content.final_output", "limited");
+  const context = await requireWritablePermission("content.final_output", "limited");
   const parsed = taskFinalOutputSchema.safeParse({
     taskId: formString(formData, "taskId"),
     finalDriveLink: formString(formData, "finalDriveLink"),
@@ -787,7 +800,7 @@ export async function submitTaskFinalOutputAction(formData: FormData) {
 }
 
 export async function createIdeaAction(formData: FormData) {
-  const context = await requirePermission("ideas.create", "limited");
+  const context = await requireWritablePermission("ideas.create", "limited");
   const parsed = ideaSchema.safeParse({
     clientId: formString(formData, "clientId"),
     ideaType: formString(formData, "ideaType") || "post",
@@ -867,7 +880,7 @@ export async function createIdeaAction(formData: FormData) {
 }
 
 export async function updateIdeaAction(formData: FormData) {
-  const context = await requirePermission("ideas.update", "limited");
+  const context = await requireWritablePermission("ideas.update", "limited");
   const parsed = ideaSchema.safeParse({
     ideaId: formString(formData, "ideaId"),
     clientId: formString(formData, "clientId"),
@@ -936,7 +949,7 @@ export async function updateIdeaAction(formData: FormData) {
 }
 
 export async function updateIdeaStatusAction(formData: FormData) {
-  const context = await requirePermission("ideas.change_status", "limited");
+  const context = await requireWritablePermission("ideas.change_status", "limited");
   const parsed = ideaStatusSchema.safeParse({
     ideaId: formString(formData, "ideaId"),
     status: formString(formData, "status"),
@@ -991,8 +1004,8 @@ export async function updateIdeaStatusAction(formData: FormData) {
 export async function reviewIdeaAction(formData: FormData) {
   const decision = formString(formData, "decision");
   const context = ["approved", "rejected", "revision_requested", "under_review"].includes(decision)
-    ? await requirePermission("ideas.change_status", "limited")
-    : await requirePermission("comments.create", "limited");
+    ? await requireWritablePermission("ideas.change_status", "limited")
+    : await requireWritablePermission("comments.create", "limited");
   const parsed = ideaReviewSchema.safeParse({
     ideaId: formString(formData, "ideaId"),
     decision,
@@ -1075,7 +1088,7 @@ export async function reviewIdeaAction(formData: FormData) {
 }
 
 export async function deleteIdeaAction(formData: FormData) {
-  const context = await requirePermission("ideas.update", "limited");
+  const context = await requireWritablePermission("ideas.update", "limited");
   const parsed = ideaDeleteSchema.safeParse({
     ideaId: formString(formData, "ideaId"),
     redirectTo: formString(formData, "redirectTo") || "/ideas",
@@ -1101,7 +1114,7 @@ export async function deleteIdeaAction(formData: FormData) {
 }
 
 export async function createContentAction(formData: FormData) {
-  const context = await requirePermission("content.create", "limited");
+  const context = await requireWritablePermission("content.create", "limited");
   const parsed = contentSchema.safeParse({
     clientId: formString(formData, "clientId"),
     title: formString(formData, "title"),
@@ -1178,7 +1191,7 @@ export async function createContentAction(formData: FormData) {
 }
 
 export async function submitContentAction(formData: FormData) {
-  const context = await requirePermission("content.submit", "limited");
+  const context = await requireWritablePermission("content.submit", "limited");
   const parsed = contentSubmitSchema.safeParse({
     contentId: formString(formData, "contentId"),
     redirectTo: formString(formData, "redirectTo") || "/content",
@@ -1245,10 +1258,10 @@ export async function submitContentAction(formData: FormData) {
 export async function reviewContentAction(formData: FormData) {
   const decision = formString(formData, "decision");
   const context = decision === "approved" || decision === "rejected"
-    ? await requirePermission("reviews.approve", "full")
+    ? await requireWritablePermission("reviews.approve", "full")
     : decision === "changes_requested"
-      ? await requirePermission("reviews.request_changes", "limited")
-      : await requirePermission("reviews.add_feedback", "limited");
+      ? await requireWritablePermission("reviews.request_changes", "limited")
+      : await requireWritablePermission("reviews.add_feedback", "limited");
   const parsed = contentReviewSchema.safeParse({
     contentId: formString(formData, "contentId"),
     decision,
@@ -1322,7 +1335,7 @@ export async function reviewContentAction(formData: FormData) {
 }
 
 export async function rateContentAction(formData: FormData) {
-  const context = await requirePermission("content.rate", "limited");
+  const context = await requireWritablePermission("content.rate", "limited");
   const parsed = contentRatingSchema.safeParse({
     contentId: formString(formData, "contentId"),
     ratingValue: formString(formData, "ratingValue"),
@@ -1371,7 +1384,7 @@ export async function rateContentAction(formData: FormData) {
 }
 
 export async function scheduleContentAction(formData: FormData) {
-  const context = await requirePermission("calendar.schedule_content", "limited");
+  const context = await requireWritablePermission("calendar.schedule_content", "limited");
   const parsed = contentScheduleSchema.safeParse({
     contentId: formString(formData, "contentId"),
     scheduledAt: formString(formData, "scheduledAt"),
@@ -1427,7 +1440,7 @@ export async function scheduleContentAction(formData: FormData) {
 }
 
 export async function submitContentFinalOutputAction(formData: FormData) {
-  const context = await requirePermission("content.final_output", "limited");
+  const context = await requireWritablePermission("content.final_output", "limited");
   const parsed = contentFinalOutputSchema.safeParse({
     contentId: formString(formData, "contentId"),
     finalDriveLink: formString(formData, "finalDriveLink"),
@@ -1459,7 +1472,7 @@ export async function submitContentFinalOutputAction(formData: FormData) {
 }
 
 export async function createTimeOffRequestAction(formData: FormData) {
-  const context = await requirePermission("day_off.submit", "limited");
+  const context = await requireWritablePermission("day_off.submit", "limited");
   const parsed = timeOffRequestSchema.safeParse({
     requestType: formString(formData, "requestType"),
     startDate: formString(formData, "startDate"),
@@ -1501,7 +1514,7 @@ export async function createTimeOffRequestAction(formData: FormData) {
 }
 
 export async function reviewTimeOffRequestAction(formData: FormData) {
-  const context = await requirePermission("day_off.approve", "limited");
+  const context = await requireWritablePermission("day_off.approve", "limited");
   const parsed = timeOffReviewSchema.safeParse({
     requestId: formString(formData, "requestId"),
     decision: formString(formData, "decision"),
@@ -1562,7 +1575,7 @@ export async function reviewTimeOffRequestAction(formData: FormData) {
 }
 
 export async function generateReportAction(formData: FormData) {
-  const context = await requirePermission("reports.submit", "limited");
+  const context = await requireWritablePermission("reports.submit", "limited");
 
   if (!isInternalUserRole(context.role)) {
     safeRedirect("/reports", "error", "Client users cannot generate internal reports.");
@@ -1911,7 +1924,7 @@ export async function generateReportAction(formData: FormData) {
 }
 
 export async function createReportAction(formData: FormData) {
-  const context = await requirePermission("reports.submit", "limited");
+  const context = await requireWritablePermission("reports.submit", "limited");
   const parsed = reportSchema.safeParse({
     clientId: formString(formData, "clientId"),
     reportType: formString(formData, "reportType"),
@@ -1976,7 +1989,7 @@ export async function createReportAction(formData: FormData) {
 }
 
 export async function sendReportToClientAction(formData: FormData) {
-  const context = await requirePermission("reports.send_to_client", "limited");
+  const context = await requireWritablePermission("reports.send_to_client", "limited");
   const parsed = reportSendToClientSchema.safeParse({
     reportId: formString(formData, "reportId"),
     redirectTo: formString(formData, "redirectTo") || "/reports",

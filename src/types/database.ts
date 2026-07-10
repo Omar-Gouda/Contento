@@ -372,6 +372,73 @@ export type Database = {
         settings_json: Json;
         updated_at: string;
       }>;
+      subscription_plans: Table<{
+        id: string;
+        code: string;
+        name: string;
+        user_limit: number | null;
+        yearly_price_egp: number | null;
+        is_custom: boolean;
+        is_active: boolean;
+        created_at: string;
+      }>;
+      organization_subscriptions: Table<{
+        id: string;
+        company_id: string;
+        plan_id: string | null;
+        status:
+          | "trial_pending"
+          | "trial_active"
+          | "grace_period"
+          | "active"
+          | "cancelled"
+          | "expired"
+          | "scheduled_deletion"
+          | "deleted";
+        trial_started_at: string | null;
+        trial_ends_at: string | null;
+        grace_ends_at: string | null;
+        current_period_start: string | null;
+        current_period_end: string | null;
+        duration_years: 1 | 5 | 7;
+        auto_renew_enabled: boolean;
+        payment_method: "instapay_manual" | "manual" | "coming_soon";
+        cancel_at_period_end: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      payment_receipts: Table<{
+        id: string;
+        company_id: string;
+        subscription_id: string;
+        amount_egp: number;
+        duration_years: 1 | 5 | 7;
+        plan_id: string | null;
+        receipt_file_path: string;
+        status: "pending" | "approved" | "rejected";
+        submitted_by: string | null;
+        reviewed_by: string | null;
+        reviewed_at: string | null;
+        rejection_reason: string | null;
+        created_at: string;
+      }>;
+      billing_events: Table<{
+        id: string;
+        company_id: string | null;
+        actor_user_id: string | null;
+        action: string;
+        metadata: Json;
+        created_at: string;
+      }>;
+      trial_blacklist: Table<{
+        id: string;
+        email: string;
+        normalized_email: string;
+        reason: string;
+        company_id: string | null;
+        blacklisted_at: string;
+        created_by: string | null;
+      }>;
       user_invitations: Table<{
         id: string;
         company_id: string;

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/lib/auth/context";
+import { assertWorkspaceWritable } from "@/lib/billing/service";
 import {
   createCompanyUserSchema,
   inviteUserSchema,
@@ -28,6 +29,18 @@ function getFormString(formData: FormData, key: string) {
 
 function redirectWith(pathname: string, key: "notice" | "error", value: string): never {
   redirect(`${pathname}?${key}=${encodeURIComponent(value)}`);
+}
+
+async function requireWritablePermission(permissionKey: string, minimumAccess: "view" | "limited" | "full", redirectTo: string) {
+  const context = await requirePermission(permissionKey, minimumAccess);
+
+  try {
+    await assertWorkspaceWritable(context);
+  } catch (error) {
+    redirectWith(redirectTo, "error", error instanceof Error ? error.message : "Workspace is read-only.");
+  }
+
+  return context;
 }
 
 async function getRequestOrigin() {
@@ -204,7 +217,7 @@ async function logAdminActivity(
 }
 
 export async function inviteUserAction(formData: FormData) {
-  const context = await requirePermission("users.invite", "full");
+  const context = await requireWritablePermission("users.invite", "full", "/admin/invitations");
   const parsed = inviteUserSchema.safeParse({
     email: getFormString(formData, "email"),
     roleId: getFormString(formData, "roleId"),
@@ -298,7 +311,7 @@ export async function inviteUserAction(formData: FormData) {
 }
 
 export async function createCompanyUserAction(formData: FormData) {
-  const context = await requirePermission("users.invite", "full");
+  const context = await requireWritablePermission("users.invite", "full", "/admin/users");
   const parsed = createCompanyUserSchema.safeParse({
     email: getFormString(formData, "email"),
     firstName: getFormString(formData, "firstName"),
@@ -531,7 +544,7 @@ export async function createCompanyUserAction(formData: FormData) {
 }
 
 export async function updateInvitationStatusAction(formData: FormData) {
-  const context = await requirePermission("users.invite", "full");
+  const context = await requireWritablePermission("users.invite", "full", "/admin/invitations");
   const parsed = updateInvitationStatusSchema.safeParse({
     invitationId: getFormString(formData, "invitationId"),
     status: getFormString(formData, "status"),
@@ -559,7 +572,7 @@ export async function updateInvitationStatusAction(formData: FormData) {
 }
 
 export async function updateUserStatusAction(formData: FormData) {
-  const context = await requirePermission("users.disable", "full");
+  const context = await requireWritablePermission("users.disable", "full", "/admin/users");
   const parsed = updateUserStatusSchema.safeParse({
     userId: getFormString(formData, "userId"),
     status: getFormString(formData, "status"),
@@ -597,7 +610,7 @@ export async function updateUserStatusAction(formData: FormData) {
 }
 
 export async function updateUserRoleAction(formData: FormData) {
-  const context = await requirePermission("users.assign_role", "full");
+  const context = await requireWritablePermission("users.assign_role", "full", "/admin/users");
   const parsed = updateUserRoleSchema.safeParse({
     userId: getFormString(formData, "userId"),
     roleId: getFormString(formData, "roleId"),
@@ -636,7 +649,7 @@ export async function updateUserRoleAction(formData: FormData) {
 }
 
 export async function updateUserTeamAction(formData: FormData) {
-  const context = await requirePermission("teams.assign_members", "full");
+  const context = await requireWritablePermission("teams.assign_members", "full", "/admin/users");
   const parsed = updateUserTeamSchema.safeParse({
     userId: getFormString(formData, "userId"),
     teamId: getFormString(formData, "teamId"),
@@ -680,7 +693,7 @@ export async function updateUserTeamAction(formData: FormData) {
 }
 
 export async function resetUserPasswordAction(formData: FormData) {
-  const context = await requirePermission("users.disable", "full");
+  const context = await requireWritablePermission("users.disable", "full", "/admin/users");
   const parsed = resetUserPasswordSchema.safeParse({
     userId: getFormString(formData, "userId"),
     temporaryPassword: getFormString(formData, "temporaryPassword"),
@@ -735,7 +748,7 @@ export async function resetUserPasswordAction(formData: FormData) {
 }
 
 export async function terminateUserAction(formData: FormData) {
-  const context = await requirePermission("users.disable", "full");
+  const context = await requireWritablePermission("users.disable", "full", "/admin/users");
   const parsed = terminateUserSchema.safeParse({
     userId: getFormString(formData, "userId"),
     mode: getFormString(formData, "mode"),

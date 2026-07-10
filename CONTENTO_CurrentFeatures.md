@@ -466,3 +466,21 @@ Created in the final production phase:
 * Dashboard widget customization with user preferences under `/settings/preferences`
 * Expanded audit logging for user management and workflow actions
 * GitHub and Vercel readiness documentation, safe `.env.example`, and temporary file cleanup
+
+## 21. Subscription, Trial, And Manual InstaPay Billing
+
+Status: Implemented
+
+Created in the billing foundation:
+
+* Subscription plan catalog for Starter, Growth, Business, and Enterprise.
+* Pricing in EGP for 1-year, 5-year with 20% discount, and 7-year with 30% discount durations.
+* Organization subscription lifecycle with `trial_pending`, `trial_active`, `grace_period`, `active`, `expired`, `scheduled_deletion`, and `deleted` states.
+* Super Admin organization approval now creates a `trial_pending` subscription; the trial starts only when the owner/Marketing Manager first signs in.
+* Self-onboarding organizations create a pending subscription and start the trial after the owner completes onboarding.
+* Trial expiry moves organizations into read-only grace for 10 Egypt business days, excluding Friday and Saturday.
+* Read-only subscription states block major server-side write actions while preserving dashboard, client, report, calendar, profile, and billing visibility.
+* Marketing Manager billing page at `/settings/billing` with status cards, plan/duration pricing, manual InstaPay instructions, receipt upload, auto-renewal reminder intent, recent receipts, and billing events.
+* Super Admin billing page at `/super-admin/billing` with receipt review, approval/rejection, subscription activation, and expired grace processing.
+* Trial blacklist blocks previously expired billing emails from requesting another public-demo free trial.
+* Billing events log trial, grace, receipt, and activation activity.

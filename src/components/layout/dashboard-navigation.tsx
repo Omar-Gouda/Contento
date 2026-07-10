@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ClipboardList,
   Clock,
+  CreditCard,
   FileBarChart,
   LayoutDashboard,
   Lightbulb,
@@ -251,6 +252,10 @@ function getAccountItems(context: AuthContext): NavigationItem[] {
 
   if (hasPermission(context, "settings.company", "limited")) {
     items.push({ label: "Organization settings", href: routes.settings, icon: Settings, exact: true });
+  }
+
+  if (context.role === "admin" && hasPermission(context, "settings.company", "limited")) {
+    items.push({ label: "Billing", href: routes.billing, icon: CreditCard, exact: true });
   }
 
   return items;
