@@ -34,7 +34,7 @@ export default async function DemoChooseRolePage({
   }
 
   return (
-    <main className="min-h-svh bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.24),transparent_34%),linear-gradient(135deg,var(--background),var(--secondary))] px-4 py-10">
+    <main className="min-h-svh bg-background px-4 py-10">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <div className="flex items-center gap-3">
           <span className="flex size-12 overflow-hidden rounded-2xl bg-primary/10 ring-1 ring-primary/20">
@@ -49,7 +49,7 @@ export default async function DemoChooseRolePage({
 
         <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-sm font-medium text-primary shadow-sm backdrop-blur">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-sm font-medium text-primary shadow-sm">
               <ShieldCheck className="size-4" />
               Temporary sandbox
             </div>
@@ -61,7 +61,7 @@ export default async function DemoChooseRolePage({
               Demo data is isolated and resets when you end the demo.
             </p>
           </div>
-          <Card className="bg-background/75 shadow-xl backdrop-blur">
+          <Card>
             <CardHeader>
               <CardTitle>Demo safety</CardTitle>
               <CardDescription>
@@ -83,7 +83,7 @@ export default async function DemoChooseRolePage({
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {demoRoles.map((demoRole) => (
-            <Card key={demoRole.role} className="bg-background/78 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-xl">
+            <Card key={demoRole.role} className="transition hover:-translate-y-0.5 hover:shadow-lg">
               <CardHeader>
                 <CardTitle>{demoRole.title}</CardTitle>
                 <CardDescription>{demoRole.description}</CardDescription>

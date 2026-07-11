@@ -515,6 +515,56 @@ export type Database = {
         demo_expires_at: string | null;
         created_at: string;
       }>;
+      platform_announcements: Table<{
+        id: string;
+        title: string;
+        message: string;
+        target_type: "all" | "organization";
+        target_company_id: string | null;
+        severity: "info" | "warning" | "critical";
+        status: "draft" | "active" | "archived";
+        starts_at: string;
+        ends_at: string | null;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      platform_support_items: Table<{
+        id: string;
+        type: "organization_request" | "password_reset" | "billing_issue" | "demo_request" | "contact_message" | "other";
+        title: string;
+        description: string;
+        company_id: string | null;
+        requester_email: string | null;
+        source_entity_type: string | null;
+        source_entity_id: string | null;
+        status: "open" | "in_progress" | "resolved" | "closed";
+        priority: "low" | "normal" | "high" | "urgent";
+        assigned_to: string | null;
+        internal_note: string;
+        metadata: Json;
+        created_at: string;
+        updated_at: string;
+        resolved_at: string | null;
+        resolved_by: string | null;
+      }>;
+      platform_events: Table<{
+        id: string;
+        severity: "info" | "warning" | "error" | "critical";
+        source: string;
+        event_type: string;
+        title: string;
+        message: string;
+        company_id: string | null;
+        related_entity_type: string | null;
+        related_entity_id: string | null;
+        status: "open" | "resolved" | "ignored";
+        metadata: Json;
+        created_at: string;
+        resolved_at: string | null;
+        resolved_by: string | null;
+        internal_note: string;
+      }>;
       organization_requests: Table<{
         id: string;
         status: "pending" | "approved" | "rejected" | "archived" | "ready_for_onboarding";
@@ -533,6 +583,9 @@ export type Database = {
         industry: string;
         preferred_contract: "monthly" | "yearly";
         needs_enterprise_pricing: boolean;
+        plan_code: "starter" | "growth" | "business" | "enterprise" | null;
+        duration_years: 1 | 5 | 7 | null;
+        calculated_amount_egp: number | null;
         additional_notes: string;
         source_demo_session_id: string | null;
         source_user_id: string | null;

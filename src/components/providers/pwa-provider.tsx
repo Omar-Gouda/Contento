@@ -16,6 +16,26 @@ export function PwaProvider() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
+      const isLocalDevelopment =
+        process.env.NODE_ENV !== "production" ||
+        ["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(window.location.hostname);
+
+      if (isLocalDevelopment) {
+        void navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+          .catch(() => undefined);
+
+        if ("caches" in window) {
+          void caches
+            .keys()
+            .then((keys) => Promise.all(keys.filter((key) => key.startsWith("contento-")).map((key) => caches.delete(key))))
+            .catch(() => undefined);
+        }
+
+        return;
+      }
+
       window.addEventListener("load", () => {
         void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
       }, { once: true });

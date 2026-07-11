@@ -39,6 +39,16 @@ async function getStarterPlan(admin: BillingClient) {
   return data as SubscriptionPlan | null;
 }
 
+async function getPlanByCode(admin: BillingClient, code: string) {
+  const { data } = await admin
+    .from("subscription_plans")
+    .select("id, code, name, user_limit, yearly_price_egp, is_custom, is_active, created_at")
+    .eq("code", code)
+    .maybeSingle();
+
+  return data as SubscriptionPlan | null;
+}
+
 export async function logBillingEvent(
   admin: BillingClient,
   companyId: string | null,
@@ -102,7 +112,10 @@ async function notifyMarketingManagers(
   );
 }
 
-export async function createTrialPendingSubscription(companyId: string) {
+export async function createTrialPendingSubscription(
+  companyId: string,
+  options: { planCode?: string | null; durationYears?: BillingDurationYears | null } = {}
+) {
   if (!canUseBillingAdmin()) {
     return;
   }
@@ -118,17 +131,23 @@ export async function createTrialPendingSubscription(companyId: string) {
     return;
   }
 
-  const starterPlan = await getStarterPlan(admin);
+  const selectedPlan = options.planCode
+    ? await getPlanByCode(admin, options.planCode)
+    : null;
+  const starterPlan = selectedPlan ?? (await getStarterPlan(admin));
+  const durationYears = options.durationYears ?? 1;
   const { error } = await admin.from("organization_subscriptions").insert({
     company_id: companyId,
     plan_id: starterPlan?.id ?? null,
     status: "trial_pending",
+    duration_years: durationYears,
     payment_method: "instapay_manual",
   });
 
   if (!error) {
     await logBillingEvent(admin, companyId, "billing.trial_pending_created", {
       plan_code: starterPlan?.code ?? "starter",
+      duration_years: durationYears,
     });
   }
 }

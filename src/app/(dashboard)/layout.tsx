@@ -5,13 +5,14 @@ import { requireAuthContext } from "@/lib/auth/context";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getSubscriptionSummary } from "@/lib/billing/service";
 import { getRecentNotifications, getUnreadNotificationCount } from "@/lib/notifications/queries";
+import { getActivePlatformAnnouncements } from "@/lib/platform/announcements";
 import { getCompanyBranding, getUserNotificationPreferences } from "@/lib/settings/queries";
 import { getCurrentUserWorkHours } from "@/lib/work-hours/queries";
 import { isInternalUserRole } from "@/types/roles";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const context = await requireAuthContext();
-  const [unreadNotificationCount, recentNotifications, notificationPreferences, branding, workHours, subscription] = await Promise.all([
+  const [unreadNotificationCount, recentNotifications, notificationPreferences, branding, workHours, subscription, platformAnnouncements] = await Promise.all([
     getUnreadNotificationCount(context),
     getRecentNotifications(context),
     getUserNotificationPreferences(context),
@@ -20,6 +21,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       ? getCurrentUserWorkHours(context).catch(() => null)
       : null,
     getSubscriptionSummary(context.companyId).catch(() => null),
+    getActivePlatformAnnouncements(),
   ]);
 
   return (
@@ -31,6 +33,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       branding={branding}
       workHours={workHours}
       subscription={subscription}
+      platformAnnouncements={platformAnnouncements}
     >
       {children}
     </DashboardShell>

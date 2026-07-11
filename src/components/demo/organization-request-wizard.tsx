@@ -1,19 +1,29 @@
 "use client";
 
-import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, Sparkles, X } from "lucide-react";
 
 import { submitOrganizationRequestAction } from "@/lib/organization-requests/actions";
 import { initialOrganizationRequestState } from "@/lib/organization-requests/state";
+import {
+  calculateOrganizationRequestAmount,
+  formatOrganizationRequestAmount,
+  organizationRequestDurationOptions,
+  organizationRequestPlans,
+  type OrganizationRequestDurationYears,
+  type OrganizationRequestPlanCode,
+} from "@/lib/organization-requests/pricing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 const steps = [
-  { title: "Organization", description: "Tell us who will own the workspace." },
-  { title: "Scale", description: "Help us understand your agency size." },
-  { title: "Purchase", description: "Online purchase is coming soon." },
+  { title: "Organization", description: "Workspace identity and operating location." },
+  { title: "Owner", description: "The Marketing Manager who will own onboarding." },
+  { title: "Plan", description: "Choose the workspace size that fits best." },
+  { title: "Duration", description: "Select the billing term for launch planning." },
+  { title: "Review", description: "Submit for Super Admin review." },
 ] as const;
 
 function Field({
@@ -68,10 +78,18 @@ export function OrganizationRequestWizard({
   onOpenChange: (open: boolean) => void;
 }) {
   const [step, setStep] = useState(0);
+  const [planCode, setPlanCode] = useState<OrganizationRequestPlanCode>("starter");
+  const [durationYears, setDurationYears] = useState<OrganizationRequestDurationYears>(1);
   const [state, formAction, pending] = useActionState(
     submitOrganizationRequestAction,
     initialOrganizationRequestState
   );
+  const selectedPlan = useMemo(
+    () => organizationRequestPlans.find((plan) => plan.code === planCode) ?? organizationRequestPlans[0],
+    [planCode]
+  );
+  const calculatedAmount = calculateOrganizationRequestAmount(planCode, durationYears);
+  const completed = state.success;
 
   useEffect(() => {
     if (!open) {
@@ -92,11 +110,9 @@ export function OrganizationRequestWizard({
     return null;
   }
 
-  const completed = state.success;
-
   return (
     <div
-      className="fixed inset-0 z-[999] grid place-items-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[999] grid place-items-center bg-background/80 p-4 backdrop-blur-md"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
@@ -108,7 +124,7 @@ export function OrganizationRequestWizard({
         role="dialog"
         aria-modal="true"
         aria-labelledby="organization-request-title"
-        className="relative max-h-[92dvh] w-full max-w-4xl overflow-hidden rounded-3xl border bg-background shadow-2xl"
+        className="relative max-h-[92dvh] w-full max-w-5xl overflow-hidden rounded-3xl border bg-background text-foreground shadow-2xl"
       >
         <button
           type="button"
@@ -119,17 +135,17 @@ export function OrganizationRequestWizard({
           <X className="size-4" />
         </button>
 
-        <div className="grid max-h-[92dvh] overflow-y-auto lg:grid-cols-[0.9fr_1.4fr]">
-          <aside className="bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,0.35),_transparent_34%),linear-gradient(135deg,_#0f0b1a,_#1a1626)] p-6 text-white sm:p-8">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium">
+        <div className="grid max-h-[92dvh] overflow-y-auto lg:grid-cols-[0.85fr_1.45fr]">
+          <aside className="border-b bg-card p-6 text-card-foreground sm:p-8 lg:border-b-0 lg:border-r">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <Sparkles className="size-3.5" />
               Contento growth request
             </span>
             <h2 id="organization-request-title" className="mt-6 max-w-sm text-3xl font-semibold tracking-normal">
               Build your own Contento workspace.
             </h2>
-            <p className="mt-3 max-w-sm text-sm leading-6 text-white/70">
-              Submit a request after exploring the demo. A Super Admin can prepare your organization for onboarding while online purchase is being finalized.
+            <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
+              Pick a launch plan after exploring the demo. Online purchase is coming soon, so our team will contact you before any payment starts.
             </p>
             <div className="mt-8 grid gap-3">
               {steps.map((item, index) => (
@@ -138,15 +154,15 @@ export function OrganizationRequestWizard({
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold",
                       index <= step || completed
-                        ? "border-violet-300 bg-violet-500 text-white"
-                        : "border-white/20 bg-white/5 text-white/60"
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-muted text-muted-foreground"
                     )}
                   >
                     {completed || index < step ? <CheckCircle2 className="size-4" /> : index + 1}
                   </span>
                   <span>
                     <span className="block text-sm font-medium">{item.title}</span>
-                    <span className="mt-1 block text-xs leading-5 text-white/55">{item.description}</span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.description}</span>
                   </span>
                 </div>
               ))}
@@ -154,6 +170,12 @@ export function OrganizationRequestWizard({
           </aside>
 
           <form action={formAction} className="p-6 sm:p-8">
+            <input type="hidden" name="planCode" value={planCode} />
+            <input type="hidden" name="durationYears" value={durationYears} />
+            <input type="hidden" name="calculatedAmountEgp" value={calculatedAmount ?? 0} />
+            <input type="hidden" name="preferredContract" value="yearly" />
+            <input type="hidden" name="needsEnterprisePricing" value={planCode === "enterprise" ? "yes" : "no"} />
+
             {completed ? (
               <div className="grid min-h-[26rem] place-items-center text-center">
                 <div>
@@ -162,7 +184,7 @@ export function OrganizationRequestWizard({
                   </span>
                   <h3 className="mt-5 text-2xl font-semibold">Request submitted</h3>
                   <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-                    Your organization request is now pending Super Admin review. Online purchase and subscriptions are coming soon.
+                    Your organization request is pending Super Admin review. Pricing & online purchase are coming soon; our team will contact you.
                   </p>
                   <Button type="button" className="mt-6" onClick={() => onOpenChange(false)}>
                     Got it
@@ -173,7 +195,7 @@ export function OrganizationRequestWizard({
               <>
                 <div className={cn("grid gap-5", step !== 0 && "hidden")}>
                   <div>
-                    <p className="text-sm font-medium text-primary">Step 1 of 3</p>
+                    <p className="text-sm font-medium text-primary">Step 1 of 5</p>
                     <h3 className="mt-1 text-2xl font-semibold">Organization details</h3>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">
                       This request does not create a paid account. It gives the platform team enough context to prepare onboarding.
@@ -186,6 +208,30 @@ export function OrganizationRequestWizard({
                     <Field id="agencyName" label="Agency name">
                       <Input id="agencyName" name="agencyName" />
                     </Field>
+                    <Field id="website" label="Website">
+                      <Input id="website" name="website" placeholder="agency.com" />
+                    </Field>
+                    <Field id="industry" label="Industry">
+                      <Input id="industry" name="industry" placeholder="Marketing, media, creative..." />
+                    </Field>
+                    <Field id="country" label="Country">
+                      <Input id="country" name="country" autoComplete="country-name" />
+                    </Field>
+                    <Field id="city" label="City">
+                      <Input id="city" name="city" autoComplete="address-level2" />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className={cn("grid gap-5", step !== 1 && "hidden")}>
+                  <div>
+                    <p className="text-sm font-medium text-primary">Step 2 of 5</p>
+                    <h3 className="mt-1 text-2xl font-semibold">Owner and scale</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      The owner will become the first Marketing Manager and must change the temporary password on first sign-in.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field id="ownerFullName" label="Owner full name">
                       <Input id="ownerFullName" name="ownerFullName" autoComplete="name" />
                     </Field>
@@ -195,27 +241,6 @@ export function OrganizationRequestWizard({
                     <Field id="phone" label="Phone number">
                       <Input id="phone" name="phone" autoComplete="tel" />
                     </Field>
-                    <Field id="website" label="Website">
-                      <Input id="website" name="website" placeholder="agency.com" />
-                    </Field>
-                  </div>
-                </div>
-
-                <div className={cn("grid gap-5", step !== 1 && "hidden")}>
-                  <div>
-                    <p className="text-sm font-medium text-primary">Step 2 of 3</p>
-                    <h3 className="mt-1 text-2xl font-semibold">Agency scale</h3>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      The workspace will be sized around your expected team, client, and workflow needs.
-                    </p>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field id="country" label="Country">
-                      <Input id="country" name="country" autoComplete="country-name" />
-                    </Field>
-                    <Field id="city" label="City">
-                      <Input id="city" name="city" autoComplete="address-level2" />
-                    </Field>
                     <SelectField id="agencySize" name="agencySize" label="Agency size" defaultValue="2-10">
                       <option value="Solo">Solo</option>
                       <option value="2-10">2-10</option>
@@ -224,9 +249,6 @@ export function OrganizationRequestWizard({
                       <option value="51-100">51-100</option>
                       <option value="100+">100+</option>
                     </SelectField>
-                    <Field id="industry" label="Industry">
-                      <Input id="industry" name="industry" placeholder="Marketing, media, creative..." />
-                    </Field>
                     <Field id="numberOfEmployees" label="Number of employees">
                       <Input id="numberOfEmployees" name="numberOfEmployees" type="number" min="1" defaultValue="5" />
                     </Field>
@@ -241,39 +263,120 @@ export function OrganizationRequestWizard({
 
                 <div className={cn("grid gap-5", step !== 2 && "hidden")}>
                   <div>
-                    <p className="text-sm font-medium text-primary">Step 3 of 3</p>
-                    <h3 className="mt-1 text-2xl font-semibold">Pricing & Online Purchase</h3>
+                    <p className="text-sm font-medium text-primary">Step 3 of 5</p>
+                    <h3 className="mt-1 text-2xl font-semibold">Plan selection</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Select the launch plan you want the Super Admin team to prepare.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {organizationRequestPlans.map((plan) => {
+                      const active = plan.code === planCode;
+
+                      return (
+                        <button
+                          key={plan.code}
+                          type="button"
+                          className={cn(
+                            "rounded-2xl border bg-card p-4 text-left text-card-foreground transition hover:border-primary/60 hover:bg-primary/5",
+                            active && "border-primary bg-primary/10 ring-2 ring-primary/20"
+                          )}
+                          onClick={() => setPlanCode(plan.code)}
+                          aria-pressed={active}
+                        >
+                          <span className="flex items-center justify-between gap-3">
+                            <span className="font-semibold">{plan.name}</span>
+                            {active && <CheckCircle2 className="size-5 text-primary" />}
+                          </span>
+                          <span className="mt-2 block text-sm text-muted-foreground">{plan.description}</span>
+                          <span className="mt-4 block text-sm font-medium">
+                            {plan.userLimit ? `Up to ${plan.userLimit} users` : "Custom users"}
+                          </span>
+                          <span className="mt-1 block text-lg font-semibold">
+                            {plan.yearlyPriceEgp === null ? "Contact Sales" : formatOrganizationRequestAmount(plan.yearlyPriceEgp)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className={cn("grid gap-5", step !== 3 && "hidden")}>
+                  <div>
+                    <p className="text-sm font-medium text-primary">Step 4 of 5</p>
+                    <h3 className="mt-1 text-2xl font-semibold">Duration selection</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      Longer durations unlock launch discounts. Enterprise requests use custom terms.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {organizationRequestDurationOptions.map((duration) => {
+                      const active = duration.years === durationYears;
+
+                      return (
+                        <button
+                          key={duration.years}
+                          type="button"
+                          className={cn(
+                            "rounded-2xl border bg-card p-4 text-left text-card-foreground transition hover:border-primary/60 hover:bg-primary/5",
+                            active && "border-primary bg-primary/10 ring-2 ring-primary/20"
+                          )}
+                          onClick={() => setDurationYears(duration.years)}
+                          aria-pressed={active}
+                        >
+                          <span className="font-semibold">{duration.label}</span>
+                          <span className="mt-2 block text-sm text-muted-foreground">{duration.discountLabel}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-2xl border border-primary/25 bg-primary/10 p-5">
+                    <p className="text-sm font-medium text-primary">Calculated total</p>
+                    <p className="mt-1 text-3xl font-semibold">
+                      {formatOrganizationRequestAmount(calculatedAmount)}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {selectedPlan.code === "enterprise"
+                        ? "Enterprise pricing is custom. Our team will contact you."
+                        : `${selectedPlan.name} for ${durationYears} year${durationYears === 1 ? "" : "s"}, before any taxes or custom onboarding fees.`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className={cn("grid gap-5", step !== 4 && "hidden")}>
+                  <div>
+                    <p className="text-sm font-medium text-primary">Step 5 of 5</p>
+                    <h3 className="mt-1 text-2xl font-semibold">Review and submit</h3>
                     <div className="mt-4 rounded-2xl border border-primary/25 bg-primary/10 p-5">
-                      <p className="text-lg font-semibold">Coming Soon</p>
+                      <p className="text-lg font-semibold">Pricing & online purchase are coming soon.</p>
                       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        We are preparing online subscriptions. Our team will contact you shortly after reviewing your request.
+                        Our team will contact you after review. No money is charged from this demo request.
                       </p>
                     </div>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <SelectField id="preferredContract" name="preferredContract" label="Preferred contract" defaultValue="monthly">
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </SelectField>
-                    <SelectField
-                      id="needsEnterprisePricing"
-                      name="needsEnterprisePricing"
-                      label="Need enterprise pricing?"
-                      defaultValue="no"
-                    >
-                      <option value="no">No</option>
-                      <option value="yes">Yes</option>
-                    </SelectField>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label htmlFor="additionalNotes">Additional notes</Label>
-                      <textarea
-                        id="additionalNotes"
-                        name="additionalNotes"
-                        rows={5}
-                        className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
-                        placeholder="Tell us about workflows, teams, approval needs, or launch timing."
-                      />
-                    </div>
+                  <div className="grid gap-3 rounded-2xl border bg-card p-4 text-sm text-card-foreground sm:grid-cols-3">
+                    <p>
+                      <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan</span>
+                      {selectedPlan.name}
+                    </p>
+                    <p>
+                      <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Duration</span>
+                      {durationYears} year{durationYears === 1 ? "" : "s"}
+                    </p>
+                    <p>
+                      <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</span>
+                      {formatOrganizationRequestAmount(calculatedAmount)}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="additionalNotes">Additional notes</Label>
+                    <textarea
+                      id="additionalNotes"
+                      name="additionalNotes"
+                      rows={5}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+                      placeholder="Tell us about workflows, teams, approval needs, or launch timing."
+                    />
                   </div>
                 </div>
 
@@ -284,17 +387,21 @@ export function OrganizationRequestWizard({
                 )}
 
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-                  <Button type="button" variant="outline" onClick={() => (step === 0 ? onOpenChange(false) : setStep((value) => value - 1))}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => (step === 0 ? onOpenChange(false) : setStep((value) => value - 1))}
+                  >
                     {step === 0 ? "Cancel" : <><ChevronLeft /> Back</>}
                   </Button>
-                  {step < 2 ? (
+                  {step < steps.length - 1 ? (
                     <Button type="button" onClick={() => setStep((value) => value + 1)}>
                       Continue
                       <ChevronRight />
                     </Button>
                   ) : (
                     <Button type="submit" disabled={pending}>
-                      {pending ? "Submitting..." : "Submit Request"}
+                      {pending ? "Submitting..." : "Submit request"}
                     </Button>
                   )}
                 </div>

@@ -52,6 +52,11 @@ export const routes = {
     organizations: "/super-admin/organizations",
     organizationRequests: "/super-admin/organization-requests",
     billing: "/super-admin/billing",
+    trialBlacklist: "/super-admin/trial-blacklist",
+    support: "/super-admin/support",
+    announcements: "/super-admin/announcements",
+    auditLogs: "/super-admin/audit-logs",
+    systemHealth: "/super-admin/system-health",
     organization: (id: string) => `/super-admin/organizations/${id}`,
   },
   dashboards: {

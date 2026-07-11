@@ -208,6 +208,22 @@ async function notifyMarketingManagersOfPasswordResetRequest(email: string, requ
         notified_marketing_manager_count: managerIds.length,
       },
     });
+
+    await admin.from("platform_support_items").insert({
+      type: "password_reset",
+      title: "Password reset requested",
+      description: `${requestedUser.email} requested password recovery from the sign-in flow.`,
+      company_id: requestedUser.company_id,
+      requester_email: requestedUser.email,
+      source_entity_type: "user",
+      source_entity_id: requestedUser.id,
+      status: "open",
+      priority: "normal",
+      metadata: {
+        requested_with_recovery_email: requestedUser.recovery_email?.toLowerCase() === email.toLowerCase(),
+        recovery_email_verified: Boolean(requestedUser.recovery_email_verified_at),
+      },
+    });
   } catch (error) {
     console.warn(
       "Contento internal password reset notification failed",

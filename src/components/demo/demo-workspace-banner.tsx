@@ -342,57 +342,52 @@ export function DemoWorkspaceBanner({ context }: { context: AuthContext }) {
         </div>
       </section>
 
-      <section className="mb-6 overflow-hidden rounded-3xl border border-primary/25 bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,0.22),_transparent_28%),linear-gradient(135deg,_rgba(15,11,26,0.98),_rgba(42,37,64,0.96))] p-5 text-white shadow-xl sm:p-6">
+      <section className="mb-6 overflow-hidden rounded-3xl border border-primary/25 bg-card p-5 text-card-foreground shadow-xl sm:p-6">
         <div className="grid gap-6 lg:grid-cols-[1fr_0.95fr] lg:items-center">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-violet-100">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
               <Sparkles className="size-3.5" />
               Demo progress {progress}%
             </span>
             <h2 className="mt-4 max-w-2xl text-2xl font-semibold tracking-normal sm:text-3xl">
               {ctaReady ? "Ready to build your own organization?" : "Explore Contento with guided sandbox progress."}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/72">
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
               {ctaReady
                 ? "You have explored enough of the sandbox to request a real Contento workspace."
                 : "Try role-scoped pages and safe actions. Progress updates as you visit routes or complete demo workflow actions."}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
               {ctaReady && (
-                <Button type="button" onClick={() => setRequestOpen(true)} className="bg-white text-violet-700 hover:bg-violet-50">
+                <Button type="button" onClick={() => setRequestOpen(true)}>
                   Create my organization
                   <ArrowRight />
                 </Button>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(true)}
-                className="border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white"
-              >
+              <Button type="button" variant="outline" onClick={() => setOpen(true)}>
                 Learn more
               </Button>
             </div>
           </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+          <div className="rounded-2xl border bg-background p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">Demo checklist</p>
-                <p className="mt-1 text-xs text-white/60">Role explored: {roleName}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Role explored: {roleName}</p>
               </div>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 {completed.size}/{checklist.length}
               </span>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-violet-300 to-white transition-all duration-500"
+                className="h-full rounded-full bg-primary transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
             <button
               type="button"
-              className="mt-4 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.08] px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-white/[0.12]"
+              className="mt-4 flex w-full items-center justify-between rounded-xl border bg-background px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted"
               onClick={() => setChecklistOpen((value) => !value)}
               aria-expanded={checklistOpen}
             >
@@ -405,13 +400,13 @@ export function DemoWorkspaceBanner({ context }: { context: AuthContext }) {
                   const done = completed.has(item.id);
 
                   return (
-                    <div key={item.id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.08] px-3 py-2 text-sm">
+                    <div key={item.id} className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-sm">
                       {done ? (
-                        <CheckCircle2 className="size-4 text-emerald-300" />
+                        <CheckCircle2 className="size-4 text-primary" />
                       ) : (
-                        <Circle className="size-4 text-white/35" />
+                        <Circle className="size-4 text-muted-foreground" />
                       )}
-                      <span className={done ? "text-white" : "text-white/65"}>{item.label}</span>
+                      <span className={done ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
                     </div>
                   );
                 })}
@@ -425,7 +420,7 @@ export function DemoWorkspaceBanner({ context }: { context: AuthContext }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-[999] grid place-items-center bg-black/55 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[999] grid place-items-center bg-background/80 p-4 backdrop-blur-sm"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {

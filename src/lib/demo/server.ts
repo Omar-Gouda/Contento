@@ -113,6 +113,8 @@ async function ensureDemoCompany(admin: ReturnType<typeof createSupabaseAdminCli
       throw new Error(`DEMO_COMPANY_UPDATE_FAILED: ${updateError.message}`);
     }
 
+    await ensureDemoCompanySettings(admin, existingCompany.id);
+
     return existingCompany.id;
   }
 
@@ -131,14 +133,18 @@ async function ensureDemoCompany(admin: ReturnType<typeof createSupabaseAdminCli
     throw new Error(`DEMO_COMPANY_INSERT_FAILED: ${error?.message ?? "No company row returned"}`);
   }
 
+  await ensureDemoCompanySettings(admin, company.id);
+
+  return company.id;
+}
+
+async function ensureDemoCompanySettings(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  companyId: string
+) {
   const { error: settingsError } = await admin.from("company_settings").upsert({
-    company_id: company.id,
+    company_id: companyId,
     settings_json: {
-      branding: {
-        primaryColor: "#7c3aed",
-        secondaryColor: "#ede9fe",
-        accentColor: "#a855f7",
-      },
       demo: true,
     },
   });
@@ -146,8 +152,6 @@ async function ensureDemoCompany(admin: ReturnType<typeof createSupabaseAdminCli
   if (settingsError) {
     throw new Error(`DEMO_COMPANY_SETTINGS_FAILED: ${settingsError.message}`);
   }
-
-  return company.id;
 }
 
 async function getRoleId(admin: ReturnType<typeof createSupabaseAdminClient>, companyId: string, role: UserRole) {
