@@ -9,11 +9,16 @@ import {
   ChevronDown,
   ClipboardCheck,
   CreditCard,
+  HeartPulse,
   LayoutDashboard,
   Menu,
+  Megaphone,
   PanelLeftClose,
   PanelLeftOpen,
+  ScrollText,
   ShieldCheck,
+  ShieldX,
+  TicketCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -64,6 +69,18 @@ const platformGroups: PlatformGroup[] = [
       { label: "All organizations", href: routes.superiorAdmin.organizations, icon: Building2 },
       { label: "Organization requests", href: routes.superiorAdmin.organizationRequests, icon: ClipboardCheck },
       { label: "Billing", href: routes.superiorAdmin.billing, icon: CreditCard },
+      { label: "Trial blacklist", href: routes.superiorAdmin.trialBlacklist, icon: ShieldX },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Operations",
+    icon: TicketCheck,
+    items: [
+      { label: "Support inbox", href: routes.superiorAdmin.support, icon: TicketCheck },
+      { label: "Announcements", href: routes.superiorAdmin.announcements, icon: Megaphone },
+      { label: "Audit logs", href: routes.superiorAdmin.auditLogs, icon: ScrollText },
+      { label: "System health", href: routes.superiorAdmin.systemHealth, icon: HeartPulse },
     ],
   },
 ];

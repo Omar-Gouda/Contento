@@ -1,7 +1,8 @@
-const CACHE_NAME = "contento-shell-v3";
+const CACHE_NAME = "contento-shell-v4";
+const OFFLINE_URL = "/offline.html";
+const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 const SHELL_ASSETS = [
-  "/",
-  "/offline.html",
+  OFFLINE_URL,
   "/favicon.ico",
   "/favicon.svg",
   "/brand/contento-mark.svg",
@@ -16,6 +17,56 @@ const SHELL_ASSETS = [
   "/apple-touch-icon.png",
 ];
 
+function isLocalDevelopment() {
+  return LOCAL_HOSTNAMES.has(self.location.hostname);
+}
+
+function isNextOrActionRequest(request, url) {
+  return (
+    url.pathname.startsWith("/_next/") ||
+    url.pathname.startsWith("/api/") ||
+    request.headers.has("Next-Action") ||
+    request.headers.has("Next-Router-State-Tree") ||
+    request.headers.get("RSC") === "1" ||
+    request.headers.get("Accept")?.includes("text/x-component")
+  );
+}
+
+function shouldBypassRequest(request, url) {
+  return (
+    isLocalDevelopment() ||
+    request.method !== "GET" ||
+    url.origin !== self.location.origin ||
+    isNextOrActionRequest(request, url)
+  );
+}
+
+async function fetchNavigation(request) {
+  try {
+    return await fetch(request);
+  } catch {
+    const offline = await caches.match(OFFLINE_URL);
+    return offline || Response.error();
+  }
+}
+
+async function fetchStaticAsset(request) {
+  const cached = await caches.match(request);
+
+  if (cached) {
+    return cached;
+  }
+
+  const response = await fetch(request);
+
+  if (response.status === 200 && response.type === "basic") {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+
+  return response;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)).catch(() => undefined)
@@ -26,7 +77,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      keys.filter((key) => key.startsWith("contento-") && key !== CACHE_NAME).map((key) => caches.delete(key))
     ))
   );
   self.clients.claim();
@@ -34,27 +85,20 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
-
-  if (request.method !== "GET") {
-    return;
-  }
-
   const url = new URL(request.url);
 
-  if (url.origin !== self.location.origin) {
+  if (shouldBypassRequest(request, url)) {
     return;
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match("/offline.html"))
-    );
+    event.respondWith(fetchNavigation(request));
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request))
-  );
+  if (SHELL_ASSETS.includes(url.pathname)) {
+    event.respondWith(fetchStaticAsset(request));
+  }
 });
 
 self.addEventListener("push", (event) => {

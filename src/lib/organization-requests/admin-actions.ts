@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 
@@ -10,6 +11,11 @@ import {
   organizationRequestRejectSchema,
   organizationRequestReviewSchema,
 } from "@/lib/organization-requests/schemas";
+import {
+  encodeOrganizationTemporaryPasswordFlash,
+  ORGANIZATION_TEMP_PASSWORD_FLASH_COOKIE,
+  type OrganizationTemporaryPasswordFlash,
+} from "@/lib/organization-requests/temp-password-flash";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -74,6 +80,50 @@ function generateTemporaryPassword() {
   return `Contento_${symbolPart}_${randomPart}9`;
 }
 
+function isExistingAuthUserError(error: { message?: string } | null | undefined) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return message.includes("already") || message.includes("registered") || message.includes("exists");
+}
+
+async function findAuthUserByEmail(admin: ReturnType<typeof createSupabaseAdminClient>, email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  for (let page = 1; page <= 10; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    const user = data.users.find((candidate) => candidate.email?.toLowerCase() === normalizedEmail);
+
+    if (user) {
+      return { user, error: null };
+    }
+
+    if (data.users.length < 1000) {
+      break;
+    }
+  }
+
+  return { user: null, error: null };
+}
+
+async function setTemporaryPasswordFlash(flash: OrganizationTemporaryPasswordFlash) {
+  const cookieStore = await cookies();
+
+  cookieStore.set(ORGANIZATION_TEMP_PASSWORD_FLASH_COOKIE, encodeOrganizationTemporaryPasswordFlash(flash), {
+    httpOnly: true,
+    maxAge: 300,
+    path: "/super-admin/organization-requests",
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
 function organizationErrorMessage(error: { code?: string; message?: string }) {
   const message = error.message ?? "";
 
@@ -118,6 +168,14 @@ async function logRequestActivity(
   });
 }
 
+export async function clearOrganizationTemporaryPasswordFlashAction() {
+  await requireSuperiorAdminContext();
+  const cookieStore = await cookies();
+  cookieStore.delete(ORGANIZATION_TEMP_PASSWORD_FLASH_COOKIE);
+
+  return { success: true };
+}
+
 export async function approveOrganizationRequestAction(formData: FormData) {
   const context = await requireSuperiorAdminContext();
 
@@ -151,7 +209,31 @@ export async function approveOrganizationRequestAction(formData: FormData) {
 
   const temporaryPassword = generateTemporaryPassword();
   const { firstName, lastName } = splitOwnerName(request.owner_full_name);
-  const { data: authUser, error: createUserError } = await admin.auth.admin.createUser({
+  const [
+    { data: existingProfile, error: existingProfileError },
+    { data: existingPlatformAdmin, error: existingPlatformAdminError },
+  ] = await Promise.all([
+    admin
+      .from("users")
+      .select("id, company_id")
+      .eq("email", request.business_email)
+      .maybeSingle(),
+    admin
+      .from("platform_admins")
+      .select("id")
+      .eq("email", request.business_email)
+      .maybeSingle(),
+  ]);
+
+  if (existingProfileError || existingProfile?.id) {
+    redirectRequests("error", "The owner email already belongs to another Contento workspace.");
+  }
+
+  if (existingPlatformAdminError || existingPlatformAdmin?.id) {
+    redirectRequests("error", "The owner email already belongs to a Super Admin account.");
+  }
+
+  const { data: createdAuthUser, error: createUserError } = await admin.auth.admin.createUser({
     email: request.business_email,
     password: temporaryPassword,
     email_confirm: true,
@@ -163,7 +245,41 @@ export async function approveOrganizationRequestAction(formData: FormData) {
     },
   });
 
-  if (createUserError || !authUser.user) {
+  let ownerAuthUserId = createdAuthUser.user?.id ?? null;
+  let createdNewAuthUser = Boolean(createdAuthUser.user);
+
+  if (createUserError) {
+    if (!isExistingAuthUserError(createUserError)) {
+      redirectRequests("error", createUserError.message ?? "The owner auth account could not be created.");
+    }
+
+    const { user: existingAuthUser, error: findAuthError } = await findAuthUserByEmail(admin, request.business_email);
+
+    if (findAuthError || !existingAuthUser) {
+      redirectRequests("error", "The owner auth account already exists but could not be safely resolved.");
+    }
+
+    const { error: updateExistingAuthError } = await admin.auth.admin.updateUserById(existingAuthUser.id, {
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: {
+        ...existingAuthUser.user_metadata,
+        first_name: firstName,
+        last_name: lastName,
+        contento_role: "organization_admin",
+        organization_request_id: request.id,
+      },
+    });
+
+    if (updateExistingAuthError) {
+      redirectRequests("error", "The existing owner auth account password could not be updated.");
+    }
+
+    ownerAuthUserId = existingAuthUser.id;
+    createdNewAuthUser = false;
+  }
+
+  if (!ownerAuthUserId) {
     redirectRequests("error", createUserError?.message ?? "The owner auth account could not be created.");
   }
 
@@ -172,18 +288,20 @@ export async function approveOrganizationRequestAction(formData: FormData) {
   const { data: companyId, error: organizationError } = await server.rpc("create_organization_with_admin_profile", {
     company_name: request.organization_name,
     company_slug: slug,
-    admin_user_id: authUser.user.id,
+    admin_user_id: ownerAuthUserId,
     admin_email: request.business_email,
     admin_first_name: firstName,
     admin_last_name: lastName,
   });
 
   if (organizationError || !companyId) {
-    await admin.auth.admin.deleteUser(authUser.user.id);
+    if (createdNewAuthUser) {
+      await admin.auth.admin.deleteUser(ownerAuthUserId);
+    }
     redirectRequests("error", organizationError ? organizationErrorMessage(organizationError) : "The organization could not be created.");
   }
 
-  await admin
+  const { error: profileUpdateError } = await admin
     .from("users")
     .update({
       must_change_password: true,
@@ -191,9 +309,13 @@ export async function approveOrganizationRequestAction(formData: FormData) {
       phone: request.phone,
       job_title: "Organization Owner",
     })
-    .eq("id", authUser.user.id);
+    .eq("id", ownerAuthUserId);
 
-  await admin
+  if (profileUpdateError) {
+    redirectRequests("error", "The owner profile was created but could not be marked for password change.");
+  }
+
+  const { error: requestUpdateError } = await admin
     .from("organization_requests")
     .update({
       status: "ready_for_onboarding",
@@ -202,7 +324,7 @@ export async function approveOrganizationRequestAction(formData: FormData) {
       rejection_reason: null,
       archived_at: null,
       approved_company_id: companyId,
-      approved_owner_user_id: authUser.user.id,
+      approved_owner_user_id: ownerAuthUserId,
       temporary_password_generated: true,
       activation_email_placeholder: {
         to: request.business_email,
@@ -211,20 +333,41 @@ export async function approveOrganizationRequestAction(formData: FormData) {
         delivery: "manual_secure_channel",
         temporary_password_generated: true,
         online_purchase: "coming_soon",
+        plan_code: request.plan_code,
+        duration_years: request.duration_years,
+        calculated_amount_egp: request.calculated_amount_egp,
       },
     })
     .eq("id", request.id);
 
-  await createTrialPendingSubscription(companyId);
+  if (requestUpdateError) {
+    redirectRequests("error", "Organization was prepared but the request status could not be updated.");
+  }
+
+  await createTrialPendingSubscription(companyId, {
+    planCode: request.plan_code,
+    durationYears: request.duration_years,
+  });
 
   await logRequestActivity(admin, platformAdminId, "organization_requests.approved", request.id, {
     company_id: companyId,
     company_slug: slug,
-    owner_user_id: authUser.user.id,
+    owner_user_id: ownerAuthUserId,
+    temporary_password_generated: true,
+    requested_plan_code: request.plan_code,
+    requested_duration_years: request.duration_years,
+    requested_amount_egp: request.calculated_amount_egp,
     online_purchase: "coming_soon",
   });
 
-  redirectRequests("notice", "Organization request approved and marked ready for onboarding.");
+  await setTemporaryPasswordFlash({
+    requestId: request.id,
+    email: request.business_email,
+    password: temporaryPassword,
+    createdAt: new Date().toISOString(),
+  });
+
+  redirectRequests("notice", "Organization request approved. Copy the temporary owner password now.");
 }
 
 export async function rejectOrganizationRequestAction(formData: FormData) {

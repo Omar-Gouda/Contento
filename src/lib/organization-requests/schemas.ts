@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  organizationRequestDurationYears,
+  organizationRequestPlanCodes,
+} from "@/lib/organization-requests/pricing";
+
 export const organizationRequestSchema = z.object({
   organizationName: z.string().trim().min(2, "Enter the organization name.").max(120),
   agencyName: z.string().trim().min(2, "Enter the agency name.").max(120),
@@ -17,7 +22,19 @@ export const organizationRequestSchema = z.object({
   preferredContract: z.enum(["monthly", "yearly"], {
     message: "Choose monthly or yearly contract preference.",
   }),
-  needsEnterprisePricing: z.coerce.boolean(),
+  needsEnterprisePricing: z.preprocess(
+    (value) => value === true || value === "true" || value === "yes",
+    z.boolean()
+  ),
+  planCode: z.enum(organizationRequestPlanCodes, {
+    message: "Choose a Contento plan.",
+  }),
+  durationYears: z.coerce.number().int().refine(
+    (value): value is (typeof organizationRequestDurationYears)[number] =>
+      organizationRequestDurationYears.some((years) => years === value),
+    "Choose a valid contract duration."
+  ),
+  calculatedAmountEgp: z.coerce.number().int().min(0).optional(),
   additionalNotes: z.string().trim().max(2000).optional(),
 });
 

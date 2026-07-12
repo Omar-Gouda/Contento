@@ -21,6 +21,7 @@ import {
 import type { AuthContext } from "@/lib/auth/permissions";
 import { isSubscriptionReadOnly, type OrganizationSubscription } from "@/lib/billing/constants";
 import type { NotificationRow } from "@/lib/notifications/queries";
+import type { ActivePlatformAnnouncement } from "@/lib/platform/announcements";
 import type { NotificationPreferences } from "@/lib/settings/queries";
 import type { CurrentWorkHours } from "@/lib/work-hours/queries";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export function DashboardShell({
   branding,
   workHours,
   subscription,
+  platformAnnouncements = [],
 }: {
   children: ReactNode;
   context: AuthContext;
@@ -48,6 +50,7 @@ export function DashboardShell({
   notificationPreferences?: NotificationPreferences;
   workHours?: CurrentWorkHours | null;
   subscription?: OrganizationSubscription | null;
+  platformAnnouncements?: ActivePlatformAnnouncement[];
   branding?: {
     companyName?: string | null;
     logoUrl?: string | null;
@@ -65,10 +68,12 @@ export function DashboardShell({
 
     return window.localStorage.getItem("contento-sidebar-collapsed") === "true";
   });
+  const customBrandingEnabled = !context.isDemo;
+  const logoUrl = customBrandingEnabled ? branding?.logoUrl : null;
   const brandingStyle = {
-    ...(branding?.primaryColor ? { "--primary": branding.primaryColor, "--sidebar-primary": branding.primaryColor } : {}),
-    ...(branding?.secondaryColor ? { "--secondary": branding.secondaryColor, "--sidebar-accent": branding.secondaryColor } : {}),
-    ...(branding?.accentColor ? { "--accent": branding.accentColor } : {}),
+    ...(customBrandingEnabled && branding?.primaryColor ? { "--primary": branding.primaryColor, "--sidebar-primary": branding.primaryColor } : {}),
+    ...(customBrandingEnabled && branding?.secondaryColor ? { "--secondary": branding.secondaryColor, "--sidebar-accent": branding.secondaryColor } : {}),
+    ...(customBrandingEnabled && branding?.accentColor ? { "--accent": branding.accentColor } : {}),
   } as CSSProperties;
   const organizationName = branding?.companyName ?? "Workspace";
   const subscriptionIsReadOnly = isSubscriptionReadOnly(subscription?.status);
@@ -119,9 +124,9 @@ export function DashboardShell({
         <div className="flex shrink-0 items-center justify-between gap-2 px-2">
           <div className={cn("flex min-w-0 items-center gap-2", sidebarCollapsed && "justify-center")}>
             <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 text-sm font-semibold text-primary">
-              {branding?.logoUrl ? (
+              {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
+                <img src={logoUrl} alt="" className="size-full object-cover object-center" />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={contentoMarkSrc} alt="" className="size-full object-cover object-center" />
@@ -181,9 +186,9 @@ export function DashboardShell({
                 <SheetHeader className="border-b px-4 py-4">
                   <SheetTitle className="flex items-center gap-2">
                     <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 text-sm font-semibold text-primary">
-                      {branding?.logoUrl ? (
+                      {logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
+                        <img src={logoUrl} alt="" className="size-full object-cover object-center" />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={contentoMarkSrc} alt="" className="size-full object-cover object-center" />
@@ -212,9 +217,9 @@ export function DashboardShell({
 
             <div className="hidden min-w-0 items-center gap-3 lg:flex">
               <div className="flex size-9 items-center justify-center overflow-hidden rounded-lg border bg-primary/10 text-primary">
-                {branding?.logoUrl ? (
+                {logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={branding.logoUrl} alt="" className="size-full object-cover object-center" />
+                  <img src={logoUrl} alt="" className="size-full object-cover object-center" />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={contentoMarkSrc} alt="" className="size-full object-cover object-center" />
@@ -263,6 +268,17 @@ export function DashboardShell({
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-6">
           {context.isDemo && <DemoWorkspaceBanner context={context} />}
+          {platformAnnouncements.map((announcement) => (
+            <Alert
+              key={announcement.id}
+              variant={announcement.severity === "critical" ? "destructive" : "default"}
+              className="mb-6"
+            >
+              <AlertCircle className="size-4" />
+              <AlertTitle>{announcement.title}</AlertTitle>
+              <AlertDescription>{announcement.message}</AlertDescription>
+            </Alert>
+          ))}
           {billingBanner && !context.isDemo && (
             <Alert variant={subscriptionIsReadOnly ? "destructive" : "default"} className="mb-6">
               <AlertCircle className="size-4" />

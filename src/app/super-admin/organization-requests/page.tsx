@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Archive, CheckCircle2, Trash2, XCircle } from "lucide-react";
 
+import { OrganizationTemporaryPasswordFlash } from "@/components/admin/temporary-password-flash";
 import { PageMessage } from "@/components/admin/page-message";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -19,6 +21,14 @@ import {
   isOrganizationRequestStatus,
   type OrganizationRequestRow,
 } from "@/lib/organization-requests/queries";
+import {
+  formatOrganizationRequestAmount,
+  getOrganizationRequestPlan,
+} from "@/lib/organization-requests/pricing";
+import {
+  decodeOrganizationTemporaryPasswordFlash,
+  ORGANIZATION_TEMP_PASSWORD_FLASH_COOKIE,
+} from "@/lib/organization-requests/temp-password-flash";
 import { formatCairoDateTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
@@ -107,6 +117,14 @@ function RequestActions({ request }: { request: OrganizationRequestRow }) {
 }
 
 function RequestCard({ request }: { request: OrganizationRequestRow }) {
+  const selectedPlan = request.plan_code ? getOrganizationRequestPlan(request.plan_code) : null;
+  const durationLabel = request.duration_years
+    ? `${request.duration_years} year${request.duration_years === 1 ? "" : "s"}`
+    : "Not selected";
+  const amountLabel = request.plan_code === "enterprise"
+    ? "Contact Sales"
+    : formatOrganizationRequestAmount(request.calculated_amount_egp);
+
   return (
     <div className="grid gap-5 rounded-2xl border bg-secondary/25 p-4 lg:grid-cols-[1fr_22rem]">
       <div className="min-w-0">
@@ -143,6 +161,23 @@ function RequestCard({ request }: { request: OrganizationRequestRow }) {
             {formatCairoDateTime(request.submitted_at)}
           </p>
         </div>
+        <div className="mt-4 grid gap-3 rounded-xl border bg-background/70 p-3 text-sm sm:grid-cols-3">
+          <p>
+            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Selected plan</span>
+            {selectedPlan ? `${selectedPlan.name}${selectedPlan.userLimit ? ` - up to ${selectedPlan.userLimit} users` : ""}` : "Not selected"}
+          </p>
+          <p>
+            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Duration</span>
+            {durationLabel}
+          </p>
+          <p>
+            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Calculated total</span>
+            {amountLabel}
+          </p>
+          <p className="text-muted-foreground sm:col-span-3">
+            Pricing & online purchase are coming soon. Our team will contact this organization before payment starts.
+          </p>
+        </div>
         <div className="mt-4 rounded-xl border bg-background/70 p-3 text-sm leading-6 text-muted-foreground">
           {request.additional_notes || "No additional notes."}
         </div>
@@ -172,7 +207,13 @@ export default async function SuperAdminOrganizationRequestsPage({
 }) {
   const params = await searchParams;
   const selectedStatus = isOrganizationRequestStatus(params.status) ? params.status : "";
-  const requests = await getOrganizationRequests(selectedStatus);
+  const [requests, cookieStore] = await Promise.all([
+    getOrganizationRequests(selectedStatus),
+    cookies(),
+  ]);
+  const temporaryPasswordFlash = decodeOrganizationTemporaryPasswordFlash(
+    cookieStore.get(ORGANIZATION_TEMP_PASSWORD_FLASH_COOKIE)?.value
+  );
 
   return (
     <section className="space-y-6">
@@ -190,6 +231,12 @@ export default async function SuperAdminOrganizationRequestsPage({
       </div>
 
       <PageMessage error={params.error} status={params.notice} />
+      {temporaryPasswordFlash && (
+        <OrganizationTemporaryPasswordFlash
+          email={temporaryPasswordFlash.email}
+          password={temporaryPasswordFlash.password}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {filterTabs.map((tab) => (

@@ -26,6 +26,12 @@ type DemoUserProfile = {
   email: string;
   is_demo?: boolean | null;
 };
+type SupabaseLikeError = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
 
 const demoCookieOptions = {
   httpOnly: true,
@@ -37,6 +43,39 @@ const demoCookieOptions = {
 
 function expiresAt() {
   return new Date(Date.now() + DEMO_TTL_MINUTES * 60 * 1000).toISOString();
+}
+
+function readSupabaseError(error: unknown): SupabaseLikeError {
+  if (!error || typeof error !== "object") {
+    return {};
+  }
+
+  const record = error as Record<string, unknown>;
+
+  return {
+    code: typeof record.code === "string" ? record.code : undefined,
+    message: typeof record.message === "string" ? record.message : undefined,
+    details: typeof record.details === "string" ? record.details : undefined,
+    hint: typeof record.hint === "string" ? record.hint : undefined,
+  };
+}
+
+function logDemoSignInFailure(step: string, error?: unknown) {
+  const supabaseError = readSupabaseError(error);
+
+  console.error("demo sign-in failed", {
+    step,
+    code: supabaseError.code,
+    message: supabaseError.message,
+    details: supabaseError.details,
+    hint: supabaseError.hint,
+  });
+}
+
+function throwDemoSignInFailure(step: string, error: unknown, fallbackMessage: string): never {
+  logDemoSignInFailure(step, error);
+  const message = readSupabaseError(error).message ?? fallbackMessage;
+  throw new Error(`${step}: ${message}`);
 }
 
 async function getCookieStore() {
@@ -66,18 +105,27 @@ export async function clearDemoCookies() {
 }
 
 async function findAuthUserIdByEmail(admin: ReturnType<typeof createSupabaseAdminClient>, email: string) {
-  const { data: profile } = await admin
+  const { data: profile, error: profileError } = await admin
     .from("users")
     .select("id")
     .eq("email", email)
     .maybeSingle();
+
+  if (profileError) {
+    throwDemoSignInFailure("demo_profile_auth_lookup", profileError, "Demo profile lookup failed.");
+  }
 
   if (profile?.id) {
     return profile.id;
   }
 
   for (let page = 1; page <= 10; page += 1) {
-    const { data } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+
+    if (error) {
+      throwDemoSignInFailure("demo_auth_list_users", error, "Demo auth user lookup failed.");
+    }
+
     const match = data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
 
     if (match) {
@@ -93,11 +141,15 @@ async function findAuthUserIdByEmail(admin: ReturnType<typeof createSupabaseAdmi
 }
 
 async function ensureDemoCompany(admin: ReturnType<typeof createSupabaseAdminClient>) {
-  const { data: existingCompany } = await admin
+  const { data: existingCompany, error: lookupError } = await admin
     .from("companies")
     .select("id")
     .eq("slug", DEMO_COMPANY_SLUG)
     .maybeSingle();
+
+  if (lookupError) {
+    throwDemoSignInFailure("demo_company_lookup", lookupError, "Demo company lookup failed.");
+  }
 
   if (existingCompany?.id) {
     const { error: updateError } = await admin
@@ -110,8 +162,10 @@ async function ensureDemoCompany(admin: ReturnType<typeof createSupabaseAdminCli
       .eq("id", existingCompany.id);
 
     if (updateError) {
-      throw new Error(`DEMO_COMPANY_UPDATE_FAILED: ${updateError.message}`);
+      throwDemoSignInFailure("demo_company_update", updateError, "Demo company update failed.");
     }
+
+    await ensureDemoCompanySettings(admin, existingCompany.id);
 
     return existingCompany.id;
   }
@@ -128,33 +182,41 @@ async function ensureDemoCompany(admin: ReturnType<typeof createSupabaseAdminCli
     .single();
 
   if (error || !company) {
-    throw new Error(`DEMO_COMPANY_INSERT_FAILED: ${error?.message ?? "No company row returned"}`);
+    throwDemoSignInFailure("demo_company_insert", error, "Demo company insert failed.");
   }
 
-  const { error: settingsError } = await admin.from("company_settings").upsert({
-    company_id: company.id,
-    settings_json: {
-      branding: {
-        primaryColor: "#7c3aed",
-        secondaryColor: "#ede9fe",
-        accentColor: "#a855f7",
-      },
-      demo: true,
-    },
-  });
-
-  if (settingsError) {
-    throw new Error(`DEMO_COMPANY_SETTINGS_FAILED: ${settingsError.message}`);
-  }
+  await ensureDemoCompanySettings(admin, company.id);
 
   return company.id;
 }
 
+async function ensureDemoCompanySettings(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  companyId: string
+) {
+  const { error: settingsError } = await admin
+    .from("company_settings")
+    .upsert({
+      company_id: companyId,
+      settings_json: {
+        demo: true,
+      },
+    }, { onConflict: "company_id" });
+
+  if (settingsError) {
+    throwDemoSignInFailure("demo_company_settings_upsert", settingsError, "Demo company settings update failed.");
+  }
+}
+
 async function getRoleId(admin: ReturnType<typeof createSupabaseAdminClient>, companyId: string, role: UserRole) {
-  const { data: roles } = await admin
+  const { data: roles, error } = await admin
     .from("roles")
     .select("id, name")
     .eq("company_id", companyId);
+
+  if (error) {
+    throwDemoSignInFailure("demo_role_lookup", error, "Demo role lookup failed.");
+  }
 
   const match = ((roles as Array<{ id: string; name: string }> | null) ?? [])
     .find((row) => normalizeRoleName(row.name) === role);
@@ -164,6 +226,7 @@ async function getRoleId(admin: ReturnType<typeof createSupabaseAdminClient>, co
 
 export async function ensurePublicDemoAccount() {
   if (!hasSupabaseAdminConfig()) {
+    logDemoSignInFailure("configuration", { message: "Demo mode requires Supabase admin configuration." });
     throw new Error("Demo mode requires Supabase admin configuration.");
   }
 
@@ -182,7 +245,7 @@ export async function ensurePublicDemoAccount() {
     });
 
     if (error || !data.user) {
-      throw new Error(`DEMO_AUTH_USER_CREATE_FAILED: ${error?.message ?? "No auth user returned"}`);
+      throwDemoSignInFailure("demo_auth_user_create", error, "Demo auth user create failed.");
     }
 
     authUserId = data.user.id;
@@ -196,13 +259,14 @@ export async function ensurePublicDemoAccount() {
     });
 
     if (updateUserError) {
-      throw new Error(`DEMO_AUTH_USER_UPDATE_FAILED: ${updateUserError.message}`);
+      throwDemoSignInFailure("demo_auth_user_update", updateUserError, "Demo auth user update failed.");
     }
   }
 
   const adminRoleId = await getRoleId(admin, companyId, "admin");
 
   if (!adminRoleId) {
+    logDemoSignInFailure("demo_role_lookup", { message: "Demo Marketing Manager role could not be resolved." });
     throw new Error("Demo Marketing Manager role could not be resolved.");
   }
 
@@ -221,13 +285,13 @@ export async function ensurePublicDemoAccount() {
   });
 
   if (profileError) {
-    throw new Error(`DEMO_PROFILE_UPSERT_FAILED: ${profileError.message}`);
+    throwDemoSignInFailure("demo_profile_upsert", profileError, "Demo profile update failed.");
   }
 
   const { error: ownerError } = await admin.from("companies").update({ owner_user_id: authUserId }).eq("id", companyId);
 
   if (ownerError) {
-    throw new Error(`DEMO_COMPANY_OWNER_UPDATE_FAILED: ${ownerError.message}`);
+    throwDemoSignInFailure("demo_company_owner_update", ownerError, "Demo company owner update failed.");
   }
 
   await cleanupExpiredDemoSessions();
@@ -239,9 +303,11 @@ export async function createDemoSessionForCurrentUser(
   const client = supabase ?? await createSupabaseServerClient();
   const {
     data: { user },
+    error: userError,
   } = await client.auth.getUser();
 
-  if (!user) {
+  if (userError || !user) {
+    logDemoSignInFailure("demo_session_auth_user", userError ?? { message: "No authenticated demo user." });
     return null;
   }
 
@@ -263,6 +329,7 @@ export async function createDemoSessionForCurrentUser(
   }
 
   if (!profile?.is_demo) {
+    logDemoSignInFailure("demo_session_profile_not_demo", { message: "Authenticated user is not marked as demo." });
     return null;
   }
 
@@ -283,12 +350,7 @@ export async function createDemoSessionForCurrentUser(
       .maybeSingle();
 
     if (existingSessionError) {
-      console.error("public demo session reuse failed", {
-        code: existingSessionError.code,
-        message: existingSessionError.message,
-        details: existingSessionError.details,
-        hint: existingSessionError.hint,
-      });
+      logDemoSignInFailure("demo_session_reuse", existingSessionError);
     }
 
     if (existingSession?.id) {
@@ -301,12 +363,7 @@ export async function createDemoSessionForCurrentUser(
         .eq("id", profile.id);
 
       if (profileUpdateError) {
-        console.error("public demo profile session update failed", {
-          code: profileUpdateError.code,
-          message: profileUpdateError.message,
-          details: profileUpdateError.details,
-          hint: profileUpdateError.hint,
-        });
+        logDemoSignInFailure("demo_session_profile_update", profileUpdateError);
       }
 
       await setDemoCookies(existingSession.id, null);
@@ -327,12 +384,7 @@ export async function createDemoSessionForCurrentUser(
     .single();
 
   if (error || !session) {
-    console.error("public demo session insert failed", {
-      code: error?.code,
-      message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
-    });
+    logDemoSignInFailure("demo_session_insert", error);
 
     return null;
   }
@@ -346,12 +398,7 @@ export async function createDemoSessionForCurrentUser(
     .eq("id", profile.id);
 
   if (profileUpdateError) {
-    console.error("public demo profile session update failed", {
-      code: profileUpdateError.code,
-      message: profileUpdateError.message,
-      details: profileUpdateError.details,
-      hint: profileUpdateError.hint,
-    });
+    logDemoSignInFailure("demo_session_profile_update", profileUpdateError);
   }
 
   await setDemoCookies(session.id, null);
